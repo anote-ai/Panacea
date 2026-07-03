@@ -11,13 +11,14 @@ from app import create_app  # noqa: E402
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
     return create_app({
         "TESTING": True,
         "JWT_SECRET_KEY": "test-secret",
         "DB_HOST": "localhost",
         "ANTHROPIC_API_KEY": "",
         "STRIPE_SECRET_KEY": "",
+        "CHAT_SESSION_DB_PATH": str(tmp_path / "chat_sessions.sqlite3"),
     })
 
 
