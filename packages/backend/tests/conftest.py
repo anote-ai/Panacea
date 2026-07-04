@@ -11,13 +11,15 @@ from app import create_app  # noqa: E402
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
     return create_app({
         "TESTING": True,
         "JWT_SECRET_KEY": "test-secret",
         "DB_HOST": "localhost",
         "ANTHROPIC_API_KEY": "",
         "STRIPE_SECRET_KEY": "",
+        "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+        "DOCUMENT_METADATA_DB_PATH": str(tmp_path / "documents.sqlite3"),
     })
 
 

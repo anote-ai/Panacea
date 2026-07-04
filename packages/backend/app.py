@@ -35,6 +35,10 @@ def create_app(config: dict | None = None) -> Flask:
         GEMINI_API_KEY=os.environ.get("GEMINI_API_KEY", ""),
         STRIPE_SECRET_KEY=os.environ.get("STRIPE_SECRET_KEY", ""),
         UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER", "/tmp/anote_uploads"),
+        DOCUMENT_METADATA_DB_PATH=os.environ.get(
+            "DOCUMENT_METADATA_DB_PATH",
+            "/tmp/anote_document_metadata.sqlite3",
+        ),
     )
     if config:
         app.config.update(config)
