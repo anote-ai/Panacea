@@ -65,8 +65,39 @@ Component | How it ships
 Web app (`packages/web`) | `deploy-panacea.yml`, on push to `develop`
 Backend (`packages/backend`) | `deploy-panacea.yml`, on push to `develop`
 Cookbook/docs (`packages/docs`) | `deploy-panacea.yml`, on push to `develop`
-CLI, VS Code extension, desktop app | `release.yml`, on `v*` git tags (unchanged, no AWS involved)
-Mobile app | **TODO** — no CI yet; needs an EAS (Expo) build/submit step once App Store/Play Store credentials exist
+CLI (`packages/cli`, npm) | `release.yml`, on `v*` git tags
+TypeScript SDK (`packages/sdk`, npm) | `release.yml`, on `v*` git tags
+Python SDK (`packages/sdk-py`, PyPI `anote-sdk`) | `release.yml`, on `v*` git tags
+VS Code extension | `release.yml`, on `v*` git tags
+Desktop app | `release.yml`, on `v*` git tags, GitHub Releases on `anote-ai/Panacea`
+Mobile app | `release.yml`, on `v*` git tags — builds via EAS; **submit is not automatic yet** (see below)
+
+### Release-track (`release.yml`) secrets
+
+- `NPM_TOKEN` — publishes both the CLI and the TypeScript SDK (two separate
+  npm packages, one token).
+- `PYPI_API_TOKEN` — PyPI API token scoped to the `anote-sdk` project.
+- `VSCE_PAT` — VS Code Marketplace personal access token for the `Anote`
+  publisher.
+- `GITHUB_TOKEN` — provided automatically by Actions; used by
+  `electron-forge publish` to create the desktop app's GitHub Release on
+  this repo (`anote-ai/Panacea` — `packages/desktop/forge.config.js` was
+  previously pointed at the old `Autonomous-Intelligence` repo name, fixed).
+- `EXPO_TOKEN` — Expo access token so `eas build` can run non-interactively
+  in CI.
+
+**Mobile app remaining action item**: `packages/mobile/eas.json`'s
+`submit.production` block is still empty, so `release.yml`'s
+`publish-mobile` job only builds the iOS/Android binaries — it does not
+submit them to the App Store / Play Store. To turn on auto-submit:
+1. Fill in `submit.production.ios` (`appleId`, `ascAppId`, `appleTeamId`)
+   and `submit.production.android` (`serviceAccountKeyPath`, or store the
+   key as an EAS secret) in `eas.json`, per the
+   [EAS submit docs](https://docs.expo.dev/submit/introduction/).
+2. Add `--auto-submit` to the `eas build` command in the `publish-mobile`
+   job.
+This needs your actual Apple Developer / Google Play Console credentials,
+which no amount of pipeline scaffolding can substitute for.
 
 ## Legacy manual deployment (anote.ai / chat.anote.ai)
 
