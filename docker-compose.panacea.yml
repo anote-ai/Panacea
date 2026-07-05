@@ -1,0 +1,25 @@
+version: "3.9"
+
+# Runs only the Panacea backend container on the existing Private Chatbot
+# EC2 instance. Unlike docker-compose.yml (full local dev stack), this
+# assumes MySQL/Redis/Tika are already running on the instance for the
+# existing chatbot product and are reused via the *_HOST env vars below —
+# see terraform/panacea/README.md and DEPLOYMENT.md for the full picture.
+#
+# Lives at the repo root so `.github/workflows/deploy-panacea.yml` can SSH
+# in, `git checkout`, and run `docker compose -f docker-compose.panacea.yml
+# up -d` without any extra setup on the instance beyond a populated
+# `.env.panacea` file (gitignored, created once by hand on the instance).
+
+services:
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${PANACEA_BACKEND_PORT:-5000}:5000"
+    env_file:
+      - .env.panacea
+    environment:
+      APP_ENV: production

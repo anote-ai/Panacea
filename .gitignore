@@ -1,10 +1,10 @@
 # Terraform
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/*.tfvars
-terraform/.terraform.lock.hcl
-terraform/crash.log
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/*.tfvars
+terraform/**/.terraform.lock.hcl
+terraform/**/crash.log
 
 # Node
 node_modules/
@@ -53,4 +53,5 @@ Thumbs.db
 *.key
 .env.local
 .env.production
+.env.panacea
 .claude/worktrees/

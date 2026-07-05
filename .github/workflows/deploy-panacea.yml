@@ -1,0 +1,145 @@
+name: Deploy Panacea
+
+# Continuous deployment for the Panacea product line (web app, backend,
+# cookbook/docs). Pushing to `develop` auto-deploys staging; production is
+# manual via workflow_dispatch. This is separate from `deploy.yml`, which
+# deploys the original anote-ai ECS/Fargate stack.
+#
+# VS Code extension / CLI / desktop app releases are handled by
+# `release.yml` on version tags — unrelated to this workflow.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "packages/web/**"
+      - "packages/backend/**"
+      - "packages/docs/**"
+      - "terraform/panacea/**"
+      - ".github/workflows/deploy-panacea.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: staging
+        type: choice
+        options: [production, staging]
+
+concurrency:
+  group: deploy-panacea-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-backend:
+    name: Deploy backend to EC2
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PANACEA_EC2_HOST }}
+          username: ${{ secrets.PANACEA_EC2_USER }}
+          key: ${{ secrets.PANACEA_EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.PANACEA_EC2_APP_DIR }}
+            git fetch origin
+            git checkout ${{ github.sha }}
+            docker compose -f docker-compose.panacea.yml build backend
+            docker compose -f docker-compose.panacea.yml up -d backend
+            docker image prune -f
+
+  deploy-web:
+    name: Deploy web app to S3/CloudFront
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: deploy-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: packages/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/web
+        run: npm ci
+
+      - name: Build
+        working-directory: packages/web
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync packages/web/dist/ s3://${{ secrets.PANACEA_S3_WEB_BUCKET }} --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" --exclude "*.json"
+          aws s3 cp packages/web/dist/index.html s3://${{ secrets.PANACEA_S3_WEB_BUCKET }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate"
+          aws s3 sync packages/web/dist/ s3://${{ secrets.PANACEA_S3_WEB_BUCKET }} \
+            --exclude "*" --include "*.json" --cache-control "no-cache"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.PANACEA_CLOUDFRONT_WEB_DISTRIBUTION_ID }} --paths "/*"
+
+  deploy-cookbook:
+    name: Deploy cookbook/docs to S3/CloudFront
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install MkDocs
+        run: pip install mkdocs-material
+
+      - name: Build docs
+        working-directory: packages/docs
+        run: mkdocs build --strict
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync packages/docs/site/ s3://${{ secrets.PANACEA_S3_COOKBOOK_BUCKET }} --delete \
+            --cache-control "public, max-age=3600"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.PANACEA_CLOUDFRONT_COOKBOOK_DISTRIBUTION_ID }} --paths "/*"
+
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-web, deploy-cookbook]
+    if: failure()
+    steps:
+      - uses: slackapi/slack-github-action@v1
+        continue-on-error: true
+        with:
+          payload: |
+            {"text": "Panacea deploy FAILED on `${{ github.ref_name }}` — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
