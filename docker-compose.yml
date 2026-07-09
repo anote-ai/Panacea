@@ -17,13 +17,13 @@ services:
 
   redis:
     image: redis:7-alpine
-    restart: always
+    restart: "no"
     ports:
       - "6379:6379"
 
   tika:
     image: apache/tika:latest
-    restart: always
+    restart: "no"
     ports:
       - "9998:9998"
 
@@ -31,7 +31,7 @@ services:
     build:
       context: ./packages/backend
       dockerfile: Dockerfile
-    restart: always
+    restart: "no"
     ports:
       - "5000:5000"
     environment:
@@ -61,6 +61,7 @@ services:
       context: ./packages/web
       dockerfile: Dockerfile
     restart: always
+    restart: "no"
     ports:
       - "3000:3000"
     environment:
