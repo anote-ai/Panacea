@@ -11,6 +11,8 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   createdAt?: string;
+  variants?: string[];
+  activeVariantIndex?: number;
 }
 
 interface Session {
@@ -65,6 +67,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [model, setModel] = useState(MODELS[0]);
   const [streaming, setStreaming] = useState(false);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
@@ -237,6 +240,62 @@ export default function ChatPage() {
     handleFiles(e.dataTransfer.files);
   };
 
+  /** Streams one assistant reply to `userContent`, invoking `onChunk` with the
+   * accumulated text as it grows. Shared by first sends and regenerations. */
+  const streamAssistantReply = async (
+    userContent: string,
+    onChunk: (accumulated: string) => void,
+  ): Promise<void> => {
+    abortRef.current = new AbortController();
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message: userContent,
+        session_id: sessionId,
+        model,
+      }),
+      signal: abortRef.current.signal,
+    });
+
+    if (!res.ok) throw new Error('Stream failed');
+    if (!res.body) throw new Error('No body');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'text' && parsed.text) {
+              accumulated += parsed.text;
+              onChunk(accumulated);
+            }
+            if (parsed.type === 'session_id' && !sessionId) {
+              nav(`/chat/${parsed.session_id}`, { replace: true });
+              loadSessions();
+            }
+          } catch {}
+        }
+      }
+    }
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || streaming) return;
     const userMsg: Message = { role: 'user', content: input.trim() };
@@ -244,65 +303,19 @@ export default function ChatPage() {
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setStreaming(true);
-
-    let assistantContent = '';
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
     try {
-      abortRef.current = new AbortController();
-      const res = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          message: userMsg.content,
-          session_id: sessionId,
-          model,
-        }),
-        signal: abortRef.current.signal,
+      await streamAssistantReply(userMsg.content, (accumulated) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: 'assistant',
+            content: accumulated,
+          };
+          return updated;
+        });
       });
-
-      if (!res.ok) throw new Error('Stream failed');
-      if (!res.body) throw new Error('No body');
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') break;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.type === 'text' && parsed.text) {
-                assistantContent += parsed.text;
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: 'assistant',
-                    content: assistantContent,
-                  };
-                  return updated;
-                });
-              }
-              if (parsed.type === 'session_id' && !sessionId) {
-                nav(`/chat/${parsed.session_id}`, { replace: true });
-                loadSessions();
-              }
-            } catch {}
-          }
-        }
-      }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         setMessages((prev) => {
@@ -319,6 +332,69 @@ export default function ChatPage() {
       abortRef.current = null;
       loadSessions();
     }
+  };
+
+  const regenerateMessage = async (index: number) => {
+    if (streaming) return;
+    const target = messages[index];
+    if (!target || target.role !== 'assistant') return;
+    const userMsg = messages[index - 1];
+    if (!userMsg || userMsg.role !== 'user') return;
+
+    setStreaming(true);
+    setRegeneratingIndex(index);
+
+    let newVariantIndex = 0;
+    setMessages((prev) => {
+      const updated = [...prev];
+      const cur = updated[index];
+      const variants = cur.variants && cur.variants.length ? cur.variants : [cur.content];
+      newVariantIndex = variants.length;
+      updated[index] = {
+        ...cur,
+        variants: [...variants, ''],
+        activeVariantIndex: newVariantIndex,
+        content: '',
+      };
+      return updated;
+    });
+
+    const applyToActiveVariant = (text: string) => {
+      setMessages((prev) => {
+        const updated = [...prev];
+        const cur = updated[index];
+        const variants = [...(cur.variants || [''])];
+        variants[newVariantIndex] = text;
+        updated[index] = { ...cur, variants, content: text };
+        return updated;
+      });
+    };
+
+    try {
+      await streamAssistantReply(userMsg.content, applyToActiveVariant);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        applyToActiveVariant('Sorry, something went wrong. Please try again.');
+      }
+    } finally {
+      setStreaming(false);
+      setRegeneratingIndex(null);
+      abortRef.current = null;
+    }
+  };
+
+  const setVariant = (index: number, variantIndex: number) => {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const cur = updated[index];
+      if (!cur.variants || variantIndex < 0 || variantIndex >= cur.variants.length) return prev;
+      updated[index] = {
+        ...cur,
+        activeVariantIndex: variantIndex,
+        content: cur.variants[variantIndex],
+      };
+      return updated;
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -481,38 +557,117 @@ export default function ChatPage() {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {msg.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[#2F2F2F] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <RocketLogo className="w-5 h-5" />
-                    </div>
-                  )}
+              {messages.map((msg, i) => {
+                const isThisStreaming =
+                  streaming &&
+                  (regeneratingIndex === i ||
+                    (regeneratingIndex === null && i === messages.length - 1));
+                const activeVariantIndex =
+                  msg.activeVariantIndex ?? (msg.variants ? msg.variants.length - 1 : 0);
+                return (
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                      msg.role === 'user'
-                        ? 'bg-gray-100 dark:bg-[#2F2F2F] text-gray-900 dark:text-white'
-                        : 'bg-transparent text-gray-900 dark:text-white'
-                    }`}
+                    key={i}
+                    className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    {msg.role === 'assistant' ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {msg.content ||
-                            (streaming && i === messages.length - 1 ? '▋' : '')}
-                        </ReactMarkdown>
+                    {msg.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[#2F2F2F] flex items-center justify-center flex-shrink-0">
+                        <RocketLogo className="w-5 h-5" />
                       </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap text-sm">
-                        {msg.content}
-                      </p>
                     )}
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 ${
+                        msg.role === 'user'
+                          ? 'py-3 bg-gray-100 dark:bg-[#2F2F2F] text-gray-900 dark:text-white'
+                          : 'py-1.5 bg-transparent text-gray-900 dark:text-white'
+                      }`}
+                    >
+                      {msg.role === 'assistant' ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.content || (isThisStreaming ? '▋' : '')}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap text-sm">
+                          {msg.content}
+                        </p>
+                      )}
+                      {msg.role === 'assistant' && !isThisStreaming && msg.content && (
+                        <div className="flex items-center gap-1 mt-1 -ml-1 text-gray-400 dark:text-gray-500">
+                          <button
+                            onClick={() => regenerateMessage(i)}
+                            disabled={streaming}
+                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            aria-label="Regenerate response"
+                            title="Regenerate response"
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                              />
+                            </svg>
+                          </button>
+                          {msg.variants && msg.variants.length > 1 && (
+                            <div className="flex items-center gap-0.5 text-xs">
+                              <button
+                                onClick={() => setVariant(i, activeVariantIndex - 1)}
+                                disabled={activeVariantIndex === 0}
+                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Previous response"
+                              >
+                                <svg
+                                  className="w-3 h-3"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15 19l-7-7 7-7"
+                                  />
+                                </svg>
+                              </button>
+                              <span className="tabular-nums">
+                                {activeVariantIndex + 1}/{msg.variants.length}
+                              </span>
+                              <button
+                                onClick={() => setVariant(i, activeVariantIndex + 1)}
+                                disabled={activeVariantIndex === msg.variants.length - 1}
+                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Next response"
+                              >
+                                <svg
+                                  className="w-3 h-3"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 5l7 7-7 7"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           )}
