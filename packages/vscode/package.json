@@ -176,6 +176,11 @@
           "default": false,
           "description": "Automatically accept file edits without confirmation"
         },
+        "anote.planMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan mode: Anote researches and proposes a plan without editing files (read-only). Takes precedence over autoEdit when enabled."
+        },
         "anote.serverUrl": {
           "type": "string",
           "default": "",

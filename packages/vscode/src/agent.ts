@@ -103,6 +103,10 @@ export class AnoteAgent {
     return vscode.workspace.getConfiguration("anote").get<boolean>("autoEdit") ?? false;
   }
 
+  private isPlanMode(): boolean {
+    return vscode.workspace.getConfiguration("anote").get<boolean>("planMode") ?? false;
+  }
+
   getCwdForWorkspace(): string {
     const folders = vscode.workspace.workspaceFolders;
     return folders && folders.length > 0 ? folders[0].uri.fsPath : process.cwd();
@@ -167,8 +171,22 @@ export class AnoteAgent {
 
     const options: Options = {
       cwd,
-      allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", ...mcpAllow],
-      permissionMode: this.isAutoEdit() ? "acceptEdits" : "default",
+      allowedTools: [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "WebSearch",
+        "WebFetch",
+        ...mcpAllow,
+      ],
+      permissionMode: this.isPlanMode()
+        ? "plan"
+        : this.isAutoEdit()
+          ? "acceptEdits"
+          : "default",
       systemPrompt,
       maxTurns: this.getMaxTurns(),
       model: getModel(),
