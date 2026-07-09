@@ -113,7 +113,7 @@ export default function ChatPage() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
   };
 
-  const newChat = () => nav('/');
+  const newChat = () => nav('/app');
   const logout = () => {
     setToken(null);
     nav('/login');
@@ -333,7 +333,7 @@ export default function ChatPage() {
     e.preventDefault();
     try {
       await axios.delete(`/api/chat/sessions/${id}`, { headers });
-      if (sessionId === id) nav('/');
+      if (sessionId === id) nav('/app');
       loadSessions();
     } catch {}
   };
