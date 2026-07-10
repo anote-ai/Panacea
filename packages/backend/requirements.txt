@@ -22,7 +22,8 @@ PyPDF2==3.0.1
 bcrypt==4.2.0
 
 # MCP server (document Q&A tools — mcp_server/)
-mcp==1.28.1
+# 1.12.x is the newest line compatible with pydantic==2.9.2 (1.13+ needs >=2.11)
+mcp==1.12.4
 
 # Payments
 stripe==10.12.0

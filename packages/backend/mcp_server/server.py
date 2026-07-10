@@ -4,8 +4,8 @@ Run from packages/backend:
 
     python -m mcp_server.server
 """
-from __future__ import annotations
-
+# No `from __future__ import annotations` here: FastMCP 1.12 inspects tool
+# signatures at runtime and cannot handle string annotations.
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server import core
