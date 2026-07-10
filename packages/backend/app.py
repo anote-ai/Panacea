@@ -14,6 +14,7 @@ from api_endpoints.payments.handler import payments_bp
 from api_endpoints.search.handler import search_bp
 from api_endpoints.user.handler import user_bp
 from api_endpoints.workspaces.handler import workspaces_bp
+from middleware.origin_verify import init_origin_verify
 
 
 def create_app(config: dict | None = None) -> Flask:
@@ -35,12 +36,14 @@ def create_app(config: dict | None = None) -> Flask:
         GEMINI_API_KEY=os.environ.get("GEMINI_API_KEY", ""),
         STRIPE_SECRET_KEY=os.environ.get("STRIPE_SECRET_KEY", ""),
         UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER", "/tmp/anote_uploads"),
+        PANACEA_ORIGIN_VERIFY=os.environ.get("PANACEA_ORIGIN_VERIFY", ""),
     )
     if config:
         app.config.update(config)
 
     CORS(app, resources={r"/*": {"origins": "*"}})
     JWTManager(app)
+    init_origin_verify(app)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
