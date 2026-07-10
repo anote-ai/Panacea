@@ -48,6 +48,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      PERSISTENCE_BACKEND: ${PERSISTENCE_BACKEND:-mysql}
     depends_on:
       - db
       - redis

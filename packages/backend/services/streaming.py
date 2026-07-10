@@ -3,17 +3,24 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 
 
-def _sse(event: str, data: dict) -> str:  # type: ignore[type-arg]
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+def sse_event(event: str, data: dict) -> str:  # type: ignore[type-arg]
+    """Format an SSE event with a client-friendly type field."""
+    payload = {"type": event, **data}
+    return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
+_sse = sse_event
 
 
 def stream_agent_response(
     message: str,
     cwd: str = ".",
     model: str = "claude-sonnet-4-6",
+    history: list[dict] | None = None,  # type: ignore[type-arg]
+    on_text: Callable[[str], None] | None = None,
 ) -> Generator[str, None, None]:
     """Stream an agent response via SSE using the Anthropic SDK."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -26,9 +33,11 @@ def stream_agent_response(
         with client.messages.stream(
             model=model,
             max_tokens=4096,
-            messages=[{"role": "user", "content": message}],  # type: ignore[list-item]
+            messages=[*(history or []), {"role": "user", "content": message}],  # type: ignore[list-item]
         ) as stream:
             for text in stream.text_stream:
+                if on_text:
+                    on_text(text)
                 yield _sse("text", {"text": text})
         yield _sse("done", {})
     except Exception as exc:

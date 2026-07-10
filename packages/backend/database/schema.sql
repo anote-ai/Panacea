@@ -13,12 +13,17 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- user_id NULL = anonymous session (guest chat without login)
 CREATE TABLE IF NOT EXISTS chats (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    user_id     INT NOT NULL,
-    name        VARCHAR(500) DEFAULT 'New Chat',
-    mode        ENUM('chat','document','code') DEFAULT 'chat',
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NULL,
+    name         VARCHAR(500) DEFAULT 'New Chat',
+    mode         ENUM('chat','document','code') DEFAULT 'chat',
+    session_uuid VARCHAR(36) NOT NULL UNIQUE,
+    cwd          VARCHAR(1024) DEFAULT '',
+    model        VARCHAR(100) DEFAULT '',
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -33,13 +38,17 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
 
+-- user_id NULL = anonymous upload (guest usage without login)
 CREATE TABLE IF NOT EXISTS documents (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    user_id     INT NOT NULL,
-    doc_uuid    VARCHAR(36) NOT NULL UNIQUE,
-    filename    VARCHAR(500) NOT NULL,
-    chunk_count INT DEFAULT 0,
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NULL,
+    doc_uuid     VARCHAR(36) NOT NULL UNIQUE,
+    filename     VARCHAR(500) NOT NULL,
+    path         VARCHAR(1024) DEFAULT '',
+    content_type VARCHAR(255) DEFAULT '',
+    chunk_count  INT DEFAULT 0,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
