@@ -21,6 +21,9 @@ PyPDF2==3.0.1
 # Auth
 bcrypt==4.2.0
 
+# MCP server (document Q&A tools — mcp_server/)
+mcp==1.28.1
+
 # Payments
 stripe==10.12.0
 
