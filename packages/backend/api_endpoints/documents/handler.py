@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from services.rag import ingest_document, query_documents
+from services.rag import answer_question, ingest_document
 
 documents_bp = Blueprint("documents", __name__, url_prefix="/api/documents")
 
@@ -95,9 +95,19 @@ def ask_document(doc_id: str) -> tuple:  # type: ignore[type-arg]
     if not question:
         return jsonify({"error": "question is required"}), 400
     model = data.get("model", "claude-sonnet-4-6")
+    top_k = data.get("topK", data.get("top_k", 5))
     try:
-        answer = query_documents(question=question, doc_ids=[doc_id], model=model)
-        return jsonify({"answer": answer, "docId": doc_id}), 200
+        result = answer_question(
+            question=question, doc_ids=[doc_id], model=model, top_k=int(top_k)
+        )
+        return jsonify({
+            "answer": result["answer"],
+            "docId": doc_id,
+            "confidence": result["confidence"],
+            "sources": result["sources"],
+            "lowConfidence": result["low_confidence"],
+            "warning": result["warning"],
+        }), 200
     except Exception as exc:
         print(f"Error answering document question: {exc}")
         return jsonify({"error": "Internal server error"}), 500
