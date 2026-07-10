@@ -1,96 +1,75 @@
 /**
- * @anote-ai/sdk — TypeScript SDK for the Anote REST API v1.
+ * @anote-ai/sdk — TypeScript SDK for the Anote backend REST API.
  *
  * @example
  * ```ts
  * import { AnoteClient } from "@anote-ai/sdk";
  *
- * const client = new AnoteClient({ apiKey: "ant-..." });
+ * const client = new AnoteClient({ apiKey: "<jwt-access-token>" });
  *
- * const { result } = await client.chat("Explain this codebase");
- * console.log(result);
+ * const { response } = await client.chat("Explain this codebase");
+ * console.log(response);
  *
- * const usage = await client.getUsage();
- * console.log(`Used ${usage.current.requestCount} requests this month`);
+ * for await (const chunk of client.chatStream("Explain this codebase")) {
+ *   process.stdout.write(chunk);
+ * }
  * ```
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AnoteClientOptions {
-  /** API key starting with `ant-`. Generate one at your Anote instance → Settings → API Keys. */
+  /** Bearer token (JWT access token from /auth/login) sent as `Authorization: Bearer <token>`. */
   apiKey: string;
   /** Base URL of your Anote server. Defaults to `https://api.anote.ai`. */
   baseUrl?: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface ChatOptions {
-  /** Working directory for file operations on the server. */
-  cwd?: string;
-  /** Claude model to use. */
-  model?: "claude-opus-4-6" | "claude-sonnet-4-6" | "claude-haiku-4-5";
-  /** Tools the AI may use. Default: read-only tools. */
-  tools?: ("Read" | "Write" | "Edit" | "Bash" | "Glob" | "Grep")[];
+  /** Claude model to use. Defaults to the server's default model. */
+  model?: string;
+  /** Prior turns to include as conversation context. */
+  history?: ChatMessage[];
 }
 
 export interface ChatResult {
-  result: string;
-  usage: { inputTokens: number; outputTokens: number };
-}
-
-export interface SessionSummary {
-  sessionId: string;
-  cwd: string;
-  messageCount: number;
-  inputTokens: number;
-  outputTokens: number;
+  response: string;
   model: string;
-  createdAt: number;
-  updatedAt: number;
 }
 
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
-  ts: number;
+export interface ChatStreamOptions {
+  model?: string;
+  /** Working directory for file operations on the server. Defaults to the server's cwd. */
+  cwd?: string;
+}
+
+export interface SessionMessages {
+  sessionId: string;
+  messages: ChatMessage[];
 }
 
 export interface SearchResult {
-  sessionId: string;
-  role: string;
-  snippet: string;
-  ts: number;
+  file: string;
+  startLine: number;
+  endLine: number;
+  preview: string;
+  score: number;
 }
 
-export interface MonthlyUsage {
-  month: string;
-  requestCount: number;
-  inputTokens: number;
-  outputTokens: number;
-  updatedAt: number;
+export interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+  cwd: string;
 }
 
-export interface UsageQuota {
-  plan: "free" | "pro";
-  maxRequests: number;
-  maxInputTokens: number;
-  maxOutputTokens: number;
-}
-
-export interface UsageSummary {
-  current: MonthlyUsage;
-  quota: UsageQuota;
-  remaining: {
-    requests: number | "unlimited";
-    inputTokens: number | "unlimited";
-    outputTokens: number | "unlimited";
-  };
-  history: MonthlyUsage[];
-}
-
-export interface ShareResult {
-  token: string;
-  shareUrl: string;
+export interface HealthResult {
+  status: string;
+  service: string;
 }
 
 // ── Error class ─────────────────────────────────────────────────────────────────────
@@ -115,7 +94,7 @@ export class AnoteClient {
   constructor(options: AnoteClientOptions) {
     if (!options.apiKey) throw new Error("apiKey is required");
     this.apiKey = options.apiKey;
-    this.baseUrl = (options.baseUrl ?? "https://api.anote.ai").replace(/\/$/, "") + "/api/v1";
+    this.baseUrl = (options.baseUrl ?? "https://api.anote.ai").replace(/\/$/, "");
   }
 
   // ── Core HTTP ───────────────────────────────────────────────────────────────────
@@ -124,7 +103,7 @@ export class AnoteClient {
     method: string,
     path: string,
     body?: unknown,
-    params?: Record<string, string | number>,
+    params?: Record<string, string | number | undefined>,
   ): Promise<T> {
     let url = `${this.baseUrl}${path}`;
     if (params) {
@@ -158,59 +137,106 @@ export class AnoteClient {
 
   // ── Chat ────────────────────────────────────────────────────────────────────────
 
-  /**
-   * Send a message to the AI and receive a complete response.
-   * Uses the non-streaming endpoint — best for scripting and automation.
-   */
+  /** Send a message and receive a complete (non-streaming) AI response. */
   async chat(message: string, options: ChatOptions = {}): Promise<ChatResult> {
-    return this.request<ChatResult>("POST", "/chat", {
+    return this.request<ChatResult>("POST", "/api/chat", {
       message,
-      cwd:   options.cwd,
       model: options.model,
-      tools: options.tools,
+      history: options.history,
     });
   }
 
+  /**
+   * Send a message and stream the response as it's generated, yielding text
+   * chunks as they arrive over Server-Sent Events.
+   */
+  async *chatStream(message: string, options: ChatStreamOptions = {}): AsyncGenerator<string> {
+    const res = await fetch(`${this.baseUrl}/api/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "User-Agent": "@anote-ai/sdk/1.0.0",
+      },
+      body: JSON.stringify({ message, model: options.model, cwd: options.cwd }),
+    });
+
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      const msg = (data as { error?: string }).error ?? `HTTP ${res.status}`;
+      throw new AnoteError(msg, res.status, data);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+
+      for (const event of events) {
+        const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+        const eventLine = event.split("\n").find((line) => line.startsWith("event: "));
+        if (!dataLine) continue;
+
+        const eventType = eventLine?.slice("event: ".length) ?? "text";
+        const payload = JSON.parse(dataLine.slice("data: ".length));
+
+        if (eventType === "text" && payload.text) yield payload.text as string;
+        if (eventType === "error") throw new AnoteError(payload.message ?? "stream error", 0, payload);
+      }
+    }
+  }
+
   // ── Sessions ─────────────────────────────────────────────────────────────────────────
+  // Note: sessions are currently just server-side placeholders — creating one
+  // doesn't yet link it to chat()/chatStream() calls.
 
-  /** List all chat sessions on the server. */
-  async listSessions(): Promise<SessionSummary[]> {
-    return this.request<SessionSummary[]>("GET", "/sessions");
+  /** Create a new (empty) chat session. */
+  async createSession(): Promise<{ sessionId: string }> {
+    return this.request("POST", "/api/chat/sessions");
   }
 
-  /** Get the full message history of a session. */
-  async getSessionMessages(sessionId: string): Promise<{ sessionId: string; history: Message[] }> {
-    return this.request("GET", `/sessions/${encodeURIComponent(sessionId)}/messages`);
+  /** List all chat session IDs on the server. */
+  async listSessions(): Promise<string[]> {
+    const data = await this.request<{ sessions: string[] }>("GET", "/api/chat/sessions");
+    return data.sessions;
   }
 
-  /** Delete a session. */
-  async deleteSession(sessionId: string): Promise<{ ok: boolean }> {
-    return this.request("DELETE", `/sessions/${encodeURIComponent(sessionId)}`);
+  /** Get the message history of a session. */
+  async getSessionMessages(sessionId: string): Promise<SessionMessages> {
+    return this.request("GET", `/api/chat/sessions/${encodeURIComponent(sessionId)}`);
   }
 
-  /** Mint a shareable read-only link for a session. */
-  async shareSession(sessionId: string): Promise<ShareResult> {
-    return this.request("POST", `/sessions/${encodeURIComponent(sessionId)}/share`);
+  /** Delete a session. Returns true on success. */
+  async deleteSession(sessionId: string): Promise<boolean> {
+    const data = await this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}`,
+    );
+    return data.deleted;
   }
 
   // ── Search ──────────────────────────────────────────────────────────────────────────
 
-  /** Full-text search across all session histories. */
-  async search(query: string, limit = 20): Promise<{ q: string; results: SearchResult[] }> {
-    return this.request("GET", "/search", undefined, { q: query, limit });
-  }
-
-  // ── Usage & billing ──────────────────────────────────────────────────────────────────────
-
-  /** Get current month usage and remaining quota. */
-  async getUsage(): Promise<UsageSummary> {
-    return this.request<UsageSummary>("GET", "/usage");
+  /** TF-IDF search over the codebase index built by `anote index`. */
+  async search(query: string, options: { cwd?: string; top?: number } = {}): Promise<SearchResponse> {
+    return this.request("GET", "/api/search", undefined, {
+      q: query,
+      cwd: options.cwd,
+      top: options.top,
+    });
   }
 
   // ── Health ─────────────────────────────────────────────────────────────────────────────
 
   /** Check server liveness. Does not require authentication. */
-  async health(): Promise<{ status: string; version: string }> {
+  async health(): Promise<HealthResult> {
     const res = await fetch(`${this.baseUrl}/health`, {
       headers: { "User-Agent": "@anote-ai/sdk/1.0.0" },
     });
