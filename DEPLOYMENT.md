@@ -41,7 +41,9 @@ Panacea's AWS bill under the ≤$100/month target — see
    create `.env.panacea` (gitignored) with the backend's runtime secrets
    (`JWT_SECRET_KEY`, `ANTHROPIC_API_KEY`, DB connection info for whatever
    MySQL/Redis/Tika the instance already runs for the existing chatbot,
-   `PANACEA_ORIGIN_VERIFY` from step 4, etc).
+   `PANACEA_ORIGIN_VERIFY` from step 4, etc). If chat/document persistence
+   lands on a MySQL backend (see #259), also set
+   `PERSISTENCE_BACKEND=mysql` alongside the `DB_*` vars here.
 6. **Set GitHub Actions secrets** (repo Settings → Environments →
    `staging`/`production`):
    - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (shared with

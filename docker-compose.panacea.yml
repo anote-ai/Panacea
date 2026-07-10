@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Runs only the Panacea backend container on the existing Private Chatbot
 # EC2 instance. Unlike docker-compose.yml (full local dev stack), this
 # assumes MySQL/Redis/Tika are already running on the instance for the
