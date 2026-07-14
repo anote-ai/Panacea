@@ -60,7 +60,6 @@ services:
     build:
       context: .
       dockerfile: packages/web/Dockerfile
-    restart: always
     restart: "no"
     ports:
       - "3000:3000"
