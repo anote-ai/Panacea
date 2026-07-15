@@ -349,6 +349,24 @@ def test_stream_agent_with_mock():
             assert any("done" in e for e in events)
 
 
+def test_stream_agent_with_mock_on_text_callback():
+    mock_stream = MagicMock()
+    mock_stream.__enter__ = MagicMock(return_value=mock_stream)
+    mock_stream.__exit__ = MagicMock(return_value=False)
+    mock_stream.text_stream = iter(["Hello", " world"])
+
+    mock_client = MagicMock()
+    mock_client.messages.stream.return_value = mock_stream
+
+    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):
+        with patch("anthropic.Anthropic", return_value=mock_client):
+            import services.streaming as mod
+            reload(mod)
+            collected: list[str] = []
+            list(mod.stream_agent_response("hello", on_text=collected.append))
+            assert collected == ["Hello", " world"]
+
+
 def test_stream_agent_error_path():
     mock_client = MagicMock()
     mock_client.messages.stream.side_effect = RuntimeError("API error")

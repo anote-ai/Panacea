@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 
 from services.llm import get_provider_for_model
 
@@ -14,11 +14,14 @@ _ENV_KEY_FOR_PROVIDER = {
 }
 
 
-def _sse(event: str, data: dict) -> str:  # type: ignore[type-arg]
+def sse_event(event: str, data: dict) -> str:  # type: ignore[type-arg]
     # The frontend reads `type` from the JSON payload itself (it doesn't parse
     # the SSE `event:` line), so every payload must carry it too.
     payload = {"type": event, **data}
     return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
+_sse = sse_event
 
 
 def _require_api_key(provider: str) -> str:
@@ -35,8 +38,13 @@ def stream_agent_response(
     message: str,
     cwd: str = ".",
     model: str = "claude-sonnet-4-6",
+    on_text: Callable[[str], None] | None = None,
 ) -> Generator[str, None, None]:
-    """Stream an agent response via SSE, routed to the provider for `model`."""
+    """Stream an agent response via SSE, routed to the provider for `model`.
+
+    `on_text` is invoked with each text delta as it streams, so callers can
+    accumulate the full reply for persistence without re-parsing SSE frames.
+    """
     provider = get_provider_for_model(model)
     try:
         api_key = _require_api_key(provider)
@@ -53,6 +61,8 @@ def stream_agent_response(
                 messages=[{"role": "user", "content": message}],  # type: ignore[list-item]
             ) as stream:
                 for text in stream.text_stream:
+                    if on_text:
+                        on_text(text)
                     yield _sse("text", {"text": text})
         elif provider == "openai":
             from openai import OpenAI
@@ -66,6 +76,8 @@ def stream_agent_response(
             for chunk in oa_stream:
                 delta = chunk.choices[0].delta.content if chunk.choices else None
                 if delta:
+                    if on_text:
+                        on_text(delta)
                     yield _sse("text", {"text": delta})
         else:
             yield _sse("error", {"message": f"Streaming is not supported for provider '{provider}'"})
