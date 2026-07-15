@@ -541,17 +541,6 @@ export default function ChatPage() {
           >
             ☰
           </button>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="text-sm bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none"
-          >
-            {MODELS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
           <button
             onClick={toggle}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
@@ -791,27 +780,7 @@ export default function ChatPage() {
             onChange={(e) => handleFiles(e.target.files)}
           />
           <div className="max-w-3xl mx-auto">
-            <div className="relative flex items-end bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-2xl border border-gray-300 dark:border-gray-600">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="ml-2 mb-2 p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
-                aria-label="Upload file"
-                title={`Upload file — ${ACCEPTED_LABEL}`}
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                  />
-                </svg>
-              </button>
+            <div className="relative flex flex-col bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-2xl border border-gray-300 dark:border-gray-600">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -822,30 +791,65 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="Message Anote AI..."
                 rows={1}
-                className="flex-1 bg-transparent px-2 py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px]"
+                className="w-full bg-transparent px-4 pt-3.5 pb-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px] resize-none"
               />
-              <button
-                onClick={
-                  streaming ? () => abortRef.current?.abort() : sendMessage
-                }
-                disabled={!streaming && !input.trim()}
-                className="m-2 p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                aria-label={streaming ? 'Stop' : 'Send'}
-              >
-                {streaming ? (
-                  <span className="w-4 h-4 flex items-center justify-center">
-                    ■
-                  </span>
-                ) : (
-                  <svg
-                    className="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
+              <div className="flex items-center justify-between px-2 pb-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
+                    aria-label="Upload file"
+                    title={`Upload file — ${ACCEPTED_LABEL}`}
                   >
-                    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                  </svg>
-                )}
-              </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                      />
+                    </svg>
+                  </button>
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] focus:outline-none transition-colors"
+                  >
+                    {MODELS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={
+                    streaming ? () => abortRef.current?.abort() : sendMessage
+                  }
+                  disabled={!streaming && !input.trim()}
+                  className="p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                  aria-label={streaming ? 'Stop' : 'Send'}
+                >
+                  {streaming ? (
+                    <span className="w-4 h-4 flex items-center justify-center">
+                      ■
+                    </span>
+                  ) : (
+                    <svg
+                      className="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
             <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-2">
               Anote AI can make mistakes. Verify important information.
