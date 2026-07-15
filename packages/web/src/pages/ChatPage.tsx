@@ -23,6 +23,7 @@ interface Session {
 
 interface UploadItem {
   id: string;
+  file: File;
   name: string;
   step: 'uploading' | 'extracting' | 'indexing' | 'done' | 'error';
   pct: number;
@@ -48,13 +49,55 @@ const MAX_FILES = 10;
 const MAX_SIZE_MB = 50;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
-const STEP_LABELS: Record<UploadItem['step'], string> = {
-  uploading: 'Uploading...',
-  extracting: 'Extracting text...',
-  indexing: 'Indexing...',
-  done: 'Ready to chat',
-  error: 'Failed',
-};
+function UploadRing({ step, pct }: { step: UploadItem['step']; pct: number }) {
+  if (step === 'error') {
+    return (
+      <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-500 text-xs font-bold flex items-center justify-center flex-shrink-0">
+        !
+      </span>
+    );
+  }
+  if (step === 'done') {
+    return (
+      <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center flex-shrink-0">
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+    );
+  }
+  const size = 20;
+  const stroke = 2.5;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(100, Math.max(0, pct));
+  const offset = circumference * (1 - clamped / 100);
+  return (
+    <svg width={size} height={size} className="flex-shrink-0 -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={stroke}
+        className="text-gray-200 dark:text-gray-600"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={stroke}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        className="text-gray-900 dark:text-white transition-all duration-300"
+      />
+    </svg>
+  );
+}
 
 export default function ChatPage() {
   const { id: sessionId } = useParams<{ id: string }>();
@@ -78,9 +121,13 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortRefs = useRef<Map<string, AbortController>>(new Map());
   const skipNextLoadRef = useRef(false);
 
   const headers = { Authorization: `Bearer ${token}` };
+  const isUploading = uploads.some(
+    (u) => u.step === 'uploading' || u.step === 'extracting' || u.step === 'indexing',
+  );
 
   const loadSessions = useCallback(async () => {
     try {
@@ -128,44 +175,45 @@ export default function ChatPage() {
     nav('/login');
   };
 
-  const uploadFile = async (file: File) => {
-    const id = crypto.randomUUID();
+  const uploadFile = async (file: File, existingId?: string) => {
+    const id = existingId ?? crypto.randomUUID();
+    const upsert = (item: UploadItem) => {
+      setUploads((prev) =>
+        existingId ? prev.map((u) => (u.id === id ? item : u)) : [...prev, item],
+      );
+    };
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setUploads((prev) => [
-        ...prev,
-        {
-          id,
-          name: file.name,
-          step: 'error',
-          pct: 0,
-          error: `Unsupported type — use ${ACCEPTED_LABEL}`,
-        },
-      ]);
+      upsert({
+        id,
+        file,
+        name: file.name,
+        step: 'error',
+        pct: 0,
+        error: `Unsupported type — use ${ACCEPTED_LABEL}`,
+      });
       return;
     }
 
     if (file.size > MAX_SIZE_BYTES) {
-      setUploads((prev) => [
-        ...prev,
-        {
-          id,
-          name: file.name,
-          step: 'error',
-          pct: 0,
-          error: `File exceeds ${MAX_SIZE_MB}MB limit. Try splitting it into smaller sections.`,
-        },
-      ]);
+      upsert({
+        id,
+        file,
+        name: file.name,
+        step: 'error',
+        pct: 0,
+        error: `File exceeds ${MAX_SIZE_MB}MB limit. Try splitting it into smaller sections.`,
+      });
       return;
     }
 
-    setUploads((prev) => [
-      ...prev,
-      { id, name: file.name, step: 'uploading', pct: 0 },
-    ]);
+    upsert({ id, file, name: file.name, step: 'uploading', pct: 0 });
 
     const form = new FormData();
     form.append('file', file);
+
+    const controller = new AbortController();
+    uploadAbortRefs.current.set(id, controller);
 
     let simulationInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -187,6 +235,7 @@ export default function ChatPage() {
     try {
       await axios.post('/api/documents/upload', form, {
         headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+        signal: controller.signal,
         onUploadProgress: (e) => {
           const pct = e.total ? Math.round((e.loaded / e.total) * 33) : 0;
           setUploads((prev) =>
@@ -206,6 +255,10 @@ export default function ChatPage() {
       );
     } catch (err: any) {
       if (simulationInterval) clearInterval(simulationInterval);
+      if (axios.isCancel(err) || err.code === 'ERR_CANCELED') {
+        setUploads((prev) => prev.filter((u) => u.id !== id));
+        return;
+      }
       const msg =
         err?.response?.data?.error === 'Internal server error'
           ? 'We had trouble reading this file. Try converting it to PDF first.'
@@ -215,12 +268,27 @@ export default function ChatPage() {
           u.id === id ? { ...u, step: 'error', error: msg } : u,
         ),
       );
+    } finally {
+      uploadAbortRefs.current.delete(id);
     }
   };
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).slice(0, MAX_FILES).forEach(uploadFile);
+    Array.from(files)
+      .slice(0, MAX_FILES)
+      .forEach((file) => uploadFile(file));
+  };
+
+  const retryUpload = (id: string) => {
+    const item = uploads.find((u) => u.id === id);
+    if (item) uploadFile(item.file, id);
+  };
+
+  const cancelUpload = (id: string) => {
+    const controller = uploadAbortRefs.current.get(id);
+    if (controller) controller.abort();
+    else setUploads((prev) => prev.filter((u) => u.id !== id));
   };
 
   const onDragEnter = (e: React.DragEvent) => {
@@ -316,7 +384,7 @@ export default function ChatPage() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || streaming) return;
+    if (!input.trim() || streaming || isUploading) return;
     const userMsg: Message = { role: 'user', content: input.trim() };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
@@ -721,88 +789,44 @@ export default function ChatPage() {
 
         {/* Upload progress cards */}
         {uploads.length > 0 && (
-          <div className="px-4 pt-3 max-w-3xl mx-auto w-full space-y-2">
+          <div className="px-4 pt-3 max-w-3xl mx-auto w-full flex flex-wrap gap-2">
             {uploads.map((u) => (
               <div
                 key={u.id}
-                className="bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-4 py-3 flex items-center gap-3"
+                className="group relative w-1/3 min-w-[160px] flex-shrink-0 bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-3 py-2 flex items-center gap-2"
               >
-                <span className="text-lg flex-shrink-0">
-                  {u.step === 'done' ? '✅' : u.step === 'error' ? '❌' : '📄'}
+                <span className="text-base flex-shrink-0">📄</span>
+                <span
+                  className="flex-1 min-w-0 text-xs font-medium truncate text-gray-900 dark:text-white"
+                  title={u.step === 'error' ? u.error : u.name}
+                >
+                  {u.name}
                 </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium truncate text-gray-900 dark:text-white">
-                      {u.name}
-                    </span>
-                    <span
-                      className={`text-xs ml-2 flex-shrink-0 ${
-                        u.step === 'done'
-                          ? 'text-green-500'
-                          : u.step === 'error'
-                            ? 'text-red-500'
-                            : 'text-gray-400 dark:text-gray-500'
-                      }`}
-                    >
-                      {u.step === 'error' ? u.error : STEP_LABELS[u.step]}
-                    </span>
-                  </div>
-                  {u.step !== 'error' && (
-                    <div className="h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          u.step === 'done'
-                            ? 'bg-green-500'
-                            : 'bg-gray-900 dark:bg-white'
-                        }`}
-                        style={{ width: `${u.pct}%` }}
-                      />
-                    </div>
-                  )}
-                  {u.step !== 'error' && u.step !== 'done' && (
-                    <div className="flex gap-4 mt-1.5">
-                      {(['uploading', 'extracting', 'indexing'] as const).map(
-                        (s, i) => {
-                          const steps = [
-                            'uploading',
-                            'extracting',
-                            'indexing',
-                          ] as const;
-                          const currentIdx = steps.indexOf(
-                            u.step as (typeof steps)[number],
-                          );
-                          const done = i < currentIdx;
-                          const active = i === currentIdx;
-                          return (
-                            <span
-                              key={s}
-                              className={`text-xs ${
-                                done
-                                  ? 'text-gray-900 dark:text-white'
-                                  : active
-                                    ? 'text-gray-700 dark:text-gray-300'
-                                    : 'text-gray-300 dark:text-gray-600'
-                              }`}
-                            >
-                              {done ? '✓ ' : ''}
-                              {i + 1}. {s.charAt(0).toUpperCase() + s.slice(1)}
-                            </span>
-                          );
-                        },
-                      )}
-                    </div>
-                  )}
-                </div>
-                {(u.step === 'done' || u.step === 'error') && (
+                {u.step === 'error' ? (
                   <button
-                    onClick={() =>
-                      setUploads((prev) => prev.filter((x) => x.id !== u.id))
-                    }
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs flex-shrink-0"
+                    onClick={() => retryUpload(u.id)}
+                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors"
+                    title="Retry upload"
                   >
-                    ✕
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
                   </button>
+                ) : (
+                  <UploadRing step={u.step} pct={u.pct} />
                 )}
+                <button
+                  onClick={() => cancelUpload(u.id)}
+                  className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 text-white text-[10px] flex items-center justify-center hover:bg-red-500 transition-colors"
+                  title={u.step === 'done' || u.step === 'error' ? 'Dismiss' : 'Cancel upload'}
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>
@@ -870,9 +894,10 @@ export default function ChatPage() {
                   onClick={
                     streaming ? () => abortRef.current?.abort() : sendMessage
                   }
-                  disabled={!streaming && !input.trim()}
+                  disabled={!streaming && (!input.trim() || isUploading)}
                   className="p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                   aria-label={streaming ? 'Stop' : 'Send'}
+                  title={isUploading && !streaming ? 'Waiting for uploads to finish...' : undefined}
                 >
                   {streaming ? (
                     <span className="w-4 h-4 flex items-center justify-center">
