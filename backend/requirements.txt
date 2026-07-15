@@ -1,18 +1,18 @@
 # Core
-Flask==2.0.3
-Flask-Cors==3.0.10
+Flask>=3.0.0
+Flask-Cors>=4.0.0
 mysql-connector-python
-flask-jwt-extended==4.4.4
+flask-jwt-extended>=4.6.0
 python-dateutil
 bcrypt==4.0.1
 boto3
 python-dotenv==1.0.0
 flask_mail
 redis
-Werkzeug==2.2.2
+Werkzeug>=3.0.3,<4
 
 # ML/AI
-numpy==1.24.3
+numpy==1.26.4
 pydantic>=2.6,<3
 pydantic-settings>=2.2,<3
 transformers==4.40.1
@@ -33,6 +33,11 @@ tika==1.24
 PyPDF2==3.0.1
 fpdf==1.7.2
 beautifulsoup4
+requests>=2.32.0
+urllib3>=2.2.2
+certifi>=2024.7.4
+idna>=3.7
+pandas
 
 # External services
 stripe==5.5.0
@@ -43,16 +48,27 @@ flask-socketio>=5.3.6
 anthropic
 sec_api
 pycryptodome==3.20.0
+setuptools>=70.0.0
+tqdm>=4.66.3
+
+# API Docs
+flasgger>=0.9.7
 
 # Dev / test
 pytest
+pytest-cov
+ruff
+mypy
+pre-commit
 mkdocstrings
 mkdocstrings-python
 ratelimit
 
 # DB
-flask-mysql-connector
 mysqlclient
+SQLAlchemy>=2.0.0
+PyMySQL>=1.1.0
+alembic>=1.13.0
 
 # Evaluation
 ragas>=0.2.0

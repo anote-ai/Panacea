@@ -1,4 +1,12 @@
-const API_ENDPOINT = process.env.REACT_APP_BACK_END_HOST;
+const API_ENDPOINT = (process.env.REACT_APP_BACK_END_HOST || "").replace(
+  /\/$/,
+  ""
+);
+
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return API_ENDPOINT ? `${API_ENDPOINT}${normalizedPath}` : normalizedPath;
+}
 
 // Enhanced error types for better error handling
 export const ErrorTypes = {
@@ -72,21 +80,24 @@ function calculateRetryDelay(retryCount) {
 function log(level, message, data = null) {
   if (!FetcherConfig.enableLogging) return;
 
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+  const logContext = {
+    timestamp: new Date().toISOString(),
+    level: String(level).toUpperCase(),
+    message,
+  };
 
   switch (level) {
     case "error":
-      console.error(logMessage, data);
+      console.error("[request-config]", logContext, data);
       break;
     case "warn":
-      console.warn(logMessage, data);
+      console.warn("[request-config]", logContext, data);
       break;
     case "info":
-      console.info(logMessage, data);
+      console.info("[request-config]", logContext, data);
       break;
     default:
-      console.log(logMessage, data);
+      console.log("[request-config]", logContext, data);
   }
 }
 
@@ -154,7 +165,7 @@ export function refreshAccessToken() {
 
   const { controller, timeoutId } = createRequestController();
 
-  return fetch(`${API_ENDPOINT}/refresh`, {
+  return fetch(buildApiUrl("/refresh"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -232,7 +243,7 @@ async function fetcher(url, options = {}, retryCount = 0) {
   const requestId = `req_${Date.now()}_${Math.random()
     .toString(36)}`;
     
-  const fullUrl = `${API_ENDPOINT}/${url}`;
+  const fullUrl = buildApiUrl(url);
 
   // Check if this is a guest mode request
   let isGuest = options.isGuest || false;
@@ -478,6 +489,31 @@ export function put(url, data, options = {}) {
 // Convenience function for DELETE requests
 export function del(url, options = {}) {
   return fetcher(url, { method: "DELETE", ...options });
+}
+
+/**
+ * POST a FormData payload (multipart/form-data).
+ *
+ * Do NOT set Content-Type manually — the browser must set it so it includes
+ * the multipart boundary.  This is the correct way to upload files mixed with
+ * text fields (e.g. chat messages with inline image attachments).
+ *
+ * Usage:
+ *   const form = new FormData();
+ *   form.append("message", "What is in this image?");
+ *   form.append("chat_id", chatId);
+ *   form.append("attachments[]", imageFile);
+ *   await postFormData("process-message-pdf", form);
+ */
+export function postFormData(url, formData, options = {}) {
+  const { headers: extraHeaders, ...rest } = options;
+  // Deliberately omit Content-Type so the browser sets it with the boundary.
+  return fetcher(url, {
+    method: "POST",
+    headers: { ...extraHeaders },
+    body: formData,
+    ...rest,
+  });
 }
 
 // Guest mode convenience functions

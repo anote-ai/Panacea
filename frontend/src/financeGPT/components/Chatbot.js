@@ -3,17 +3,16 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPaperPlane,
   faFile,
+  faImage,
+  faXmark,
   faBrain,
-  faSearch,
-  faCog,
   faCheckCircle,
   faExclamationTriangle,
   faChevronDown,
   faChevronUp,
-  faArrowRight,
-  faInfoCircle,
-  faSitemap,
-  faLightbulb,
+  faShare,
+  faCopy,
+  faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -22,21 +21,53 @@ import {
   createCheckoutSession,
   useUser,
 } from "../../redux/UserSlice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { setChatMessages, selectCachedMessages } from "../../redux/ChatSlice";
 import FileUpload from "../../components/FileUpload";
-import fetcher from "../../http/RequestConfig";
+import fetcher, { postFormData } from "../../http/RequestConfig";
+import ThinkingIndicator from "../chatbot/ThinkingIndicator";
+import {
+  createUploadedDocumentMessages,
+  formatChatMessages,
+  normalizeSources,
+  sortMessagesByTimestamp,
+  updateMessageWithStreamData,
+} from "../chatbot/messageUtils";
+import { useChatbotApi } from "../useChatbotApi";
 
 // Development-only debug logging helper
 const isDev = process.env.NODE_ENV === "development";
 
-const Chatbot = (props) => {
+const Chatbot = ({
+  createNewChat,
+  handleChatSelect,
+  isGuestMode = false,
+  isPrivate,
+  onChatsChanged,
+  onUploadComplete,
+  selectedChatId,
+  processMessagePath = "process-message-pdf",
+  uploadPath = "ingest-pdf",
+  retrieveMessagesPath = "retrieve-messages-from-chat",
+  retrieveDocsPath = "retrieve-current-docs",
+  enableChatNameInference = true,
+  emptyStateTitle = "What can I help you with?",
+  streamResponses = true,
+}) => {
   const [message, setMessage] = useState("");
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const pollingStartedRef = useRef(false);
   const { id } = useParams();
   const dispatch = useDispatch();
+  const cachedMessages = useSelector(selectCachedMessages(id));
   const location = useLocation();
+  const {
+    inferChatName: inferChatNameRequest,
+    retrieveCurrentDocs,
+    retrieveMessages,
+    uploadDocuments,
+  } = useChatbotApi();
   const numCredits = useNumCredits();
   const user = useUser();
   const [chatNameGenerated, setChatNameGenerated] = useState(false);
@@ -48,23 +79,38 @@ const Chatbot = (props) => {
   const [expandedReasoning, setExpandedReasoning] = useState({});
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-  // Streaming mode state - 'agent' or 'non-agent'
-  const [streamingMode, setStreamingMode] = useState(() => {
-    const saved = localStorage.getItem("chatbot-streaming-mode");
-    return saved || "non-agent";
-  });
-
-  // Handle streaming mode change
-  const handleStreamingModeChange = (mode) => {
-    setStreamingMode(mode);
-    localStorage.setItem("chatbot-streaming-mode", mode);
-  };
+  // Inline image attachments staged for the next chat message
+  const [pendingAttachments, setPendingAttachments] = useState([]);
+  const imageInputRef = useRef(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const shouldShowUpgradeModal = () => {
     return user && numCredits === 0 && messages.length > 0 && !showUpgradeModal; // Only if not already shown
+  };
+
+  const handleImageAttachmentPick = (e) => {
+    const files = Array.from(e.target.files || []);
+    const picked = files.map((file) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      name: file.name,
+    }));
+    setPendingAttachments((prev) => [...prev, ...picked]);
+    // Reset input so the same file can be re-selected if removed then re-added
+    e.target.value = "";
+  };
+
+  const removeAttachment = (id) => {
+    setPendingAttachments((prev) => {
+      const removed = prev.find((a) => a.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((a) => a.id !== id);
+    });
   };
 
   const handleFileSelect = (files) => {
@@ -85,7 +131,7 @@ const Chatbot = (props) => {
 
     try {
       // Check if we have a chat ID, if not, create a new chat first
-      let chatId = id || props.selectedChatId;
+      let chatId = id || selectedChatId;
 
       if (!chatId) {
         // For guests, don't create a persistent chat or navigate
@@ -96,7 +142,7 @@ const Chatbot = (props) => {
 
         // Create a new chat first for authenticated users
         try {
-          chatId = await props.createNewChat();
+          chatId = await createNewChat();
           // Navigate to the new chat
           navigate(`/chat/${chatId}`, { id: chatId });
         } catch (err) {
@@ -118,14 +164,8 @@ const Chatbot = (props) => {
       formData.append("chat_id", chatId);
 
       // Upload files using your existing fetcher to ingest-pdf endpoint
-      const response = await fetcher("ingest-pdf", {
-        method: "POST",
-        body: formData,
-        // Don't set Content-Type header for FormData, let browser set it
-      });
-
-      if (response.ok) {
-        const result = await response.json();
+      const result = await uploadDocuments(uploadPath, formData);
+      if (result) {
         console.log("Upload successful:", result);
 
         // Add uploaded files to the state for display
@@ -134,8 +174,6 @@ const Chatbot = (props) => {
           size: fileObj.size,
           uploadTime: new Date().toISOString(),
         }));
-        setUploadedFiles((prev) => [...prev, ...uploadedFileInfo]);
-
         // Add a system message to show files were uploaded
         const systemMessage = {
           id: `upload-${Date.now()}`,
@@ -156,40 +194,54 @@ const Chatbot = (props) => {
         setSelectedFiles([]);
 
         // Optionally trigger a refresh or update
-        if (props.onUploadComplete) {
-          props.onUploadComplete(result);
+        if (onUploadComplete) {
+          onUploadComplete(result);
         }
 
         // Don't show alert since we're showing it in chat
         // alert(`Successfully uploaded ${selectedFiles.length} file(s) to chat`);
-      } else {
-        const errorData = await response.json();
-        console.error("Upload failed:", errorData);
-        alert(errorData.error || "Upload failed. Please try again.");
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Upload failed. Please check your connection and try again.");
+      alert(error?.message || "Upload failed. Please check your connection and try again.");
     }
   };
 
-  const inferChatName = async (text, answer, chatId) => {
+  const inferChatName = useCallback(async (text, answer, chatId) => {
     const combinedText = `${text} ${answer}`;
     try {
-      const response = await fetcher("infer-chat-name", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ messages: combinedText, chat_id: chatId }),
-      });
-      const data = await response.json();
-      props.setCurrChatName(data.chat_name);
-      props.handleForceUpdate();
+      await inferChatNameRequest(combinedText, chatId);
+      onChatsChanged?.();
     } catch (err) {
       console.error("Chat name inference failed", err);
     }
+  }, [inferChatNameRequest, onChatsChanged]);
+
+  const handleShare = async () => {
+    const chatId = id || selectedChatId;
+    if (!chatId) return;
+    setShareLoading(true);
+    setShowShareModal(true);
+    try {
+      const res = await fetcher(`generate-playbook/${chatId}`, { method: "GET" });
+      const data = await res.json();
+      const slug = data.url; // e.g. "/playbook/abc-123"
+      const fullUrl = `${window.location.origin}${slug}`;
+      setShareUrl(fullUrl);
+    } catch (err) {
+      console.error("Failed to generate share URL:", err);
+      setShareUrl("");
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const handleCopyShareUrl = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    });
   };
 
   const pollForMessages = useCallback((chatId, maxAttempts = 3) => {
@@ -198,27 +250,9 @@ const Chatbot = (props) => {
     const poll = async () => {
       attempts++;
       try {
-        const res = await fetcher("retrieve-messages-from-chat", {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ chat_id: chatId, chat_type: 0 }),
-        });
-
-        const data = await res.json();
+        const data = await retrieveMessages("retrieve-messages-from-chat", chatId, 0);
         if (data.messages && data.messages.length > 0) {
-          const formatted = data.messages.map((m) => ({
-            id: m.id,
-            chat_id: chatId,
-            content: m.message_text,
-            role: m.sent_from_user === 1 ? "user" : "assistant",
-            relevant_chunks: m.relevant_chunks,
-            reasoning: m.reasoning || [], // Include reasoning data from database
-            sources: m.sources || [], // Include sources if available
-            timestamp: new Date(m.created).getTime(), // Add timestamp from database
-          }));
+          const formatted = formatChatMessages(data.messages, chatId);
           setMessages(formatted);
           localStorage.removeItem(`pending-message-${chatId}`);
           pollingTimeoutRef.current = null;
@@ -260,162 +294,36 @@ const Chatbot = (props) => {
     };
 
     pollingTimeoutRef.current = setTimeout(poll, 2000);
-  }, []);
+  }, [retrieveMessages]);
 
   // Function to fetch uploaded documents for a chat and create system messages
   const fetchUploadedDocuments = useCallback(async (chatId) => {
     try {
-      const response = await fetcher("retrieve-current-docs", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ chat_id: chatId }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log("Backend doc_info response:", result.doc_info);
-        if (result.doc_info && result.doc_info.length > 0) {
-          // Create system messages for uploaded files
-          const fileSystemMessages = result.doc_info.map((doc, index) => {
-            console.log("Processing doc:", doc);
-            return {
-              id: `file-system-${doc.id}`,
-              chat_id: chatId,
-              role: "system",
-              content: doc.documents
-                ? doc.documents
-                : `📎 Uploaded 1 file(s): ${doc.document_name}`,
-              isFileUpload: true,
-              uploadedFiles: [
-                {
-                  name: doc.document_name,
-                  size: 0, // Size not available from database
-                  uploadTime: doc.created || new Date().toISOString(), // Fallback if created is undefined
-                  id: doc.id,
-                },
-              ],
-              // Use current time so uploaded files appear at current position in chat
-              timestamp: doc.created
-                ? new Date(doc.created).getTime() + index
-                : Date.now() + index,
-            };
-          });
-          console.log(fileSystemMessages);
-          return fileSystemMessages;
-        }
+      const result = await retrieveCurrentDocs(retrieveDocsPath, chatId);
+      console.log("Backend doc_info response:", result.doc_info);
+      if (result.doc_info && result.doc_info.length > 0) {
+        return createUploadedDocumentMessages(result.doc_info, chatId);
       }
     } catch (error) {
       console.error("Error fetching uploaded documents:", error);
     }
     return [];
-  }, []);
+  }, [retrieveCurrentDocs, retrieveDocsPath]);
 
-  const handleLoadChat = useCallback(async () => {
-    if (!id) return;
+  const handleFollowUpClick = useCallback((question) => {
+    const fakeEvent = { preventDefault: () => {} };
+    handleSendMessage(fakeEvent, question);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (!props.selectedChatId) {
-      props.handleChatSelect(id);
-    }
-
-    try {
-      const res = await fetcher("retrieve-messages-from-chat", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ chat_id: id, chat_type: 0 }),
-      });
-
-      const data = await res.json();
-
-      console.log("res", data);
-      props.setCurrChatName(data.chat_name);
-      setChatNameGenerated(true);
-
-      if (!data.messages?.length) {
-        const pending =
-          location.state?.message ||
-          localStorage.getItem(`pending-message-${id}`);
-        if (pending) {
-          console.log(
-            "[handleLoadChat] Loading pending message after new chat creation:",
-            pending
-          );
-          const userMsg = {
-            id: "user-content",
-            chat_id: id,
-            role: "user",
-            content: pending,
-            timestamp: Date.now(),
-          };
-          const thinkingMsg = {
-            id: `thinking-${Date.now()}`,
-            chat_id: id,
-            role: "assistant",
-            content: "",
-            isThinking: true,
-            reasoning: [],
-            sources: [],
-            timestamp: Date.now() + 1,
-          };
-          setMessages([userMsg, thinkingMsg]);
-          if (location.state?.message) {
-            localStorage.setItem(
-              `pending-message-${id}`,
-              location.state.message
-            );
-          }
-          await sendToAPI(pending, id, thinkingMsg.id);
-          return;
-        } else {
-          setMessages([]);
-        }
-        return;
-      }
-
-      localStorage.removeItem(`pending-message-${id}`);
-      const formatted = data.messages.map((m) => ({
-        id: m.id,
-        chat_id: id,
-        content: m.message_text,
-        role: m.sent_from_user === 1 ? "user" : "assistant",
-        relevant_chunks: m.relevant_chunks,
-        reasoning: m.reasoning || [], // Include reasoning data from database
-        sources: m.sources || [], // Include sources if available
-        timestamp: new Date(m.created).getTime(), // Add timestamp from database
-      }));
-
-      // Fetch uploaded documents and create system messages for them
-      const fileSystemMessages = await fetchUploadedDocuments(id);
-
-      // Combine regular messages with file system messages and sort by timestamp
-      const allMessages = [...formatted, ...fileSystemMessages];
-
-      // Sort messages by timestamp
-      allMessages.sort((a, b) => {
-        const aTime = a.timestamp || 0;
-        const bTime = b.timestamp || 0;
-        return aTime - bTime;
-      });
-
-      setMessages(allMessages);
-    } catch (err) {
-      console.error("Failed to load chat:", err);
-    }
-  }, [id, location.state?.message, fetchUploadedDocuments]);
-
-  const handleSendMessage = async (event) => {
+  const handleSendMessage = async (event, overrideText = null) => {
     event.preventDefault();
     console.log(
       "handleSendMessage called for user:",
       user ? "authenticated" : "guest"
     );
 
-    if (!message.trim()) return;
+    if (overrideText === null && !message.trim() && pendingAttachments.length === 0) return;
+    if (overrideText !== null && !overrideText.trim()) return;
 
     // For authenticated users, check credits and deduct them
     if (user) {
@@ -429,15 +337,14 @@ const Chatbot = (props) => {
     }
     // For guests, we skip credit checks and allow them to chat
 
-    const currentMessage = message.trim();
+    const currentMessage = (overrideText !== null ? overrideText : message).trim();
+    const currentAttachments = pendingAttachments;
     setMessage("");
+    setPendingAttachments([]);
 
-    let targetChatId = id;
+    let targetChatId = id || selectedChatId;
 
-    const isNewChat =
-      !id ||
-      window.location.pathname === "/" ||
-      window.location.pathname === "/chat";
+    const isNewChat = !targetChatId;
 
     if (isNewChat) {
       try {
@@ -514,7 +421,7 @@ const Chatbot = (props) => {
         }
         if (user) {
           // For authenticated users, create a real chat and navigate
-          targetChatId = await props.createNewChat();
+          targetChatId = await createNewChat();
           navigate(`/chat/${targetChatId}`, {
             state: { message: currentMessage },
           });
@@ -538,14 +445,6 @@ const Chatbot = (props) => {
           reasoning: [],
           sources: [],
           timestamp: Date.now(),
-          currentStep: {
-            type: "streaming",
-            message:
-              streamingMode === "agent"
-                ? "AI is thinking..."
-                : "Generating response...",
-            streaming_mode: streamingMode,
-          },
         };
 
         setMessages([userMsg, thinkingMsg]);
@@ -573,6 +472,10 @@ const Chatbot = (props) => {
         chat_id: targetChatId,
         role: "user",
         content: currentMessage,
+        attachments: currentAttachments.map((a) => ({
+          previewUrl: a.previewUrl,
+          name: a.name,
+        })),
         timestamp: now,
       },
       {
@@ -583,15 +486,7 @@ const Chatbot = (props) => {
         isThinking: true,
         reasoning: [],
         sources: [],
-        timestamp: now + 1, // Slightly later timestamp for thinking message
-        currentStep: {
-          type: "streaming",
-          message:
-            streamingMode === "agent"
-              ? "AI is thinking..."
-              : "Generating response...",
-          streaming_mode: streamingMode,
-        },
+        timestamp: now + 1,
       },
     ]);
 
@@ -599,73 +494,10 @@ const Chatbot = (props) => {
     if (user) {
       localStorage.setItem(`pending-message-${targetChatId}`, currentMessage);
     }
-    await sendToAPI(currentMessage, targetChatId, thinkingId);
+    await sendToAPI(currentMessage, targetChatId, thinkingId, currentAttachments);
   };
 
-  const sendToAPI = async (text, chatId, thinkingId) => {
-    try {
-      // Check if this is a guest chat
-      const isGuestChat =
-        (typeof chatId === "string" && chatId.startsWith("guest-")) ||
-        (!user && chatId === null); // Also detect guest mode when no user and chatId is null
-
-      if (isDev) {
-        console.log("sendToAPI called with:", {
-          text,
-          chatId,
-          isGuestChat,
-          user: !!user,
-        });
-      }
-
-      const res = await fetcher("process-message-pdf", {
-        method: "POST",
-        isGuest: isGuestChat, // Only set isGuest for actual guest chats
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          chat_id: isGuestChat ? null : Number(chatId), // Send null for guest chats
-          model_type: props.isPrivate,
-          model_key: props.confirmedModelKey,
-          is_guest: isGuestChat, // Flag to indicate guest chat
-          streaming_mode: streamingMode, // Add streaming mode parameter
-        }),
-      });
-
-      if (isDev) {
-        console.log("API response status:", res.status);
-      }
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      await handleSSEStreamingResponse(res, thinkingId, text, chatId);
-
-      // Only remove from localStorage for authenticated user chats
-      if (!isGuestChat) {
-        localStorage.removeItem(`pending-message-${chatId}`);
-      }
-      if (isDev) {
-        console.log("sendToAPI completed successfully");
-      }
-    } catch (err) {
-      console.error("Message send error:", err);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === thinkingId
-            ? {
-                ...msg,
-                content:
-                  "Sorry, I couldn't connect to the server. Please try again.",
-                isThinking: false,
-              }
-            : msg
-        )
-      );
-    }
-  };
-
-  const handleSSEStreamingResponse = async (
+  const handleSSEStreamingResponse = useCallback(async (
     response,
     thinkingId,
     originalText,
@@ -734,11 +566,12 @@ const Chatbot = (props) => {
                   eventData.type === "step-complete") &&
                 eventData.answer &&
                 !chatNameGenerated &&
-                !isGuestChat
+                !isGuestChat &&
+                enableChatNameInference
               ) {
                 await inferChatName(originalText, eventData.answer, chatId);
                 setChatNameGenerated(true);
-                props.handleForceUpdate?.();
+                onChatsChanged?.();
               }
 
               // Force final state update for completion events
@@ -746,6 +579,7 @@ const Chatbot = (props) => {
                 eventData.type === "complete" ||
                 eventData.type === "step-complete"
               ) {
+                const normalizedSources = normalizeSources(eventData.sources);
                 setTimeout(() => {
                   setMessages((prev) =>
                     prev.map((msg) =>
@@ -755,7 +589,14 @@ const Chatbot = (props) => {
                             isThinking: false,
                             currentStep: null,
                             content: eventData.answer || msg.content,
-                            sources: eventData.sources || msg.sources || [],
+                            sources: normalizedSources.length
+                              ? normalizedSources
+                              : msg.sources || [],
+                            charts: [
+                              ...(msg.charts || []),
+                              ...(eventData.charts || []),
+                            ],
+                            suggested_follow_ups: eventData.suggested_follow_ups || [],
                           }
                         : msg
                     )
@@ -782,405 +623,104 @@ const Chatbot = (props) => {
         )
       );
     }
-  };
+  }, [chatNameGenerated, enableChatNameInference, inferChatName, onChatsChanged]);
 
-  const updateMessageWithStreamData = (message, eventData) => {
-    const updatedMessage = { ...message };
+  const sendToAPI = useCallback(async (text, chatId, thinkingId, attachments = []) => {
+    try {
+      const isGuestChat =
+        (typeof chatId === "string" && chatId.startsWith("guest-")) ||
+        (!user && chatId === null);
 
-    console.log("Processing event:", eventData);
+      if (isDev) {
+        console.log("sendToAPI called with:", {
+          text,
+          chatId,
+          isGuestChat,
+          user: !!user,
+          attachments: attachments.length,
+        });
+      }
 
-    switch (eventData.type) {
-      case "tool_start":
-      case "tools_start":
-        // Add reasoning step for tool start
-        const toolStartStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          tool_name: eventData.tool_name,
-          message: `Using ${eventData.tool_name}...`,
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          toolStartStep,
-        ];
-        updatedMessage.currentStep = toolStartStep;
-        break;
+      let res;
+      if (attachments.length > 0) {
+        // Use multipart/form-data so image files travel alongside the message
+        const form = new FormData();
+        form.append("message", text);
+        form.append("chat_id", isGuestChat ? "" : String(Number(chatId)));
+        form.append("model_type", String(isPrivate));
+        form.append("model_key", "");
+        form.append("is_guest", isGuestChat ? "true" : "false");
+        attachments.forEach((a) => form.append("attachments[]", a.file));
+        res = await postFormData("process-message-pdf", form, { isGuest: isGuestChat });
+      } else {
+        res = await fetcher("process-message-pdf", {
+          method: "POST",
+          isGuest: isGuestChat,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            chat_id: isGuestChat ? null : Number(chatId),
+            model_type: isPrivate,
+            model_key: "",
+            is_guest: isGuestChat,
+          }),
+        });
+      }
 
-      case "tool_end":
-        // Update the last tool step with output
-        const reasoningWithOutput = [...(updatedMessage.reasoning || [])];
-        const lastToolIndex = reasoningWithOutput.findLastIndex(
-          (step) => step.type === "tool_start" || step.type === "tools_start"
+      // Revoke object URLs now the request is away
+      attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+
+      if (isDev) {
+        console.log("API response status:", res.status);
+      }
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      if (streamResponses) {
+        await handleSSEStreamingResponse(res, thinkingId, text, chatId);
+      } else {
+        const data = await res.json();
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === thinkingId
+              ? {
+                  ...msg,
+                  content:
+                    data.answer ||
+                    "Sorry, I couldn't generate a response. Please try again.",
+                  isThinking: false,
+                  sources: data.sources || [],
+                  reasoning: data.reasoning || [],
+                  suggested_follow_ups: data.suggested_follow_ups || [],
+                }
+              : msg
+          )
         );
-        if (lastToolIndex !== -1) {
-          reasoningWithOutput[lastToolIndex] = {
-            ...reasoningWithOutput[lastToolIndex],
-            tool_output: eventData.output,
-            message: "Tool execution completed",
-          };
-        }
-        updatedMessage.reasoning = reasoningWithOutput;
-        updatedMessage.currentStep = {
-          type: "tool_end",
-          message: "Tool execution completed",
-        };
-        break;
+      }
 
-      case "agent_thinking":
-        // Add thinking step
-        const thinkingStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          agent_thought: eventData.thought,
-          planned_action: eventData.action,
-          message: "Planning next step...",
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          thinkingStep,
-        ];
-        updatedMessage.currentStep = thinkingStep;
-        break;
-
-      case "complete":
-        // Set final answer and sources
-        updatedMessage.content = eventData.answer || "";
-        updatedMessage.sources = eventData.sources || [];
-        updatedMessage.isThinking = false;
-        updatedMessage.currentStep = null;
-
-        // Add completion step to reasoning
-        const completeStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          thought: eventData.thought,
-          message: "Response complete",
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          completeStep,
-        ];
-        break;
-
-      case "content":
-        // Handle non-agent streaming content
-        if (eventData.streaming_mode === "non-agent") {
-          // For non-agent mode, append content directly
-          updatedMessage.content =
-            (updatedMessage.content || "") + (eventData.content || "");
-          updatedMessage.isThinking = true; // Keep thinking until done
-          updatedMessage.currentStep = {
-            type: "streaming",
-            message: "Generating response...",
-            streaming_mode: "non-agent",
-          };
-        }
-        break;
-
-      case "done":
-        // Handle completion for both agent and non-agent modes
-        if (eventData.streaming_mode === "non-agent") {
-          updatedMessage.isThinking = false;
-          updatedMessage.currentStep = null;
-        }
-        break;
-      case "step-complete":
-        // Set final answer and sources
-        updatedMessage.content = eventData.answer || "";
-        updatedMessage.sources = eventData.sources || [];
-        updatedMessage.isThinking = false;
-        updatedMessage.currentStep = null;
-
-        // Add completion step to reasoning
-        const StepComplete = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          thought: eventData.thought,
-          message: "Query processing completed",
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          StepComplete,
-        ];
-        break;
-
-      // Multi-agent system event types
-      case "agent_start":
-        const agentStartStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          agent_name: eventData.agent_name,
-          message: eventData.message || `${eventData.agent_name} started`,
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          agentStartStep,
-        ];
-        updatedMessage.currentStep = agentStartStep;
-        break;
-
-      case "agent_progress":
-        const progressStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          current_agent: eventData.current_agent,
-          completed_agents: eventData.completed_agents,
-          message: eventData.message || `${eventData.current_agent} completed`,
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          progressStep,
-        ];
-        break;
-
-      case "agent_reasoning":
-        const reasoningStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          agent_name: eventData.agent_name,
-          reasoning: eventData.reasoning,
-          message: `${eventData.agent_name} reasoning`,
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          reasoningStep,
-        ];
-        break;
-
-      case "agent_tool_use":
-        const agentToolStep = {
-          id: `step-${Date.now()}`,
-          type: eventData.type,
-          agent_name: eventData.agent_name,
-          tool_name: eventData.tool_name,
-          input: eventData.input,
-          message:
-            eventData.message ||
-            `${eventData.agent_name} using ${eventData.tool_name}`,
-          timestamp: Date.now(),
-        };
-        updatedMessage.reasoning = [
-          ...(updatedMessage.reasoning || []),
-          agentToolStep,
-        ];
-        break;
-
-      case "agent_tool_complete":
-        // Update the last agent tool step with output
-        const agentReasoningWithOutput = [...(updatedMessage.reasoning || [])];
-        const lastAgentToolIndex = agentReasoningWithOutput.findLastIndex(
-          (step) => step.type === "agent_tool_use"
-        );
-        if (lastAgentToolIndex !== -1) {
-          agentReasoningWithOutput[lastAgentToolIndex] = {
-            ...agentReasoningWithOutput[lastAgentToolIndex],
-            tool_output: eventData.output,
-            message: eventData.message || "Agent tool execution completed",
-          };
-        }
-        updatedMessage.reasoning = agentReasoningWithOutput;
-        break;
-
-      case "reasoning_step":
-        // Add reasoning step from multi-agent system
-        if (eventData.step) {
-          updatedMessage.reasoning = [
-            ...(updatedMessage.reasoning || []),
-            eventData.step,
-          ];
-        }
-        break;
-
-      default:
-        console.warn("Unhandled event type:", eventData.type);
+      if (!isGuestChat) {
+        localStorage.removeItem(`pending-message-${chatId}`);
+      }
+      if (isDev) {
+        console.log("sendToAPI completed successfully");
+      }
+    } catch (err) {
+      console.error("Message send error:", err);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === thinkingId
+            ? {
+                ...msg,
+                content:
+                  "Sorry, I couldn't connect to the server. Please try again.",
+                isThinking: false,
+              }
+            : msg
+        )
+      );
     }
-
-    return updatedMessage;
-  };
-
-  // Component for displaying thinking steps
-  const ThinkingIndicator = ({ step }) => {
-    const getStepIcon = (type) => {
-      switch (type) {
-        case "llm_reasoning":
-          return <FontAwesomeIcon icon={faBrain} className="text-accent" />;
-        case "tool_start":
-        case "tools_start":
-        case "tool_end":
-          return <FontAwesomeIcon icon={faSearch} className="text-accent" />;
-        case "agent_thinking":
-          return <FontAwesomeIcon icon={faCog} className="text-accent" />;
-        case "complete":
-        case "step-complete":
-          return (
-            <FontAwesomeIcon icon={faCheckCircle} className="text-accent" />
-          );
-        // Multi-agent system icons
-        case "agent_start":
-          return <FontAwesomeIcon icon={faCog} className="text-accent" />;
-        case "agent_progress":
-          return (
-            <FontAwesomeIcon icon={faArrowRight} className="text-accent" />
-          );
-        case "agent_reasoning":
-          return <FontAwesomeIcon icon={faBrain} className="text-accent" />;
-        case "agent_tool_use":
-        case "agent_tool_complete":
-          return <FontAwesomeIcon icon={faSearch} className="text-accent" />;
-        case "agent_completion":
-        case "agent_error":
-          return (
-            <FontAwesomeIcon icon={faInfoCircle} className="text-accent" />
-          );
-        case "orchestrator_decision":
-        case "orchestrator_synthesis":
-          return <FontAwesomeIcon icon={faSitemap} className="text-accent" />;
-        case "reasoning_step":
-          return <FontAwesomeIcon icon={faLightbulb} className="text-accent" />;
-        default:
-          return <FontAwesomeIcon icon={faCog} className="text-accent" />;
-      }
-    };
-    console.log("stepsss", step);
-    const getStepColor = (type) => {
-      switch (type) {
-        case "llm_reasoning":
-          return "border-l-accent bg-accent/10";
-        case "tool_start":
-        case "tools_start":
-        case "tool_end":
-          return "border-l-accent bg-accent/10";
-        case "agent_thinking":
-          return "border-l-accent bg-accent/10";
-        case "complete":
-        case "step-complete":
-          return "border-l-accent bg-accent/20";
-        // Multi-agent system colors
-        case "agent_start":
-          return "border-l-accent bg-accent/10";
-        case "agent_progress":
-          return "border-l-accent bg-accent/10";
-        case "agent_reasoning":
-          return "border-l-accent bg-accent/10";
-        case "agent_tool_use":
-        case "agent_tool_complete":
-          return "border-l-accent bg-accent/10";
-        case "agent_completion":
-          return "border-l-accent bg-accent/10";
-        case "agent_error":
-          return "border-l-red-400 bg-red-950/20";
-        case "orchestrator_decision":
-        case "orchestrator_synthesis":
-          return "border-l-accent bg-accent/10";
-        case "reasoning_step":
-          return "border-l-accent bg-accent/10";
-        default:
-          return "border-l-gray-400 bg-gray-800/20";
-      }
-    };
-    console.log(`${step.message || "Processing"}: `, step);
-    if (!step) return null;
-    return (
-      <div
-        className={`border-l-2 ${getStepColor(
-          step.type
-        )} pl-3 py-2 mb-2 text-sm`}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          {getStepIcon(step.type)}
-          <span className="text-gray-300 font-medium">
-            {step.message || "Processing..."}
-          </span>
-        </div>
-
-        {step.thought && (
-          <div className="text-gray-400 text-xs mb-1">
-            <strong>Thought:</strong> {step.thought}
-          </div>
-        )}
-
-        {step.agent_thought && (
-          <div className="text-gray-400 text-xs mb-1">
-            <strong>Planning:</strong> {step.agent_thought}
-          </div>
-        )}
-
-        {step.tool_name && (
-          <div className="text-gray-500 text-xs">
-            <strong>Tool:</strong> {step.tool_name}
-          </div>
-        )}
-
-        {step.tool_output && (
-          <div className="text-gray-500 text-xs mt-1">
-            <strong>Result:</strong>{" "}
-            {step.tool_output.length > 100
-              ? step.tool_output.substring(0, 100) + "..."
-              : step.tool_output}
-          </div>
-        )}
-
-        {/* Multi-agent system specific fields */}
-        {step.agent_name && (
-          <div className="text-gray-400 text-xs mb-1">
-            <strong>Agent:</strong> {step.agent_name}
-          </div>
-        )}
-
-        {step.reasoning && (
-          <div className="text-gray-400 text-xs mb-1">
-            <strong>Reasoning:</strong>{" "}
-            {step.reasoning.length > 150
-              ? step.reasoning.substring(0, 150) + "..."
-              : step.reasoning}
-          </div>
-        )}
-
-        {step.current_agent && (
-          <div className="text-gray-400 text-xs mb-1">
-            <strong>Current Agent:</strong> {step.current_agent}
-          </div>
-        )}
-
-        {step.completed_agents && step.completed_agents.length > 0 && (
-          <div className="text-gray-500 text-xs">
-            <strong>Completed:</strong> {step.completed_agents.join(", ")}
-          </div>
-        )}
-
-        {step.final_thought && (
-          <div className="text-gray-400 text-xs mb-1">
-            <strong>Final Thought:</strong> {step.final_thought}
-          </div>
-        )}
-
-        {step.planned_action && (
-          <div className="text-gray-500 text-xs">
-            <strong>Planned Action:</strong> {step.planned_action}
-          </div>
-        )}
-
-        {step.confidence && (
-          <div className="text-gray-500 text-xs">
-            <strong>Confidence:</strong> {Math.round(step.confidence * 100)}%
-          </div>
-        )}
-
-        {step.error && (
-          <div className="text-red-400 text-xs mt-1">
-            <strong>Error:</strong> {step.error}
-          </div>
-        )}
-      </div>
-    );
-  };
+  }, [handleSSEStreamingResponse, isPrivate, streamResponses, user]);
 
   // Function to toggle reasoning expansion
   const toggleReasoningExpansion = (messageId) => {
@@ -1198,12 +738,84 @@ const Chatbot = (props) => {
 
     pollingStartedRef.current = false;
 
-    if (id) {
-      handleLoadChat();
+    const activeChatId = id || selectedChatId;
+
+    if (activeChatId) {
+      const loadChat = async () => {
+        if (handleChatSelect && activeChatId !== selectedChatId) {
+          handleChatSelect(activeChatId);
+        }
+
+        // Seed from Redux cache immediately so the user sees messages
+        // without a loading flash while the network request is in-flight.
+        if (cachedMessages?.length) {
+          setMessages(cachedMessages);
+        }
+
+        try {
+          const data = await retrieveMessages(retrieveMessagesPath, activeChatId, 0);
+
+          console.log("res", data);
+          setChatNameGenerated(true);
+
+          if (!data.messages?.length) {
+            const pending =
+              location.state?.message ||
+              localStorage.getItem(`pending-message-${activeChatId}`);
+            if (pending) {
+              console.log(
+                "[handleLoadChat] Loading pending message after new chat creation:",
+                pending
+              );
+              const userMsg = {
+                id: "user-content",
+                chat_id: activeChatId,
+                role: "user",
+                content: pending,
+                timestamp: Date.now(),
+              };
+              const thinkingMsg = {
+                id: `thinking-${Date.now()}`,
+                chat_id: activeChatId,
+                role: "assistant",
+                content: "",
+                isThinking: true,
+                reasoning: [],
+                sources: [],
+                timestamp: Date.now() + 1,
+              };
+              setMessages([userMsg, thinkingMsg]);
+              if (location.state?.message) {
+                localStorage.setItem(
+                  `pending-message-${activeChatId}`,
+                  location.state.message
+                );
+              }
+              await sendToAPI(pending, activeChatId, thinkingMsg.id);
+              return;
+            }
+
+            setMessages([]);
+            return;
+          }
+
+          localStorage.removeItem(`pending-message-${activeChatId}`);
+          const formatted = formatChatMessages(data.messages, activeChatId);
+
+          const fileSystemMessages = await fetchUploadedDocuments(activeChatId);
+          const sorted = sortMessagesByTimestamp([...formatted, ...fileSystemMessages]);
+          setMessages(sorted);
+          // Update the Redux cache so the next visit to this chat is instant.
+          dispatch(setChatMessages({ chatId: activeChatId, messages: sorted }));
+        } catch (err) {
+          console.error("Failed to load chat:", err);
+        }
+      };
+
+      loadChat();
     } else {
       setMessages([]);
       setChatNameGenerated(false);
-      setUploadedFiles([]); // Clear uploaded files when switching chats
     }
 
     return () => {
@@ -1212,7 +824,18 @@ const Chatbot = (props) => {
         pollingTimeoutRef.current = null;
       }
     };
-  }, [id, handleLoadChat]);
+  }, [
+    id,
+    location.state?.message,
+    fetchUploadedDocuments,
+    retrieveMessages,
+    retrieveMessagesPath,
+    selectedChatId,
+    handleChatSelect,
+    sendToAPI,
+    cachedMessages,
+    dispatch,
+  ]);
 
   const handleInputKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1227,7 +850,7 @@ const Chatbot = (props) => {
     <div
       className={`h-full bg-anoteblack-800 w-full ${
         messages.length !== 0 && "pt-16"
-      } flex flex-col ${props.menu ? "md:blur-none blur" : ""}`}
+      } flex flex-col`}
     >
       <div
         ref={(ref) =>
@@ -1341,47 +964,6 @@ const Chatbot = (props) => {
                           : "bg-[#181f29] text-white border border-[#2e3a4c] rounded-bl-none"
                       }`}
                     >
-                      {/* Assistant Message Header with streaming mode indicator */}
-                      {msg.role === "assistant" && (
-                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <FontAwesomeIcon
-                              icon={faBrain}
-                              className="text-blue-400 text-sm"
-                            />
-                            <span className="text-xs text-gray-400 font-medium">
-                              Assistant Response
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {/* Streaming mode indicator */}
-                            {msg.currentStep?.streaming_mode === "non-agent" ||
-                            (msg.isThinking &&
-                              streamingMode === "non-agent") ? (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-green-600/20 rounded-md">
-                                <FontAwesomeIcon
-                                  icon={faLightbulb}
-                                  className="text-green-400 text-xs"
-                                />
-                                <span className="text-xs text-green-400 font-medium">
-                                  Direct
-                                </span>
-                              </div>
-                            ) : msg.reasoning?.length > 0 || msg.isThinking ? (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-600/20 rounded-md">
-                                <FontAwesomeIcon
-                                  icon={faSitemap}
-                                  className="text-blue-400 text-xs"
-                                />
-                                <span className="text-xs text-blue-400 font-medium">
-                                  Agent
-                                </span>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      )}
-
                       {/* Assistant Thinking Animation */}
                       {msg.isThinking ? (
                         <div className="space-y-3">
@@ -1398,9 +980,7 @@ const Chatbot = (props) => {
                               ></div>
                             </div>
                             <span className="text-sm text-gray-400">
-                              {msg.currentStep?.streaming_mode === "non-agent"
-                                ? "Generating response..."
-                                : "AI is thinking..."}
+                              AI is thinking...
                             </span>
                           </div>
 
@@ -1412,13 +992,112 @@ const Chatbot = (props) => {
                               </p>
                             </div>
                           )}
+                          {/* Show charts as they arrive during streaming */}
+                          {msg.charts && msg.charts.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {msg.charts.map((chart, idx) => (
+                                <div key={idx} className="rounded-lg overflow-hidden border border-[#2e3a4c]">
+                                  <img
+                                    src={`data:image/png;base64,${chart.image_data}`}
+                                    alt={chart.title || "Chart"}
+                                    className="w-full max-w-lg"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div>
+                          {/* Image thumbnails for user messages with attachments */}
+                          {msg.role === "user" && msg.attachments?.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {msg.attachments.map((att, i) => (
+                                <img
+                                  key={i}
+                                  src={att.previewUrl}
+                                  alt={att.name}
+                                  className="max-h-48 max-w-xs rounded-lg object-cover border border-gray-600"
+                                />
+                              ))}
+                            </div>
+                          )}
                           {/* Main response content */}
-                          <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                            {msg.content}
-                          </p>
+                          {msg.content && (
+                            <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                              {msg.content}
+                            </p>
+                          )}
+                          {/* Inline charts */}
+                          {msg.charts && msg.charts.length > 0 && (
+                            <div className="mt-4 space-y-3">
+                              {msg.charts.map((chart, idx) => (
+                                <div key={idx} className="rounded-lg overflow-hidden border border-[#2e3a4c]">
+                                  {chart.title && (
+                                    <div className="px-3 py-1 bg-[#0f1419] text-xs text-gray-400 font-medium">
+                                      {chart.title}
+                                    </div>
+                                  )}
+                                  <img
+                                    src={`data:image/png;base64,${chart.image_data}`}
+                                    alt={chart.title || "Chart"}
+                                    className="w-full max-w-lg"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {msg.role === "assistant" &&
+                            !msg.isThinking &&
+                            msg.sources?.length > 0 && (
+                              <div className="mt-4 border-t border-[#2e3a4c] pt-3">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-[#defe47] mb-2">
+                                  Grounded Sources
+                                </div>
+                                <div className="space-y-2">
+                                  {msg.sources.map((source, sourceIndex) => (
+                                    <div
+                                      key={source.id || sourceIndex}
+                                      className="rounded-lg border border-[#2e3a4c] bg-[#0f1419] p-3"
+                                    >
+                                      <div className="flex items-center justify-between gap-2 text-xs text-gray-300">
+                                        <span className="font-medium text-white">
+                                          {source.document_name}
+                                        </span>
+                                        <span className="text-gray-400">
+                                          {source.page_number != null
+                                            ? `Page ${source.page_number}`
+                                            : "Document evidence"}
+                                        </span>
+                                      </div>
+                                      <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-300">
+                                        {source.chunk_text}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          {msg.role === "assistant" &&
+                            !msg.isThinking &&
+                            msg.suggested_follow_ups?.length > 0 && (
+                              <div className="mt-4 border-t border-[#2e3a4c] pt-3">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                                  Suggested follow-ups
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {msg.suggested_follow_ups.map((q, qi) => (
+                                    <button
+                                      key={qi}
+                                      onClick={() => handleFollowUpClick(q)}
+                                      className="text-xs px-3 py-1.5 rounded-full border border-[#2e3a4c] bg-[#0f1419] text-gray-300 hover:border-[#defe47] hover:text-[#defe47] transition-colors text-left"
+                                    >
+                                      {q}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                         </div>
                       )}
                     </div>
@@ -1440,92 +1119,101 @@ const Chatbot = (props) => {
         {/* Welcome message */}
         {messages.length === 0 && (
           <div className="w-full text-white animate-typing overflow-hidden whitespace-nowrap flex items-center justify-center font-bold text-2xl mb-4">
-            What can I help you with?
+            {emptyStateTitle}
           </div>
         )}
 
-        {/* Streaming Mode Toggle */}
-        <div className="flex justify-center mb-3 px-4">
-          <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-2">
-            <FontAwesomeIcon icon={faBrain} className="text-gray-400 text-sm" />
-            <span className="text-gray-300 text-sm font-medium">
-              Response Mode:
-            </span>
-            <div className="flex bg-gray-700 rounded-md overflow-hidden">
-              <button
-                disabled={true}
-                onClick={() => handleStreamingModeChange("agent")}
-                className={`px-3 py-1 text-sm font-medium transition-colors ${
-                  streamingMode === "agent"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-300 hover:text-white hover:bg-gray-600"
-                }`}
-                title="AI Agent with reasoning - shows thought process and tool usage"
-              >
-                <FontAwesomeIcon icon={faSitemap} className="mr-1" />
-                Agent
-              </button>
-              <button
-                onClick={() => handleStreamingModeChange("non-agent")}
-                className={`px-3 py-1 text-sm font-medium transition-colors ${
-                  streamingMode === "non-agent"
-                    ? "bg-green-600 text-white"
-                    : "text-gray-300 hover:text-white hover:bg-gray-600"
-                }`}
-                title="Direct LLM response - faster but without reasoning steps"
-              >
-                <FontAwesomeIcon icon={faLightbulb} className="mr-1" />
-                Direct
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* Input form */}
         <div className="flex w-full justify-center mb-4 px-4">
-          <div className="flex items-center gap-1 focus-within:ring-slate-600 focus-within:ring-2 border-gray-600 p-2 rounded-xl bg-sidebar w-full max-w-4xl">
-            {/* Left side - Upload button */}
-            <button
-              type="button"
-              onClick={() => {
-                console.log(
-                  "Upload button clicked in Chatbot",
-                  "selectedChatId:",
-                  props.selectedChatId
-                );
-                setShowFileUpload(true);
-                setUploadButtonClicked(true);
-                setTimeout(() => setUploadButtonClicked(false), 1000);
-              }}
-              disabled={props.isUploading || (!user ? false : numCredits === 0)}
-              className={`flex items-center justify-center w-12 h-12 rounded-lg transition-colors flex-shrink-0 ${
-                uploadButtonClicked
-                  ? "bg-gray-600 text-white"
-                  : props.isUploading
-                  ? "bg-gray-500 text-gray-300 cursor-not-allowed"
-                  : "bg-gray-600 hover:bg-gray-500 text-white"
-              }`}
-              title={
-                !id
-                  ? "Please select or create a chat first"
-                  : !user
-                  ? "Add files (login for enhanced features)"
-                  : "Add files"
-              }
-            >
-              <FontAwesomeIcon icon={faFile} className="text-lg" />
-            </button>
+          <div className="flex flex-col gap-1 focus-within:ring-slate-600 focus-within:ring-2 border-gray-600 p-2 rounded-xl bg-sidebar w-full max-w-4xl">
+            {/* Pending image attachment previews */}
+            {pendingAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-2 pt-1">
+                {pendingAttachments.map((attachment) => (
+                  <div key={attachment.id} className="relative group">
+                    <img
+                      src={attachment.previewUrl}
+                      alt={attachment.name}
+                      className="h-16 w-16 object-cover rounded-lg border border-gray-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(attachment.id)}
+                      className="absolute -top-1.5 -right-1.5 bg-gray-700 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center transition-colors"
+                      title="Remove image"
+                    >
+                      <FontAwesomeIcon icon={faXmark} className="text-xs" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Center - Input */}
-            <div className="flex-1">
-              <div className="relative">
-                <div className="relative flex items-center rounded-lg focus-within:border-accent  focus-within:ring-0 transition-all duration-200">
+            <div className="flex items-center gap-1">
+              {/* Hidden image file input */}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
+                multiple
+                onChange={handleImageAttachmentPick}
+                className="hidden"
+              />
+
+              {/* Left side - Document upload button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFileUpload(true);
+                  setUploadButtonClicked(true);
+                  setTimeout(() => setUploadButtonClicked(false), 1000);
+                }}
+                disabled={!user ? false : numCredits === 0}
+                className={`flex items-center justify-center w-12 h-12 rounded-lg transition-colors flex-shrink-0 ${
+                  uploadButtonClicked
+                    ? "bg-gray-600 text-white"
+                    : "bg-gray-600 hover:bg-gray-500 text-white"
+                }`}
+                title={!id ? "Please select or create a chat first" : "Upload documents"}
+              >
+                <FontAwesomeIcon icon={faFile} className="text-lg" />
+              </button>
+
+              {/* Image attach button */}
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={messages.some((msg) => msg.isThinking)}
+                className="flex items-center justify-center w-12 h-12 rounded-lg transition-colors flex-shrink-0 bg-gray-600 hover:bg-gray-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Attach images"
+              >
+                <FontAwesomeIcon icon={faImage} className="text-lg" />
+              </button>
+
+              {/* Share button — only for authenticated users with an active chat */}
+              {user && (id || selectedChatId) && messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex items-center justify-center w-12 h-12 rounded-lg transition-colors flex-shrink-0 bg-gray-600 hover:bg-gray-500 text-white"
+                  title="Share this chat as a playbook"
+                >
+                  <FontAwesomeIcon icon={faShare} className="text-lg" />
+                </button>
+              )}
+
+              {/* Center - Input */}
+              <div className="flex-1">
+                <div className="relative flex items-center rounded-lg focus-within:border-accent focus-within:ring-0 transition-all duration-200">
                   <textarea
-                    className="w-full  border-none disabled:cursor-not-allowed  resize-none text-base px-4 py-3 focus:ring-0 focus:outline-none text-white placeholder:text-gray-400 bg-transparent rounded-lg"
+                    className="w-full border-none disabled:cursor-not-allowed resize-none text-base px-4 py-3 focus:ring-0 focus:outline-none text-white placeholder:text-gray-400 bg-transparent rounded-lg"
                     rows={1}
                     placeholder={
                       !user
                         ? "Ask your question (guest mode)"
+                        : pendingAttachments.length > 0
+                        ? "Ask about your image..."
                         : "Ask your document a question"
                     }
                     value={message}
@@ -1536,30 +1224,82 @@ const Chatbot = (props) => {
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Right side - Send button */}
-            <button
-              type="button"
-              onClick={handleSendMessage}
-              disabled={
-                !message ||
-                message.trim() === "" ||
-                messages.some((msg) => msg.isThinking)
-              }
-              className={`flex items-center justify-center w-12 h-12 rounded-lg transition-colors flex-shrink-0 ${
-                !message ||
-                message.trim() === "" ||
-                messages.some((msg) => msg.isThinking)
-                  ? "bg-gray-600 text-gray-400 cursor-not-allowed"
-                  : "bg-gray-600 hover:bg-gray-500 text-white"
-              }`}
-            >
-              <FontAwesomeIcon icon={faPaperPlane} className="text-lg" />
-            </button>
+              {/* Right side - Send button */}
+              <button
+                type="button"
+                onClick={handleSendMessage}
+                disabled={
+                  ((!message || message.trim() === "") && pendingAttachments.length === 0) ||
+                  messages.some((msg) => msg.isThinking)
+                }
+                className={`flex items-center justify-center w-12 h-12 rounded-lg transition-colors flex-shrink-0 ${
+                  ((!message || message.trim() === "") && pendingAttachments.length === 0) ||
+                  messages.some((msg) => msg.isThinking)
+                    ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-600 hover:bg-gray-500 text-white"
+                }`}
+              >
+                <FontAwesomeIcon icon={faPaperPlane} className="text-lg" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
+      {/* Share / Playbook Modal */}
+      {showShareModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowShareModal(false); }}
+        >
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-lg shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <FontAwesomeIcon icon={faShare} className="text-[#defe47]" />
+                Share Playbook
+              </h2>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {shareLoading ? (
+              <div className="flex items-center justify-center py-8 text-gray-400">
+                <div className="w-5 h-5 border-2 border-gray-400 border-t-[#defe47] rounded-full animate-spin mr-3" />
+                Generating shareable link…
+              </div>
+            ) : shareUrl ? (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-300">
+                  Anyone with this link can view a read-only snapshot of this chat
+                  and import it into their own workspace.
+                </p>
+                <div className="flex items-center gap-2 bg-gray-900 border border-gray-600 rounded-lg p-3">
+                  <span className="flex-1 text-sm text-gray-200 truncate select-all">{shareUrl}</span>
+                  <button
+                    onClick={handleCopyShareUrl}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-[#defe47] text-black text-sm font-medium rounded-md hover:bg-yellow-300 transition-colors flex-shrink-0"
+                  >
+                    <FontAwesomeIcon icon={shareCopied ? faCheck : faCopy} className="text-xs" />
+                    {shareCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-red-400 py-4 text-center">
+                Failed to generate share link. Please try again.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* File Upload Modal */}
       {showFileUpload && (
         <div

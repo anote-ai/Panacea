@@ -1,0 +1,24 @@
+{
+  "name": "anote-ai",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/cli",
+    "packages/vscode",
+    "packages/web",
+    "packages/sdk"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1",
+    "tmp": "^0.2.7",
+    "vite": "^8.0.16"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

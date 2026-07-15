@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-anote}
+      MYSQL_DATABASE: ${DB_NAME:-anote}
+      MYSQL_USER: ${DB_USER:-anote}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-anote}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./packages/backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+  tika:
+    image: apache/tika:latest
+    restart: always
+    ports:
+      - "9998:9998"
+
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      IS_PROD: ${IS_PROD:-false}
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-anote}
+      DB_USER: ${DB_USER:-anote}
+      DB_PASSWORD: ${DB_PASSWORD:-anote}
+      REDIS_URL: redis://redis:6379
+      TIKA_URL: http://tika:9998
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-change-me}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    depends_on:
+      - db
+      - redis
+      - tika
+    volumes:
+      - ./packages/backend:/app
+      - backend_uploads:/app/uploads
+
+  web:
+    build:
+      context: ./packages/web
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_BACK_END_HOST: http://localhost:5000
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  backend_uploads:

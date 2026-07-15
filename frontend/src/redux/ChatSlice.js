@@ -86,7 +86,10 @@ const initialState = {
   chats: [],
   loading: false,
   error: null,
-  lastFetchTime: null,
+  // Per-chat message cache keyed by chatId.
+  // Populated after a successful fetch so navigating back to a chat
+  // renders immediately without waiting for a network round-trip.
+  messagesByChat: {},
 };
 
 // Chat slice
@@ -96,13 +99,23 @@ export const chatSlice = createSlice({
   reducers: {
     clearChats: (state) => {
       state.chats = [];
+      state.messagesByChat = {};
     },
     clearError: (state) => {
       state.error = null;
     },
-    // Add a new chat to the state (useful when creating new chats)
     addChat: (state, action) => {
       state.chats.unshift(action.payload);
+    },
+    // Cache the fully-loaded message list for a chat so it can be
+    // shown instantly on next visit without a loading flash.
+    setChatMessages: (state, action) => {
+      const { chatId, messages } = action.payload;
+      state.messagesByChat[String(chatId)] = messages;
+    },
+    // Remove a single chat's messages from cache (e.g. after deletion).
+    evictChatMessages: (state, action) => {
+      delete state.messagesByChat[String(action.payload)];
     },
   },
   extraReducers: (builder) => {
@@ -115,14 +128,13 @@ export const chatSlice = createSlice({
       .addCase(fetchAllChats.fulfilled, (state, action) => {
         state.loading = false;
         state.chats = action.payload || [];
-        state.lastFetchTime = Date.now();
         state.error = null;
       })
       .addCase(fetchAllChats.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // Delete chat
+      // Delete chat — also evict its message cache
       .addCase(deleteChat.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -130,6 +142,7 @@ export const chatSlice = createSlice({
       .addCase(deleteChat.fulfilled, (state, action) => {
         state.loading = false;
         state.chats = state.chats.filter((chat) => chat.id !== action.payload);
+        delete state.messagesByChat[String(action.payload)];
         state.error = null;
       })
       .addCase(deleteChat.rejected, (state, action) => {
@@ -155,14 +168,14 @@ export const chatSlice = createSlice({
 });
 
 // Export actions
-export const { clearChats, clearError, addChat } = chatSlice.actions;
+export const { clearChats, clearError, addChat, setChatMessages, evictChatMessages } = chatSlice.actions;
 
 // Selectors
 export const selectAllChats = (state) => state.chatReducer?.chats || [];
-export const selectChatsLoading = (state) =>
-  state.chatReducer?.loading || false;
+export const selectChatsLoading = (state) => state.chatReducer?.loading || false;
 export const selectChatsError = (state) => state.chatReducer?.error;
-export const selectLastFetchTime = (state) => state.chatReducer?.lastFetchTime;
+export const selectCachedMessages = (chatId) => (state) =>
+  state.chatReducer?.messagesByChat?.[String(chatId)] ?? null;
 
 // Export reducer
 export default chatSlice.reducer;

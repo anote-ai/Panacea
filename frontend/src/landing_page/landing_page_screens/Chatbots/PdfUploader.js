@@ -1,10 +1,8 @@
-import axios from "axios";
 import React, { useRef, useState } from "react";
-import { Document, Page } from "react-pdf";
 import { pdfjs } from "react-pdf";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileUpload } from "@fortawesome/free-solid-svg-icons";
-import fetcher from "../../../http/RequestConfig";
+import { useLandingChatApi } from "./useLandingChatApi";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
@@ -14,14 +12,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 
 // is_private = input("Please choose an option (enter 1 or 2): ")
 function PDFUploader({ chat_id, handleForceUpdate }) {
-  const [file, setFile] = useState();
-  const [numPages, setNumPages] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef();
-
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-  };
+  const { uploadDemoDocuments } = useLandingChatApi();
 
   const splashScreenStyle = {
     position: "fixed",
@@ -41,28 +34,16 @@ function PDFUploader({ chat_id, handleForceUpdate }) {
   const uploadFile = async (e) => {
     const files = e.target.files;
 
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append("files[]", files[i]);
-    }
-
-    //console.log("chat_id", chat_id);
-    formData.append("chat_id", chat_id);
-
     setIsUploading(true);
 
     try {
-      const response = await fetcher("ingest-pdf-demo", {
-        method: "POST",
-        body: formData,
-      })
-        const response_str = await response.json();
-        setIsUploading(false);
-        handleForceUpdate();
+      await uploadDemoDocuments(chat_id, files);
+      setIsUploading(false);
+      handleForceUpdate();
     } catch (error) {
-      console.error("Error during file upload")
+      console.error("Error during file upload");
+      setIsUploading(false);
     }
-
   };
 
   const handleUploadBtnClick = () => {
@@ -87,28 +68,8 @@ function PDFUploader({ chat_id, handleForceUpdate }) {
           icon={faFileUpload}
           onClick={handleUploadBtnClick}
           className="px-2 text-black"
-          style={{ color: 'black' }}
+          style={{ color: "black" }}
         />
-      </div>
-      <div>
-        {file && (
-          <div>
-            {Array.from(file).map((singleFile, fileIndex) => (
-              <Document
-                key={`file_${fileIndex}`}
-                file={singleFile}
-                onLoadSuccess={onDocumentLoadSuccess}
-              >
-                {Array.from(new Array(numPages), (el, pageIndex) => (
-                  <Page
-                    key={`page_${fileIndex}_${pageIndex + 1}`}
-                    pageNumber={pageIndex + 1}
-                  />
-                ))}
-              </Document>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

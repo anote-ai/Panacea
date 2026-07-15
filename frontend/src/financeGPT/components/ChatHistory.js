@@ -1,41 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
-import fetcher from "../../http/RequestConfig";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Dropdown } from "flowbite-react";
 
-function ChatHistory(props) {
-  const [chats, setChats] = useState([]);
+function ChatHistory({
+  chats = [],
+  loading = false,
+  handleChatSelect,
+  onRenameChat,
+  onDeleteChat,
+}) {
   const [chatIdToDelete, setChatIdToDelete] = useState(null);
   const [chatToDelete, setChatToDelete] = useState("");
   const [showConfirmPopupChat, setShowConfirmPopupChat] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [chatIdToRename, setChatIdToRename] = useState(null);
   const [newChatName, setNewChatName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const { id } = useParams();
-
-  const retrieveAllChats = async () => {
-    console.log("i am in retrieve chats");
-    try {
-      const response = await fetcher("retrieve-all-chats", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ chat_type: 0 }),
-      });
-
-      const response_data = await response.json();
-      setChats(response_data.chat_info);
-      console.log("retriving data", response_data);
-    } catch (error) {
-      console.error("Error fetching chats:", error);
-    }
-  };
-  useEffect(() => {
-    retrieveAllChats();
-  }, [props.chats]);
+  const navigate = useNavigate();
 
   const handleDeleteChat = async (chat_id) => {
     const chatToDelete =
@@ -47,23 +30,11 @@ function ChatHistory(props) {
 
   const confirmDeleteChat = async () => {
     try {
-      const response = await fetcher("delete-chat", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ chat_id: chatIdToDelete }),
-      });
+      await onDeleteChat(chatIdToDelete);
+      setShowConfirmPopupChat(false);
 
-      if (response.ok) {
-        setShowConfirmPopupChat(false);
-        await retrieveAllChats();
-        // If deleted chat was selected, clear selection
-        if (Number(id) === chatIdToDelete) {
-          // Navigate to a different chat or home
-          window.location.href = "/chat";
-        }
+      if (Number(id) === chatIdToDelete) {
+        navigate("/");
       }
     } catch (e) {
       console.error("Error during chat deletion", e);
@@ -88,22 +59,8 @@ function ChatHistory(props) {
     if (!newChatName.trim()) return;
 
     try {
-      const response = await fetcher("update-chat-name", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: chatIdToRename,
-          chat_name: newChatName,
-        }),
-      });
-
-      if (response.ok) {
-        setShowRenameModal(false);
-        await retrieveAllChats();
-      }
+      await onRenameChat(chatIdToRename, newChatName.trim());
+      setShowRenameModal(false);
     } catch (e) {
       console.error("Error during chat rename", e);
     }
@@ -114,6 +71,12 @@ function ChatHistory(props) {
     setChatIdToRename(null);
     setNewChatName("");
   };
+
+  const filteredChats = searchQuery.trim()
+    ? [...chats].reverse().filter((c) =>
+        c.chat_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [...chats].reverse();
 
   return (
     <>
@@ -191,17 +154,34 @@ function ChatHistory(props) {
         )}
 
       <div className="h-full py-2">
-        <div className="flex justify-between items-center ">
-          <h2
-            className={`text-gray-400 text-sm ${
-              chats.length === 0 ? "hidden" : ""
-            } font-bold`}
-          >
-            Chat History
-          </h2>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-gray-400 text-sm font-bold">Chat History</h2>
         </div>
-        <ul className="flex-col  w-full h-full py-2 flex">
-          {[...chats].reverse().map((chat, index) => (
+
+        {/* Search bar */}
+        {chats.length > 3 && (
+          <div className="mb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search chats…"
+              className="w-full px-3 py-1.5 text-xs bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && chats.length === 0 && (
+          <ul className="space-y-1">
+            {[...Array(4)].map((_, i) => (
+              <li key={i} className="h-7 rounded-md bg-gray-700/40 animate-pulse" />
+            ))}
+          </ul>
+        )}
+
+        <ul className="flex-col w-full h-full py-1 flex overflow-y-auto">
+          {filteredChats.map((chat, index) => (
             <li
               key={index}
               className={`group hover:bg-gray-800 rounded-md px-2 py-1 cursor-pointer text-sm mb-1 flex w-full items-center gap-4 relative ${
@@ -212,9 +192,8 @@ function ChatHistory(props) {
             >
               <span className="cursor-pointer  w-full truncate max-w-2xl">
                 <Link
-                  onClick={async () => {
-                    props.handleChatSelect(chat.id);
-                    await retrieveAllChats();
+                  onClick={() => {
+                    handleChatSelect(chat.id);
                   }}
                   className="w-full text-turquoise-200 block"
                   to={`/chat/${chat.id}`}
@@ -262,10 +241,17 @@ function ChatHistory(props) {
               </Dropdown>
             </li>
           ))}
-          {chats.length === 0 && (
-            <li className="flex items-center justify-center h-full">
-              <div className="text-gray-400 text-sm text-center">
-                No chat yet. Start a conversation!
+          {!loading && chats.length === 0 && (
+            <li className="flex items-center justify-center py-6">
+              <div className="text-gray-500 text-xs text-center">
+                No chats yet. Start a conversation!
+              </div>
+            </li>
+          )}
+          {!loading && filteredChats.length === 0 && chats.length > 0 && (
+            <li className="flex items-center justify-center py-4">
+              <div className="text-gray-500 text-xs text-center">
+                No chats match "{searchQuery}"
               </div>
             </li>
           )}
