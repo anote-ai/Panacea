@@ -789,11 +789,11 @@ export default function ChatPage() {
 
         {/* Upload progress cards */}
         {uploads.length > 0 && (
-          <div className="px-4 pt-3 max-w-3xl mx-auto w-full flex flex-wrap gap-2">
+          <div className="px-4 pt-3 max-w-3xl mx-auto w-full flex gap-2 overflow-x-auto pb-1 scrollbar-thin-x">
             {uploads.map((u) => (
               <div
                 key={u.id}
-                className="group relative w-1/3 min-w-[160px] flex-shrink-0 bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-3 py-2 flex items-center gap-2"
+                className="group relative w-48 min-w-[160px] flex-shrink-0 bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-3 py-2 flex items-center gap-2"
               >
                 <span className="text-base flex-shrink-0">📄</span>
                 <span

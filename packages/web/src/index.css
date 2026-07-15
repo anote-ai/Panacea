@@ -21,6 +21,14 @@ html {
   background: #4b5563;
 }
 
+/* Thin horizontal scrollbar (e.g. upload progress cards row) */
+.scrollbar-thin-x {
+  scrollbar-width: thin;
+}
+.scrollbar-thin-x::-webkit-scrollbar {
+  height: 3px;
+}
+
 /* Textarea auto-resize */
 textarea {
   resize: none;
