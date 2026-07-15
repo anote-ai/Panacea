@@ -71,6 +71,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -422,14 +423,18 @@ export default function ChatPage() {
     }
   };
 
-  const deleteSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const deleteSession = async (id: string) => {
     try {
       await axios.delete(`/api/chat/sessions/${id}`, { headers });
       if (sessionId === id) nav('/app');
       loadSessions();
     } catch {}
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!deleteTarget) return;
+    await deleteSession(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   return (
@@ -462,6 +467,36 @@ export default function ChatPage() {
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             Supports {ACCEPTED_LABEL}
           </p>
+        </div>
+      )}
+
+      {/* Delete chat confirmation */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white dark:bg-[#2F2F2F] rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <h2 className="text-base font-semibold mb-2">Delete chat?</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Are you sure you want to delete "
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                {deleteTarget.title || 'New chat'}
+              </span>
+              "? This can't be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteSession}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -507,7 +542,11 @@ export default function ChatPage() {
               >
                 <span className="truncate">{s.title || 'New chat'}</span>
                 <button
-                  onClick={(e) => deleteSession(s.id, e)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setDeleteTarget(s);
+                  }}
                   className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs ml-1 flex-shrink-0"
                 >
                   ✕
