@@ -90,11 +90,10 @@ export default function DocumentsPage() {
 
   const loadDocuments = useCallback(async () => {
     try {
-      const params = selectedFolder ? { folder_id: selectedFolder.id } : {};
-      const res = await axios.get('/api/documents', { headers, params });
+      const res = await axios.get('/api/documents', { headers });
       setDocuments(res.data.documents || []);
     } catch {}
-  }, [token, selectedFolder]);
+  }, [token]);
 
   useEffect(() => {
     loadFolders();
@@ -830,7 +829,16 @@ export default function DocumentsPage() {
                     }`}
                   >
                     <div
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-600'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDocs((prev) => {
+                          const next = new Set(prev);
+                          next.has(doc.id) ? next.delete(doc.id) : next.add(doc.id);
+                          return next;
+                        });
+                        setLastClickedId(doc.id);
+                      }}
+                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 cursor-pointer ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
                     >
                       {isSelected && (
                         <svg
