@@ -158,3 +158,88 @@ def move_document(cnx: Any, user_id: int, doc_uuid: str, folder_id: int | None) 
     updated = cursor.rowcount > 0
     cursor.close()
     return updated
+
+
+# ---------------------------------------------------------------------------
+# Chats
+# ---------------------------------------------------------------------------
+
+def create_chat(cnx: Any, user_id: int, name: str = "New Chat") -> int:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "INSERT INTO chats (user_id, name) VALUES (%s, %s)",
+        (user_id, name),
+    )
+    chat_id: int = cursor.lastrowid
+    cursor.close()
+    return chat_id
+
+
+def get_chats(cnx: Any, user_id: int) -> list[dict]:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT id, name, created_at FROM chats WHERE user_id = %s ORDER BY created_at DESC",
+        (user_id,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows  # type: ignore[return-value]
+
+
+def get_chat(cnx: Any, user_id: int, chat_id: int) -> dict | None:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT id, name, created_at FROM chats WHERE id = %s AND user_id = %s",
+        (chat_id, user_id),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    return row  # type: ignore[return-value]
+
+
+def rename_chat(cnx: Any, user_id: int, chat_id: int, name: str) -> bool:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "UPDATE chats SET name = %s WHERE id = %s AND user_id = %s",
+        (name, chat_id, user_id),
+    )
+    updated = cursor.rowcount > 0
+    cursor.close()
+    return updated
+
+
+def delete_chat(cnx: Any, user_id: int, chat_id: int) -> bool:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "DELETE FROM chats WHERE id = %s AND user_id = %s",
+        (chat_id, user_id),
+    )
+    deleted = cursor.rowcount > 0
+    cursor.close()
+    return deleted
+
+
+# ---------------------------------------------------------------------------
+# Messages
+# ---------------------------------------------------------------------------
+
+def create_message(cnx: Any, chat_id: int, role: str, content: str, model: str | None = None) -> int:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "INSERT INTO messages (chat_id, role, content, model) VALUES (%s, %s, %s, %s)",
+        (chat_id, role, content, model),
+    )
+    message_id: int = cursor.lastrowid
+    cursor.close()
+    return message_id
+
+
+def get_messages(cnx: Any, chat_id: int) -> list[dict]:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT role, content, created_at FROM messages WHERE chat_id = %s ORDER BY id",
+        (chat_id,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows  # type: ignore[return-value]

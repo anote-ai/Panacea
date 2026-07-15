@@ -77,6 +77,7 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const skipNextLoadRef = useRef(false);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -101,6 +102,10 @@ export default function ChatPage() {
     loadSessions();
   }, [loadSessions]);
   useEffect(() => {
+    if (skipNextLoadRef.current) {
+      skipNextLoadRef.current = false;
+      return;
+    }
     if (sessionId) loadMessages(sessionId);
     else setMessages([]);
   }, [sessionId, loadMessages]);
@@ -280,17 +285,30 @@ export default function ChatPage() {
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim();
           if (data === '[DONE]') break;
+          let parsed: any;
           try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'text' && parsed.text) {
-              accumulated += parsed.text;
-              onChunk(accumulated);
-            }
-            if (parsed.type === 'session_id' && !sessionId) {
-              nav(`/chat/${parsed.session_id}`, { replace: true });
-              loadSessions();
-            }
-          } catch {}
+            parsed = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          if (parsed.type === 'error') {
+            throw new Error(parsed.message || 'Something went wrong. Please try again.');
+          }
+          if (parsed.type === 'text' && parsed.text) {
+            accumulated += parsed.text;
+            onChunk(accumulated);
+          }
+          if (parsed.type === 'session_id' && !sessionId) {
+            skipNextLoadRef.current = true;
+            nav(`/app/chat/${parsed.session_id}`, { replace: true });
+            loadSessions();
+          }
+          if (parsed.type === 'title' && parsed.session_id) {
+            const id = String(parsed.session_id);
+            setSessions((prev) =>
+              prev.map((s) => (s.id === id ? { ...s, title: parsed.title } : s)),
+            );
+          }
         }
       }
     }
@@ -322,7 +340,7 @@ export default function ChatPage() {
           const updated = [...prev];
           updated[updated.length - 1] = {
             role: 'assistant',
-            content: 'Sorry, something went wrong. Please try again.',
+            content: err.message || 'Sorry, something went wrong. Please try again.',
           };
           return updated;
         });
@@ -374,7 +392,7 @@ export default function ChatPage() {
       await streamAssistantReply(userMsg.content, applyToActiveVariant);
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        applyToActiveVariant('Sorry, something went wrong. Please try again.');
+        applyToActiveVariant(err.message || 'Sorry, something went wrong. Please try again.');
       }
     } finally {
       setStreaming(false);
@@ -480,7 +498,7 @@ export default function ChatPage() {
             {sessions.map((s) => (
               <div
                 key={s.id}
-                onClick={() => nav(`/chat/${s.id}`)}
+                onClick={() => nav(`/app/chat/${s.id}`)}
                 className={`group flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
                   s.id === sessionId
                     ? 'bg-gray-200 dark:bg-[#2F2F2F]'
