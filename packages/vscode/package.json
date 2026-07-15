@@ -2,7 +2,7 @@
   "name": "anote-ai-coding",
   "displayName": "Anote - AI Assisted Coding Agent",
   "description": "AI coding assistant for VS Code — chat, explain, fix, review, and generate code",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "Anote",
   "icon": "media/icon.png",
   "engines": {
