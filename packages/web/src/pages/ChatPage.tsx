@@ -3,10 +3,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
-import { useAuth, useTheme } from '../App';
+import { useAuth } from '../App';
 import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
+import UserMenu from '../components/UserMenu';
 
 interface Message {
   id?: string;
@@ -125,8 +126,7 @@ function UploadRing({ step, pct }: { step: UploadItem['step']; pct: number }) {
 export default function ChatPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const nav = useNavigate();
-  const { token, setToken } = useAuth();
-  const { dark, toggle } = useTheme();
+  const { token } = useAuth();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -277,10 +277,6 @@ export default function ChatPage() {
   };
 
   const newChat = () => nav('/app');
-  const logout = () => {
-    setToken(null);
-    nav('/login');
-  };
 
   const uploadFile = async (file: File, existingId?: string) => {
     const id = existingId ?? crypto.randomUUID();
@@ -923,17 +919,7 @@ export default function ChatPage() {
           </div>
         )}
         {!sidebarOpen && <div className="flex-1" />}
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={logout}
-            title="Sign out"
-            className={`w-full rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2F2F2F] transition-colors flex items-center gap-2 ${
-              sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
-            }`}
-          >
-            <span>🚪</span> {sidebarOpen && 'Sign out'}
-          </button>
-        </div>
+        <UserMenu sidebarOpen={sidebarOpen} />
       </aside>
 
       {/* Main */}
@@ -946,13 +932,6 @@ export default function ChatPage() {
             aria-label="Toggle sidebar"
           >
             ☰
-          </button>
-          <button
-            onClick={toggle}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? '☀️' : '🌙'}
           </button>
         </header>
 

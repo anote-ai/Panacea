@@ -31,6 +31,22 @@ def get_user_by_email(cnx: Any, email: str) -> dict | None:
     return row
 
 
+def get_user_by_id(cnx: Any, user_id: int) -> dict | None:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM users WHERE id = %s LIMIT 1", (user_id,))
+    row = cursor.fetchone()
+    cursor.close()
+    return row
+
+
+def update_user_name(cnx: Any, user_id: int, name: str) -> bool:
+    cursor = cnx.cursor()
+    cursor.execute("UPDATE users SET name = %s WHERE id = %s", (name, user_id))
+    updated = cursor.rowcount > 0
+    cursor.close()
+    return updated
+
+
 def create_user(cnx: Any, email: str, password_hash: str, name: str = "") -> int:
     cursor = cnx.cursor()
     cursor.execute(
