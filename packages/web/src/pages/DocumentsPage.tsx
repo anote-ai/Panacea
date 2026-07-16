@@ -16,38 +16,12 @@ interface Document {
   chat_id: number | null;
   chat_name?: string | null;
 }
-interface UploadItem {
-  id: string;
-  name: string;
-  step: 'uploading' | 'extracting' | 'indexing' | 'done' | 'error';
-  pct: number;
-  error?: string;
-}
 interface RubberBand {
   startX: number;
   startY: number;
   curX: number;
   curY: number;
 }
-
-const ACCEPTED_TYPES = [
-  'application/pdf',
-  'text/plain',
-  'text/markdown',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
-const ACCEPTED_LABEL = 'PDF, DOCX, TXT, MD';
-const ACCEPTED_EXT = '.pdf,.docx,.txt,.md';
-const MAX_FILES = 10;
-const MAX_SIZE_MB = 50;
-const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
-const STEP_LABELS: Record<UploadItem['step'], string> = {
-  uploading: 'Uploading...',
-  extracting: 'Extracting text...',
-  indexing: 'Indexing...',
-  done: 'Ready',
-  error: 'Failed',
-};
 
 export default function DocumentsPage() {
   const { token, setToken } = useAuth();
@@ -57,7 +31,6 @@ export default function DocumentsPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
-  const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [draggingDoc, setDraggingDoc] = useState<string | null>(null);
   const [draggingOver, setDraggingOver] = useState<number | 'root' | null>(
     null,
@@ -67,7 +40,6 @@ export default function DocumentsPage() {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [dragOver, setDragOver] = useState(false);
 
   // Multi-select state
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
@@ -75,8 +47,6 @@ export default function DocumentsPage() {
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
   const [bulkMoveFolder, setBulkMoveFolder] = useState<string>('');
 
-  const dragCounterRef = useRef(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const docItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const isRubberBanding = useRef(false);
@@ -281,116 +251,6 @@ export default function DocumentsPage() {
     setBulkMoveFolder('');
   };
 
-  const uploadFile = async (file: File) => {
-    const id = crypto.randomUUID();
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setUploads((prev) => [
-        ...prev,
-        {
-          id,
-          name: file.name,
-          step: 'error',
-          pct: 0,
-          error: `Unsupported type — use ${ACCEPTED_LABEL}`,
-        },
-      ]);
-      return;
-    }
-    if (file.size > MAX_SIZE_BYTES) {
-      setUploads((prev) => [
-        ...prev,
-        {
-          id,
-          name: file.name,
-          step: 'error',
-          pct: 0,
-          error: `Exceeds ${MAX_SIZE_MB}MB limit`,
-        },
-      ]);
-      return;
-    }
-    setUploads((prev) => [
-      ...prev,
-      { id, name: file.name, step: 'uploading', pct: 0 },
-    ]);
-    const form = new FormData();
-    form.append('file', file);
-    if (selectedFolder) form.append('folder_id', String(selectedFolder.id));
-
-    let simulationInterval: ReturnType<typeof setInterval> | null = null;
-    const startSimulation = () => {
-      let pct = 34;
-      simulationInterval = setInterval(() => {
-        pct += 1;
-        const step: UploadItem['step'] = pct < 67 ? 'extracting' : 'indexing';
-        if (pct >= 99) {
-          clearInterval(simulationInterval!);
-          return;
-        }
-        setUploads((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, step, pct } : u)),
-        );
-      }, 200);
-    };
-    try {
-      await axios.post('/api/documents/upload', form, {
-        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (e) => {
-          const pct = e.total ? Math.round((e.loaded / e.total) * 33) : 0;
-          setUploads((prev) =>
-            prev.map((u) => (u.id === id ? { ...u, pct } : u)),
-          );
-          if (e.loaded === e.total) startSimulation();
-        },
-      });
-      if (simulationInterval) clearInterval(simulationInterval);
-      setUploads((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, step: 'done', pct: 100 } : u)),
-      );
-      loadDocuments();
-      setTimeout(
-        () => setUploads((prev) => prev.filter((u) => u.id !== id)),
-        3000,
-      );
-    } catch (err: any) {
-      if (simulationInterval) clearInterval(simulationInterval);
-      const msg =
-        err?.response?.data?.error === 'Internal server error'
-          ? 'We had trouble reading this file. Try converting it to PDF first.'
-          : 'Upload failed — please try again.';
-      setUploads((prev) =>
-        prev.map((u) =>
-          u.id === id ? { ...u, step: 'error', error: msg } : u,
-        ),
-      );
-    }
-  };
-
-  const handleFiles = (files: FileList | null) => {
-    if (!files) return;
-    Array.from(files).slice(0, MAX_FILES).forEach(uploadFile);
-  };
-
-  const onDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounterRef.current++;
-    setDragOver(true);
-  };
-  const onDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) setDragOver(false);
-  };
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounterRef.current = 0;
-    setDragOver(false);
-    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
-  };
-
   const onDocDragStart = (docId: string) => {
     setDraggingDoc(docId);
     isRubberBanding.current = false;
@@ -434,44 +294,13 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div
-      className="flex h-screen bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative"
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
+    <div className="flex h-screen bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative">
       {/* Rubber band selection rectangle */}
       {rubberBand && (
         <div
           className="fixed z-40 border border-blue-400 bg-blue-400/10 pointer-events-none"
           style={getRubberBandStyle()}
         />
-      )}
-
-      {/* File drag overlay */}
-      {dragOver && !draggingDoc && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/90 dark:bg-[#212121]/90 border-4 border-dashed border-gray-400 dark:border-gray-500 pointer-events-none">
-          <svg
-            className="w-16 h-16 text-gray-400 mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-            />
-          </svg>
-          <p className="text-lg font-medium text-gray-600 dark:text-gray-300">
-            Drop to upload
-          </p>
-          <p className="text-sm text-gray-400 mt-1">
-            Supports {ACCEPTED_LABEL}
-          </p>
-        </div>
       )}
 
       {/* Left sidebar */}
@@ -647,33 +476,6 @@ export default function DocumentsPage() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_EXT}
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                />
-              </svg>
-              Upload
-            </button>
             <button
               onClick={toggle}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
@@ -733,52 +535,6 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        {/* Upload progress */}
-        {uploads.length > 0 && (
-          <div className="px-6 pt-4 space-y-2">
-            {uploads.map((u) => (
-              <div
-                key={u.id}
-                className="bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-4 py-3 flex items-center gap-3"
-              >
-                <span className="text-lg flex-shrink-0">
-                  {u.step === 'done' ? '✅' : u.step === 'error' ? '❌' : '📄'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium truncate">
-                      {u.name}
-                    </span>
-                    <span
-                      className={`text-xs ml-2 flex-shrink-0 ${u.step === 'done' ? 'text-green-500' : u.step === 'error' ? 'text-red-500' : 'text-gray-400'}`}
-                    >
-                      {u.step === 'error' ? u.error : STEP_LABELS[u.step]}
-                    </span>
-                  </div>
-                  {u.step !== 'error' && (
-                    <div className="h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${u.step === 'done' ? 'bg-green-500' : 'bg-gray-900 dark:bg-white'}`}
-                        style={{ width: `${u.pct}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-                {(u.step === 'done' || u.step === 'error') && (
-                  <button
-                    onClick={() =>
-                      setUploads((prev) => prev.filter((x) => x.id !== u.id))
-                    }
-                    className="text-gray-400 hover:text-gray-600 text-xs flex-shrink-0"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Document list */}
         <div
           ref={listRef}
@@ -801,10 +557,10 @@ export default function DocumentsPage() {
                 />
               </svg>
               <p className="text-gray-400 dark:text-gray-500">
-                No documents yet — drag files here or click Upload
+                No documents yet
               </p>
               <p className="text-xs text-gray-300 dark:text-gray-600">
-                Supports {ACCEPTED_LABEL}
+                Upload files from a chat to use them as context — they'll show up here too
               </p>
             </div>
           ) : (
