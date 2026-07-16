@@ -124,11 +124,16 @@ jobs:
             aws ecr get-login-password --region us-east-1 \
               | docker login --username AWS --password-stdin $REGISTRY
 
+            # Shared network: web's nginx proxies /api, /auth and /health to
+            # http://backend:5000, so both containers must resolve "backend".
+            docker network create panacea 2>/dev/null || true
+
             # Backend (gunicorn on 5000)
             docker pull $REGISTRY/panacea-backend:${{ github.sha }}
             docker stop panacea-backend || true
             docker rm panacea-backend || true
             docker run -d --name panacea-backend --restart unless-stopped \
+              --network panacea --network-alias backend \
               -p 5000:5000 \
               --env-file $HOME/panacea/.env \
               $REGISTRY/panacea-backend:${{ github.sha }}
@@ -138,6 +143,7 @@ jobs:
             docker stop panacea-web || true
             docker rm panacea-web || true
             docker run -d --name panacea-web --restart unless-stopped \
+              --network panacea \
               -p 80:3000 \
               $REGISTRY/panacea-web:${{ github.sha }}
 
