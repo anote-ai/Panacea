@@ -145,6 +145,40 @@ def test_get_document_found(client, auth_headers):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/documents/<doc_id>/file
+# ---------------------------------------------------------------------------
+
+def test_get_document_file_no_auth(client):
+    resp = client.get("/api/documents/abc/file")
+    assert resp.status_code == 401
+
+
+def test_get_document_file_not_found_in_db(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.get("/api/documents/abc/file", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_file_missing_on_disk(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.txt"}
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/file", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_file_success(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.txt"}
+    (tmp_path / "abc.txt").write_text("hello world")
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/file", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.data == b"hello world"
+    assert resp.mimetype == "text/plain"
+
+
+# ---------------------------------------------------------------------------
 # DELETE /api/documents/<doc_id>
 # ---------------------------------------------------------------------------
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import Any
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from flask_jwt_extended import get_jwt_identity
 
 from database.db import (
@@ -30,6 +31,7 @@ _MIME_TO_EXT: dict[str, str] = {
     "text/csv": ".csv",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
+_EXT_TO_MIME: dict[str, str] = {ext: mime for mime, ext in _MIME_TO_EXT.items()}
 
 
 @documents_bp.post("/upload")
@@ -123,6 +125,31 @@ def get_document(doc_id: str) -> tuple:  # type: ignore[type-arg]
         return jsonify(doc), 200
     except Exception:
         return jsonify({"error": "Internal server error"}), 500
+
+
+@documents_bp.get("/<doc_id>/file")
+@require_auth
+def get_document_file(doc_id: str) -> Any:
+    try:
+        cnx = get_connection()
+        doc = get_document_by_uuid(cnx, int(get_jwt_identity()), doc_id)
+        cnx.close()
+    except Exception:
+        return jsonify({"error": "Internal server error"}), 500
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+
+    ext = Path(doc["filename"]).suffix.lower()
+    file_path = UPLOAD_FOLDER / f"{doc_id}{ext}"
+    if not file_path.exists():
+        return jsonify({"error": "File not found"}), 404
+
+    return send_file(
+        file_path,
+        mimetype=_EXT_TO_MIME.get(ext, "application/octet-stream"),
+        as_attachment=False,
+        download_name=doc["filename"],
+    )
 
 
 @documents_bp.delete("/<doc_id>")

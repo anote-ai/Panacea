@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import { useAuth, useTheme } from '../App';
+import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
 
 interface Message {
@@ -140,6 +141,7 @@ export default function ChatPage() {
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
   const [chatDocs, setChatDocs] = useState<AttachedDoc[]>([]);
   const [docsModalOpen, setDocsModalOpen] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<AttachedDoc | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ChatSearchResult[]>([]);
@@ -737,7 +739,8 @@ export default function ChatPage() {
                 {chatDocs.map((d) => (
                   <div
                     key={d.id}
-                    className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors"
+                    onClick={() => setViewingDoc(d)}
+                    className="group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors"
                   >
                     <span className="text-base flex-shrink-0">📄</span>
                     <span
@@ -747,7 +750,10 @@ export default function ChatPage() {
                       {d.filename}
                     </span>
                     <button
-                      onClick={() => removeAttachedDoc(d.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeAttachedDoc(d.id);
+                      }}
                       className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
                       title="Remove from this chat"
                     >
@@ -1259,6 +1265,11 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+      <FileViewerModal
+        doc={viewingDoc}
+        token={token}
+        onClose={() => setViewingDoc(null)}
+      />
     </div>
   );
 }
