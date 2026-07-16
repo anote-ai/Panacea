@@ -25,6 +25,8 @@ _sse = sse_event
 
 
 def _require_api_key(provider: str) -> str:
+    if provider == "ollama":
+        return ""
     env_key = _ENV_KEY_FOR_PROVIDER.get(provider)
     if not env_key:
         raise RuntimeError(f"Streaming is not supported for provider '{provider}'")
@@ -79,6 +81,35 @@ def stream_agent_response(
                     if on_text:
                         on_text(delta)
                     yield _sse("text", {"text": delta})
+        elif provider == "google":
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            gm = genai.GenerativeModel(model)
+            for chunk in gm.generate_content(message, stream=True):
+                text = chunk.text
+                if text:
+                    if on_text:
+                        on_text(text)
+                    yield _sse("text", {"text": text})
+        elif provider == "ollama":
+            import requests
+            base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            with requests.post(
+                f"{base_url}/api/generate",
+                json={"model": model, "prompt": message, "stream": True},
+                stream=True,
+                timeout=120,
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    chunk = json.loads(line)
+                    text = chunk.get("response", "")
+                    if text:
+                        if on_text:
+                            on_text(text)
+                        yield _sse("text", {"text": text})
         else:
             yield _sse("error", {"message": f"Streaming is not supported for provider '{provider}'"})
             return
@@ -118,4 +149,25 @@ def stream_llm_response(
         )
         choice = response_oa.choices[0] if response_oa.choices else None
         return (choice.message.content or "") if choice else ""
+    if provider == "google":
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        gm = genai.GenerativeModel(model)
+        gm_history = [
+            {"role": "model" if h.get("role") == "assistant" else "user", "parts": [h["content"]]}
+            for h in history
+        ]
+        chat = gm.start_chat(history=gm_history)
+        return chat.send_message(message).text or ""
+    if provider == "ollama":
+        import requests
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        messages = [*history, {"role": "user", "content": message}]
+        resp = requests.post(
+            f"{base_url}/api/chat",
+            json={"model": model, "messages": messages, "stream": False},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        return resp.json().get("message", {}).get("content", "")
     raise RuntimeError(f"Streaming is not supported for provider '{provider}'")
