@@ -16,6 +16,7 @@ from database.db import (
     get_documents,
     get_messages,
     rename_chat,
+    search_chats,
 )
 from database.db import delete_chat as db_delete_chat
 from middleware.auth import require_auth
@@ -135,6 +136,37 @@ def create_session() -> tuple:
     finally:
         cnx.close()
     return jsonify({"sessionId": str(chat_id)}), 201
+
+
+@chat_bp.get("/search")
+@require_auth
+def search() -> tuple:
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"error": "q is required"}), 400
+    user_id = int(get_jwt_identity())
+    cnx = get_connection()
+    try:
+        results = search_chats(cnx, user_id, query)
+    finally:
+        cnx.close()
+
+    def snippet(content: str | None) -> str | None:
+        if not content:
+            return None
+        return content[:160] + ("..." if len(content) > 160 else "")
+
+    return jsonify({
+        "results": [
+            {
+                "id": str(r["id"]),
+                "title": r["name"] or "New Chat",
+                "createdAt": r["created_at"].isoformat(),
+                "snippet": snippet(r["content"]),
+            }
+            for r in results
+        ],
+    }), 200
 
 
 @chat_bp.get("/sessions")

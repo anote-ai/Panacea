@@ -139,6 +139,85 @@ def test_create_session_no_auth(client):
     assert resp.status_code == 401
 
 
+def test_search_missing_query(client, auth_headers):
+    resp = client.get("/api/chat/search", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_search_no_auth(client):
+    resp = client.get("/api/chat/search?q=hello")
+    assert resp.status_code == 401
+
+
+def test_search_returns_results(client, auth_headers):
+    rows = [
+        {
+            "id": 1,
+            "name": "Deploy Pipeline Help",
+            "created_at": datetime.datetime(2024, 1, 1),
+            "content": "How do I fix my CI pipeline? " + "x" * 200,
+        },
+    ]
+    with patch(
+        "api_endpoints.chat.handler.get_connection",
+        return_value=_mock_cnx(fetchall=rows),
+    ):
+        resp = client.get("/api/chat/search?q=pipeline", headers=auth_headers)
+    assert resp.status_code == 200
+    results = resp.get_json()["results"]
+    assert results[0]["id"] == "1"
+    assert results[0]["title"] == "Deploy Pipeline Help"
+    assert results[0]["snippet"].endswith("...")
+    assert len(results[0]["snippet"]) == 163  # 160 chars + "..."
+
+
+def test_search_dedupes_multiple_matching_messages_per_chat(client, auth_headers):
+    rows = [
+        {"id": 1, "name": "Chat A", "created_at": datetime.datetime(2024, 1, 1), "content": "first match"},
+        {"id": 1, "name": "Chat A", "created_at": datetime.datetime(2024, 1, 1), "content": "second match"},
+    ]
+    with patch(
+        "api_endpoints.chat.handler.get_connection",
+        return_value=_mock_cnx(fetchall=rows),
+    ):
+        resp = client.get("/api/chat/search?q=match", headers=auth_headers)
+    results = resp.get_json()["results"]
+    assert len(results) == 1
+    assert results[0]["snippet"] == "first match"
+
+
+def test_search_title_only_match_has_no_snippet(client, auth_headers):
+    rows = [
+        {"id": 2, "name": "Budget Planning", "created_at": datetime.datetime(2024, 1, 1), "content": None},
+    ]
+    with patch(
+        "api_endpoints.chat.handler.get_connection",
+        return_value=_mock_cnx(fetchall=rows),
+    ):
+        resp = client.get("/api/chat/search?q=budget", headers=auth_headers)
+    results = resp.get_json()["results"]
+    assert results[0]["snippet"] is None
+
+
+def test_search_chats_escapes_like_wildcards():
+    from database.db import search_chats
+
+    cnx = _mock_cnx(fetchall=[])
+    search_chats(cnx, user_id=1, query="50%_off")
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params[0] == "%50\\%\\_off%"
+
+
+def test_search_chats_is_case_insensitive():
+    from database.db import search_chats
+
+    cnx = _mock_cnx(fetchall=[])
+    search_chats(cnx, user_id=1, query="BuDgEt")
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params[0] == "%budget%"
+    assert "LOWER(" in executed_sql
+
+
 def test_chat_stream_retitles_existing_untitled_session(client, auth_headers):
     """A prior attempt may have failed before producing a reply, leaving the
     chat named 'New Chat' — a later successful retry should still title it."""

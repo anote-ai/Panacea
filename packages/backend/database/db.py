@@ -225,6 +225,34 @@ def delete_chat(cnx: Any, user_id: int, chat_id: int) -> bool:
     return deleted
 
 
+def search_chats(cnx: Any, user_id: int, query: str, limit: int = 20) -> list[dict]:
+    """Search a user's chats by title or message content.
+
+    Returns one row per matching chat, with the earliest matching message
+    (if any) as `content` — title-only matches have `content` as NULL.
+    """
+    cursor = cnx.cursor(dictionary=True)
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    like = f"%{escaped.lower()}%"
+    cursor.execute(
+        "SELECT c.id, c.name, c.created_at, m.content "
+        "FROM chats c "
+        "LEFT JOIN messages m ON m.chat_id = c.id AND LOWER(m.content) LIKE %s "
+        "WHERE c.user_id = %s AND (LOWER(c.name) LIKE %s OR LOWER(m.content) LIKE %s) "
+        "ORDER BY c.created_at DESC, m.id ASC",
+        (like, user_id, like, like),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+
+    seen: dict[int, dict] = {}
+    for row in rows:
+        chat_id = row["id"]
+        if chat_id not in seen:
+            seen[chat_id] = row
+    return list(seen.values())[:limit]  # type: ignore[return-value]
+
+
 # ---------------------------------------------------------------------------
 # Messages
 # ---------------------------------------------------------------------------

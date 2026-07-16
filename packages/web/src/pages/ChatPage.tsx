@@ -35,6 +35,12 @@ interface AttachedDoc {
   filename: string;
 }
 
+interface ChatSearchResult {
+  id: string;
+  title: string;
+  snippet: string | null;
+}
+
 const MODELS = [
   'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
@@ -65,8 +71,18 @@ function UploadRing({ step, pct }: { step: UploadItem['step']; pct: number }) {
   if (step === 'done') {
     return (
       <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center flex-shrink-0">
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        <svg
+          className="w-3 h-3"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={3}
+            d="M5 13l4 4L19 7"
+          />
         </svg>
       </span>
     );
@@ -115,13 +131,18 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [model, setModel] = useState(MODELS[0]);
   const [streaming, setStreaming] = useState(false);
-  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(
+    null,
+  );
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
   const [chatDocs, setChatDocs] = useState<AttachedDoc[]>([]);
   const [docsModalOpen, setDocsModalOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ChatSearchResult[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -135,7 +156,16 @@ export default function ChatPage() {
 
   const headers = { Authorization: `Bearer ${token}` };
   const isUploading = uploads.some(
-    (u) => u.step === 'uploading' || u.step === 'extracting' || u.step === 'indexing',
+    (u) =>
+      u.step === 'uploading' ||
+      u.step === 'extracting' ||
+      u.step === 'indexing',
+  );
+  // Title-only for now — context/content search can layer on top of this later.
+  const filteredSessions = sessions.filter((s) =>
+    (s.title || 'New chat')
+      .toLowerCase()
+      .includes(searchQuery.trim().toLowerCase()),
   );
 
   const loadSessions = useCallback(async () => {
@@ -190,6 +220,28 @@ export default function ChatPage() {
     else setChatDocs([]);
   }, [sessionId, loadChatDocs]);
 
+  // Debounced content/title search — empty query falls back to browsing
+  // the full chat list client-side (see filteredSessions).
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      try {
+        const res = await axios.get('/api/chat/search', {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { q },
+        });
+        setSearchResults(res.data.results || []);
+      } catch {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchQuery, token]);
+
   // Creates a chat up front if one doesn't exist yet, so a file dropped
   // before any message has somewhere to attach to. Concurrent calls (e.g.
   // dropping several files at once into a brand-new chat) share one
@@ -231,7 +283,9 @@ export default function ChatPage() {
     const id = existingId ?? crypto.randomUUID();
     const upsert = (item: UploadItem) => {
       setUploads((prev) =>
-        existingId ? prev.map((u) => (u.id === id ? item : u)) : [...prev, item],
+        existingId
+          ? prev.map((u) => (u.id === id ? item : u))
+          : [...prev, item],
       );
     };
 
@@ -268,7 +322,11 @@ export default function ChatPage() {
       setUploads((prev) =>
         prev.map((u) =>
           u.id === id
-            ? { ...u, step: 'error', error: 'Upload failed — please try again.' }
+            ? {
+                ...u,
+                step: 'error',
+                error: 'Upload failed — please try again.',
+              }
             : u,
         ),
       );
@@ -436,7 +494,9 @@ export default function ChatPage() {
             continue;
           }
           if (parsed.type === 'error') {
-            throw new Error(parsed.message || 'Something went wrong. Please try again.');
+            throw new Error(
+              parsed.message || 'Something went wrong. Please try again.',
+            );
           }
           if (parsed.type === 'text' && parsed.text) {
             accumulated += parsed.text;
@@ -450,7 +510,9 @@ export default function ChatPage() {
           if (parsed.type === 'title' && parsed.session_id) {
             const id = String(parsed.session_id);
             setSessions((prev) =>
-              prev.map((s) => (s.id === id ? { ...s, title: parsed.title } : s)),
+              prev.map((s) =>
+                s.id === id ? { ...s, title: parsed.title } : s,
+              ),
             );
           }
         }
@@ -484,7 +546,8 @@ export default function ChatPage() {
           const updated = [...prev];
           updated[updated.length - 1] = {
             role: 'assistant',
-            content: err.message || 'Sorry, something went wrong. Please try again.',
+            content:
+              err.message || 'Sorry, something went wrong. Please try again.',
           };
           return updated;
         });
@@ -510,7 +573,8 @@ export default function ChatPage() {
     setMessages((prev) => {
       const updated = [...prev];
       const cur = updated[index];
-      const variants = cur.variants && cur.variants.length ? cur.variants : [cur.content];
+      const variants =
+        cur.variants && cur.variants.length ? cur.variants : [cur.content];
       newVariantIndex = variants.length;
       updated[index] = {
         ...cur,
@@ -536,7 +600,9 @@ export default function ChatPage() {
       await streamAssistantReply(userMsg.content, applyToActiveVariant);
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        applyToActiveVariant(err.message || 'Sorry, something went wrong. Please try again.');
+        applyToActiveVariant(
+          err.message || 'Sorry, something went wrong. Please try again.',
+        );
       }
     } finally {
       setStreaming(false);
@@ -549,7 +615,12 @@ export default function ChatPage() {
     setMessages((prev) => {
       const updated = [...prev];
       const cur = updated[index];
-      if (!cur.variants || variantIndex < 0 || variantIndex >= cur.variants.length) return prev;
+      if (
+        !cur.variants ||
+        variantIndex < 0 ||
+        variantIndex >= cur.variants.length
+      )
+        return prev;
       updated[index] = {
         ...cur,
         activeVariantIndex: variantIndex,
@@ -690,13 +761,101 @@ export default function ChatPage() {
         </div>
       )}
 
+      {/* Search chats */}
+      {searchOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24"
+          onClick={() => {
+            setSearchOpen(false);
+            setSearchQuery('');
+          }}
+        >
+          <div
+            className="bg-white dark:bg-[#2F2F2F] rounded-2xl shadow-xl max-w-md w-full p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setSearchOpen(false);
+                  setSearchQuery('');
+                }
+              }}
+              placeholder="Search chats by title or content..."
+              className="w-full bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none"
+            />
+            <div className="mt-2 max-h-80 overflow-y-auto space-y-0.5">
+              {searchQuery.trim() === '' ? (
+                filteredSessions.length === 0 ? (
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
+                    No chats yet.
+                  </p>
+                ) : (
+                  filteredSessions.map((s) => (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        nav(`/app/chat/${s.id}`);
+                        setSearchOpen(false);
+                        setSearchQuery('');
+                      }}
+                      className={`px-3 py-2 rounded-lg text-sm cursor-pointer truncate transition-colors ${
+                        s.id === sessionId
+                          ? 'bg-gray-200 dark:bg-[#3F3F3F]'
+                          : 'hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
+                      }`}
+                    >
+                      {s.title || 'New chat'}
+                    </div>
+                  ))
+                )
+              ) : searchResults.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
+                  No chats found.
+                </p>
+              ) : (
+                searchResults.map((r) => (
+                  <div
+                    key={r.id}
+                    onClick={() => {
+                      nav(`/app/chat/${r.id}`);
+                      setSearchOpen(false);
+                      setSearchQuery('');
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
+                      r.id === sessionId
+                        ? 'bg-gray-200 dark:bg-[#3F3F3F]'
+                        : 'hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
+                    }`}
+                  >
+                    <p className="truncate font-medium">{r.title}</p>
+                    {r.snippet && (
+                      <p className="truncate text-xs text-gray-400 dark:text-gray-500">
+                        {r.snippet}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside
         className={`${sidebarOpen ? 'w-64' : 'w-14'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col`}
       >
-        <div className={`p-3 flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}>
+        <div
+          className={`p-3 flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}
+        >
           <RocketLogo className="w-7 h-7 flex-shrink-0" />
-          {sidebarOpen && <span className="font-semibold text-sm truncate">Anote AI</span>}
+          {sidebarOpen && (
+            <span className="font-semibold text-sm truncate">Anote AI</span>
+          )}
         </div>
         <div className="px-2 pb-2 space-y-0.5">
           <button
@@ -716,6 +875,15 @@ export default function ChatPage() {
             }`}
           >
             <span>📁</span> {sidebarOpen && 'Library'}
+          </button>
+          <button
+            onClick={() => setSearchOpen(true)}
+            title="Search chats"
+            className={`w-full rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-[#2F2F2F] transition-colors flex items-center gap-2 ${
+              sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
+            }`}
+          >
+            <span>🔍</span> {sidebarOpen && 'Search Chats'}
           </button>
         </div>
         {sidebarOpen && (
@@ -799,7 +967,8 @@ export default function ChatPage() {
                   (regeneratingIndex === i ||
                     (regeneratingIndex === null && i === messages.length - 1));
                 const activeVariantIndex =
-                  msg.activeVariantIndex ?? (msg.variants ? msg.variants.length - 1 : 0);
+                  msg.activeVariantIndex ??
+                  (msg.variants ? msg.variants.length - 1 : 0);
                 return (
                   <div
                     key={i}
@@ -828,78 +997,87 @@ export default function ChatPage() {
                           {msg.content}
                         </p>
                       )}
-                      {msg.role === 'assistant' && !isThisStreaming && msg.content && (
-                        <div className="flex items-center gap-1 mt-1 -ml-1 text-gray-400 dark:text-gray-500">
-                          <button
-                            onClick={() => regenerateMessage(i)}
-                            disabled={streaming}
-                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            aria-label="Regenerate response"
-                            title="Regenerate response"
-                          >
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
+                      {msg.role === 'assistant' &&
+                        !isThisStreaming &&
+                        msg.content && (
+                          <div className="flex items-center gap-1 mt-1 -ml-1 text-gray-400 dark:text-gray-500">
+                            <button
+                              onClick={() => regenerateMessage(i)}
+                              disabled={streaming}
+                              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label="Regenerate response"
+                              title="Regenerate response"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                              />
-                            </svg>
-                          </button>
-                          {msg.variants && msg.variants.length > 1 && (
-                            <div className="flex items-center gap-0.5 text-xs">
-                              <button
-                                onClick={() => setVariant(i, activeVariantIndex - 1)}
-                                disabled={activeVariantIndex === 0}
-                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                aria-label="Previous response"
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
                               >
-                                <svg
-                                  className="w-3 h-3"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                />
+                              </svg>
+                            </button>
+                            {msg.variants && msg.variants.length > 1 && (
+                              <div className="flex items-center gap-0.5 text-xs">
+                                <button
+                                  onClick={() =>
+                                    setVariant(i, activeVariantIndex - 1)
+                                  }
+                                  disabled={activeVariantIndex === 0}
+                                  className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  aria-label="Previous response"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M15 19l-7-7 7-7"
-                                  />
-                                </svg>
-                              </button>
-                              <span className="tabular-nums">
-                                {activeVariantIndex + 1}/{msg.variants.length}
-                              </span>
-                              <button
-                                onClick={() => setVariant(i, activeVariantIndex + 1)}
-                                disabled={activeVariantIndex === msg.variants.length - 1}
-                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                aria-label="Next response"
-                              >
-                                <svg
-                                  className="w-3 h-3"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15 19l-7-7 7-7"
+                                    />
+                                  </svg>
+                                </button>
+                                <span className="tabular-nums">
+                                  {activeVariantIndex + 1}/{msg.variants.length}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setVariant(i, activeVariantIndex + 1)
+                                  }
+                                  disabled={
+                                    activeVariantIndex ===
+                                    msg.variants.length - 1
+                                  }
+                                  className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-[#3F3F3F] hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  aria-label="Next response"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                     </div>
                   </div>
                 );
@@ -930,7 +1108,12 @@ export default function ChatPage() {
                     className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors"
                     title="Retry upload"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -945,7 +1128,11 @@ export default function ChatPage() {
                 <button
                   onClick={() => cancelUpload(u.id)}
                   className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 text-white text-[10px] flex items-center justify-center hover:bg-red-500 transition-colors"
-                  title={u.step === 'done' || u.step === 'error' ? 'Dismiss' : 'Cancel upload'}
+                  title={
+                    u.step === 'done' || u.step === 'error'
+                      ? 'Dismiss'
+                      : 'Cancel upload'
+                  }
                 >
                   ✕
                 </button>
@@ -1044,7 +1231,11 @@ export default function ChatPage() {
                   disabled={!streaming && (!input.trim() || isUploading)}
                   className="p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                   aria-label={streaming ? 'Stop' : 'Send'}
-                  title={isUploading && !streaming ? 'Waiting for uploads to finish...' : undefined}
+                  title={
+                    isUploading && !streaming
+                      ? 'Waiting for uploads to finish...'
+                      : undefined
+                  }
                 >
                   {streaming ? (
                     <span className="w-4 h-4 flex items-center justify-center">
