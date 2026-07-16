@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth, useTheme } from '../App';
+import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
 
@@ -566,7 +567,7 @@ export default function DocumentsPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {displayDocs.map((doc) => {
                 const isSelected = selectedDocs.has(doc.id);
                 return (
@@ -582,7 +583,7 @@ export default function DocumentsPage() {
                     onDragEnd={onDocDragEnd}
                     onClick={(e) => onDocClick(e, doc.id, displayDocs)}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-colors cursor-pointer ${
+                    className={`group relative flex flex-col rounded-xl p-2 transition-colors cursor-pointer ${
                       isSelected
                         ? 'bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400 dark:ring-blue-500'
                         : 'bg-[#F7F7F8] dark:bg-[#2F2F2F] hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
@@ -598,7 +599,11 @@ export default function DocumentsPage() {
                         });
                         setLastClickedId(doc.id);
                       }}
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 cursor-pointer ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
+                      className={`absolute top-3 left-3 z-10 w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-opacity ${
+                        isSelected
+                          ? 'opacity-100 bg-blue-500 border-blue-500'
+                          : 'opacity-0 group-hover:opacity-100 bg-white/90 dark:bg-black/50 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                      }`}
                     >
                       {isSelected && (
                         <svg
@@ -616,51 +621,66 @@ export default function DocumentsPage() {
                         </svg>
                       )}
                     </div>
-                    <span className="text-xl flex-shrink-0">📄</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {doc.filename}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
-                        <span>{doc.chunks} chunks</span>
-                        {doc.chat_id && (
-                          <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 truncate max-w-[160px]"
-                            title={`Attached to chat: ${doc.chat_name || 'Untitled chat'}`}
-                          >
-                            💬 <span className="truncate">{doc.chat_name || 'Untitled chat'}</span>
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setViewingDoc(doc);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex-shrink-0"
-                      title="View file"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                    <div className="absolute top-3 right-3 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingDoc(doc);
+                        }}
+                        className="w-6 h-6 rounded-full bg-white/90 dark:bg-black/50 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                        title="View file"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteDocument(doc.id);
+                        }}
+                        className="w-6 h-6 rounded-full bg-white/90 dark:bg-black/50 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-red-500 text-xs"
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="aspect-[3/4] w-full rounded-lg overflow-hidden">
+                      <DocThumbnail docId={doc.id} token={token} size="lg" />
+                    </div>
+                    <p
+                      className="text-xs font-medium truncate mt-2 px-0.5"
+                      title={doc.filename}
+                    >
+                      {doc.filename}
+                    </p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 px-0.5 mt-0.5">
+                      {doc.chunks} chunks
+                    </p>
+                    {doc.chat_id && (
+                      <span
+                        className="mt-1 mx-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 truncate text-[10px]"
+                        title={`Attached to chat: ${doc.chat_name || 'Untitled chat'}`}
+                      >
+                        💬 <span className="truncate">{doc.chat_name || 'Untitled chat'}</span>
+                      </span>
+                    )}
                     <select
                       value={doc.folder_id ?? ''}
                       onChange={(e) => {
@@ -671,7 +691,7 @@ export default function DocumentsPage() {
                         );
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="opacity-0 group-hover:opacity-100 text-xs bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 focus:outline-none text-gray-600 dark:text-gray-300"
+                      className="mt-1 w-full text-[10px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 focus:outline-none text-gray-600 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Move to folder"
                     >
                       <option value="">Unfiled</option>
@@ -681,16 +701,6 @@ export default function DocumentsPage() {
                         </option>
                       ))}
                     </select>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteDocument(doc.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
-                      title="Delete"
-                    >
-                      ✕
-                    </button>
                   </div>
                 );
               })}

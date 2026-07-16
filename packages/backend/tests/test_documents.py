@@ -179,6 +179,53 @@ def test_get_document_file_success(client, auth_headers, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/documents/<doc_id>/thumbnail
+# ---------------------------------------------------------------------------
+
+def test_get_document_thumbnail_no_auth(client):
+    resp = client.get("/api/documents/abc/thumbnail")
+    assert resp.status_code == 401
+
+
+def test_get_document_thumbnail_not_found_in_db(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.get("/api/documents/abc/thumbnail", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_thumbnail_missing_on_disk(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.pdf"}
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/thumbnail", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_thumbnail_success(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.pdf"}
+    (tmp_path / "abc_thumb.png").write_bytes(b"\x89PNG\r\n\x1a\nfakepngdata")
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/thumbnail", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+
+
+def test_upload_generates_thumbnail(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", return_value=1), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        data = {"file": (io.BytesIO(b"Hello world, this is a preview."), "test.txt")}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    doc_id = resp.get_json()["id"]
+    assert (tmp_path / f"{doc_id}_thumb.png").exists()
+
+
+# ---------------------------------------------------------------------------
 # DELETE /api/documents/<doc_id>
 # ---------------------------------------------------------------------------
 
@@ -193,6 +240,17 @@ def test_delete_document_found(client, auth_headers):
     with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
         resp = client.delete("/api/documents/abc", headers=auth_headers)
     assert resp.status_code == 200
+
+
+def test_delete_document_removes_thumbnail(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.txt", "chunk_count": 5, "folder_id": None, "created_at": None}
+    thumb = tmp_path / "abc_thumb.png"
+    thumb.write_bytes(b"fake")
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.delete("/api/documents/abc", headers=auth_headers)
+    assert resp.status_code == 200
+    assert not thumb.exists()
 
 
 # ---------------------------------------------------------------------------
