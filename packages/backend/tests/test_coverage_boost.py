@@ -296,6 +296,32 @@ def test_query_documents_no_context_no_key():
             assert "not find" in result.lower() or isinstance(result, str)
 
 
+def test_retrieve_context_no_chromadb_returns_empty():
+    with patch.dict("sys.modules", {"chromadb": None}):
+        import services.rag as mod
+        reload(mod)
+        result = mod.retrieve_context("what is this?")
+        assert result == ""
+
+
+def test_retrieve_context_returns_joined_chunks():
+    mock_chroma = MagicMock()
+    mock_collection = MagicMock()
+    mock_collection.query.return_value = {"documents": [["chunk1", "chunk2"]]}
+    mock_chroma.PersistentClient.return_value.get_or_create_collection.return_value = mock_collection
+
+    mock_ef_module = MagicMock()
+    mock_ef_module.DefaultEmbeddingFunction.return_value = MagicMock()
+
+    with patch.dict("sys.modules", {"chromadb": mock_chroma,
+                                     "chromadb.utils": mock_ef_module,
+                                     "chromadb.utils.embedding_functions": mock_ef_module}):
+        import services.rag as mod
+        reload(mod)
+        result = mod.retrieve_context("what is this?", doc_ids=["doc1"])
+        assert result == "chunk1\n\nchunk2"
+
+
 def test_query_documents_context_no_key():
     """When chromadb returns results but no API key, returns the context snippet."""
     mock_chroma = MagicMock()

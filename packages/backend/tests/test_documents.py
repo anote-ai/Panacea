@@ -38,6 +38,12 @@ def test_list_documents_with_folder(client, auth_headers):
     assert resp.status_code == 200
 
 
+def test_list_documents_with_chat_id(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.get("/api/documents?chat_id=5", headers=auth_headers)
+    assert resp.status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # POST /api/documents/upload
 # ---------------------------------------------------------------------------
@@ -82,6 +88,32 @@ def test_upload_with_folder_id(client, auth_headers, tmp_path):
         )
     assert resp.status_code == 201
     assert resp.get_json()["folder_id"] == 2
+
+
+def test_upload_with_chat_id(client, auth_headers, tmp_path):
+    import datetime
+    chat_row = {"id": 5, "name": "New Chat", "created_at": datetime.datetime(2024, 1, 1)}
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", return_value=2), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=chat_row)):
+        data = {"file": (io.BytesIO(b"Chat context."), "notes.txt"), "chat_id": "5"}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    assert resp.get_json()["chat_id"] == 5
+
+
+def test_upload_with_chat_id_not_found(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        data = {"file": (io.BytesIO(b"data"), "notes.txt"), "chat_id": "999"}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 404
 
 
 def test_upload_ingest_failure(client, auth_headers, tmp_path):

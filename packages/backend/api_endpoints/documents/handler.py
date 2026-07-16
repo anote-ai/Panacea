@@ -9,6 +9,7 @@ from flask_jwt_extended import get_jwt_identity
 
 from database.db import (
     create_document,
+    get_chat,
     get_connection,
     get_document_by_uuid,
     get_documents,
@@ -46,6 +47,18 @@ def upload() -> tuple:  # type: ignore[type-arg]
     folder_id_raw = request.form.get("folder_id")
     folder_id = int(folder_id_raw) if folder_id_raw and folder_id_raw.isdigit() else None
 
+    chat_id_raw = request.form.get("chat_id")
+    chat_id = int(chat_id_raw) if chat_id_raw and chat_id_raw.isdigit() else None
+    user_id = int(get_jwt_identity())
+
+    if chat_id is not None:
+        cnx = get_connection()
+        try:
+            if not get_chat(cnx, user_id, chat_id):
+                return jsonify({"error": "Chat not found"}), 404
+        finally:
+            cnx.close()
+
     doc_id = str(uuid.uuid4())
     save_path = UPLOAD_FOLDER / f"{doc_id}{ext}"
 
@@ -63,11 +76,10 @@ def upload() -> tuple:  # type: ignore[type-arg]
         return jsonify({"error": "Internal server error"}), 500
 
     original_name = file.filename or f"upload{ext}"
-    user_id = int(get_jwt_identity())
 
     try:
         cnx = get_connection()
-        create_document(cnx, user_id, doc_id, original_name, chunk_count, folder_id)
+        create_document(cnx, user_id, doc_id, original_name, chunk_count, folder_id, chat_id)
         cnx.close()
     except Exception as exc:
         print(f"DB insert failed: {exc}")
@@ -79,6 +91,7 @@ def upload() -> tuple:  # type: ignore[type-arg]
         "filename": original_name,
         "chunks": chunk_count,
         "folder_id": folder_id,
+        "chat_id": chat_id,
     }), 201
 
 
@@ -87,9 +100,11 @@ def upload() -> tuple:  # type: ignore[type-arg]
 def list_documents() -> tuple:  # type: ignore[type-arg]
     folder_id_raw = request.args.get("folder_id")
     folder_id = int(folder_id_raw) if folder_id_raw and folder_id_raw.isdigit() else None
+    chat_id_raw = request.args.get("chat_id")
+    chat_id = int(chat_id_raw) if chat_id_raw and chat_id_raw.isdigit() else None
     try:
         cnx = get_connection()
-        docs = get_documents(cnx, int(get_jwt_identity()), folder_id)
+        docs = get_documents(cnx, int(get_jwt_identity()), folder_id, chat_id)
         cnx.close()
         return jsonify({"documents": docs}), 200
     except Exception:

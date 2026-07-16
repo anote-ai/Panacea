@@ -13,6 +13,8 @@ interface Document {
   filename: string;
   chunks: number;
   folder_id: number | null;
+  chat_id: number | null;
+  chat_name?: string | null;
 }
 interface UploadItem {
   id: string;
@@ -861,8 +863,16 @@ export default function DocumentsPage() {
                       <p className="text-sm font-medium truncate">
                         {doc.filename}
                       </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {doc.chunks} chunks
+                      <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                        <span>{doc.chunks} chunks</span>
+                        {doc.chat_id && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 truncate max-w-[160px]"
+                            title={`Attached to chat: ${doc.chat_name || 'Untitled chat'}`}
+                          >
+                            💬 <span className="truncate">{doc.chat_name || 'Untitled chat'}</span>
+                          </span>
+                        )}
                       </p>
                     </div>
                     <select
