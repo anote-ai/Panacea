@@ -95,32 +95,39 @@ def delete_folder(cnx: Any, folder_id: int, user_id: int) -> bool:
 # ---------------------------------------------------------------------------
 
 def create_document(cnx: Any, user_id: int, doc_uuid: str, filename: str,
-                    chunk_count: int, folder_id: int | None = None) -> int:
+                    chunk_count: int, folder_id: int | None = None,
+                    chat_id: int | None = None) -> int:
     cursor = cnx.cursor()
     cursor.execute(
-        "INSERT INTO documents (user_id, folder_id, doc_uuid, filename, chunk_count) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (user_id, folder_id, doc_uuid, filename, chunk_count),
+        "INSERT INTO documents (user_id, folder_id, chat_id, doc_uuid, filename, chunk_count) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (user_id, folder_id, chat_id, doc_uuid, filename, chunk_count),
     )
     doc_id: int = cursor.lastrowid
     cursor.close()
     return doc_id
 
 
-def get_documents(cnx: Any, user_id: int, folder_id: int | None = None) -> list[dict]:
+_DOCUMENT_SELECT = (
+    "SELECT d.doc_uuid as id, d.filename, d.chunk_count, d.folder_id, d.chat_id, "
+    "c.name as chat_name, d.created_at "
+    "FROM documents d LEFT JOIN chats c ON d.chat_id = c.id"
+)
+
+
+def get_documents(cnx: Any, user_id: int, folder_id: int | None = None,
+                  chat_id: int | None = None) -> list[dict]:
     cursor = cnx.cursor(dictionary=True)
-    if folder_id is None:
-        cursor.execute(
-            "SELECT doc_uuid as id, filename, chunk_count, folder_id, created_at "
-            "FROM documents WHERE user_id = %s ORDER BY created_at DESC",
-            (user_id,),
-        )
-    else:
-        cursor.execute(
-            "SELECT doc_uuid as id, filename, chunk_count, folder_id, created_at "
-            "FROM documents WHERE user_id = %s AND folder_id = %s ORDER BY created_at DESC",
-            (user_id, folder_id),
-        )
+    query = f"{_DOCUMENT_SELECT} WHERE d.user_id = %s"
+    params: list[Any] = [user_id]
+    if folder_id is not None:
+        query += " AND d.folder_id = %s"
+        params.append(folder_id)
+    if chat_id is not None:
+        query += " AND d.chat_id = %s"
+        params.append(chat_id)
+    query += " ORDER BY d.created_at DESC"
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     cursor.close()
     return rows  # type: ignore[return-value]
@@ -129,8 +136,7 @@ def get_documents(cnx: Any, user_id: int, folder_id: int | None = None) -> list[
 def get_document_by_uuid(cnx: Any, user_id: int, doc_uuid: str) -> dict | None:
     cursor = cnx.cursor(dictionary=True)
     cursor.execute(
-        "SELECT doc_uuid as id, filename, chunk_count, folder_id, created_at "
-        "FROM documents WHERE user_id = %s AND doc_uuid = %s",
+        f"{_DOCUMENT_SELECT} WHERE d.user_id = %s AND d.doc_uuid = %s",
         (user_id, doc_uuid),
     )
     row = cursor.fetchone()

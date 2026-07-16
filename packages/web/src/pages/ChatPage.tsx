@@ -30,6 +30,11 @@ interface UploadItem {
   error?: string;
 }
 
+interface AttachedDoc {
+  id: string;
+  filename: string;
+}
+
 const MODELS = [
   'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
@@ -115,6 +120,8 @@ export default function ChatPage() {
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
+  const [chatDocs, setChatDocs] = useState<AttachedDoc[]>([]);
+  const [docsModalOpen, setDocsModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +130,8 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortRefs = useRef<Map<string, AbortController>>(new Map());
   const skipNextLoadRef = useRef(false);
+  const activeChatIdRef = useRef<string | null>(null);
+  const ensureChatIdPromiseRef = useRef<Promise<string> | null>(null);
 
   const headers = { Authorization: `Bearer ${token}` };
   const isUploading = uploads.some(
@@ -146,10 +155,29 @@ export default function ChatPage() {
     [token],
   );
 
+  const loadChatDocs = useCallback(
+    async (id: string) => {
+      try {
+        const res = await axios.get('/api/documents', {
+          headers,
+          params: { chat_id: id },
+        });
+        setChatDocs(
+          (res.data.documents || []).map((d: any) => ({
+            id: d.id,
+            filename: d.filename,
+          })),
+        );
+      } catch {}
+    },
+    [token],
+  );
+
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
   useEffect(() => {
+    activeChatIdRef.current = sessionId ?? null;
     if (skipNextLoadRef.current) {
       skipNextLoadRef.current = false;
       return;
@@ -157,6 +185,30 @@ export default function ChatPage() {
     if (sessionId) loadMessages(sessionId);
     else setMessages([]);
   }, [sessionId, loadMessages]);
+  useEffect(() => {
+    if (sessionId) loadChatDocs(sessionId);
+    else setChatDocs([]);
+  }, [sessionId, loadChatDocs]);
+
+  // Creates a chat up front if one doesn't exist yet, so a file dropped
+  // before any message has somewhere to attach to. Concurrent calls (e.g.
+  // dropping several files at once into a brand-new chat) share one
+  // in-flight request instead of each creating their own chat.
+  const ensureChatId = useCallback(async (): Promise<string> => {
+    if (activeChatIdRef.current) return activeChatIdRef.current;
+    if (!ensureChatIdPromiseRef.current) {
+      ensureChatIdPromiseRef.current = (async () => {
+        const res = await axios.post('/api/chat/sessions', {}, { headers });
+        const newId = String(res.data.sessionId);
+        activeChatIdRef.current = newId;
+        skipNextLoadRef.current = true;
+        nav(`/app/chat/${newId}`, { replace: true });
+        loadSessions();
+        return newId;
+      })();
+    }
+    return ensureChatIdPromiseRef.current;
+  }, [headers, nav, loadSessions]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -209,8 +261,23 @@ export default function ChatPage() {
 
     upsert({ id, file, name: file.name, step: 'uploading', pct: 0 });
 
+    let chatId: string;
+    try {
+      chatId = await ensureChatId();
+    } catch {
+      setUploads((prev) =>
+        prev.map((u) =>
+          u.id === id
+            ? { ...u, step: 'error', error: 'Upload failed — please try again.' }
+            : u,
+        ),
+      );
+      return;
+    }
+
     const form = new FormData();
     form.append('file', file);
+    form.append('chat_id', chatId);
 
     const controller = new AbortController();
     uploadAbortRefs.current.set(id, controller);
@@ -249,6 +316,7 @@ export default function ChatPage() {
       setUploads((prev) =>
         prev.map((u) => (u.id === id ? { ...u, step: 'done', pct: 100 } : u)),
       );
+      loadChatDocs(chatId);
       setTimeout(
         () => setUploads((prev) => prev.filter((u) => u.id !== id)),
         3000,
@@ -289,6 +357,13 @@ export default function ChatPage() {
     const controller = uploadAbortRefs.current.get(id);
     if (controller) controller.abort();
     else setUploads((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  const removeAttachedDoc = async (docId: string) => {
+    setChatDocs((prev) => prev.filter((d) => d.id !== docId));
+    try {
+      await axios.delete(`/api/documents/${docId}`, { headers });
+    } catch {}
   };
 
   const onDragEnter = (e: React.DragEvent) => {
@@ -564,6 +639,53 @@ export default function ChatPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Documents attached to this chat */}
+      {docsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white dark:bg-[#2F2F2F] rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold">Documents</h2>
+              <button
+                onClick={() => setDocsModalOpen(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] transition-colors"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            {chatDocs.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
+                No files attached to this chat yet.
+              </p>
+            ) : (
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {chatDocs.map((d) => (
+                  <div
+                    key={d.id}
+                    className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors"
+                  >
+                    <span className="text-base flex-shrink-0">📄</span>
+                    <span
+                      className="flex-1 min-w-0 text-sm truncate text-gray-900 dark:text-white"
+                      title={d.filename}
+                    >
+                      {d.filename}
+                    </span>
+                    <button
+                      onClick={() => removeAttachedDoc(d.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
+                      title="Remove from this chat"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -889,6 +1011,31 @@ export default function ChatPage() {
                       </option>
                     ))}
                   </select>
+                  <button
+                    onClick={() => setDocsModalOpen(true)}
+                    className="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
+                    aria-label="Documents"
+                    title="Documents attached to this chat"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    {chatDocs.length > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-medium flex items-center justify-center">
+                        {chatDocs.length}
+                      </span>
+                    )}
+                  </button>
                 </div>
                 <button
                   onClick={

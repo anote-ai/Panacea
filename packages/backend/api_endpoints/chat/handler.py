@@ -13,11 +13,13 @@ from database.db import (
     get_chat,
     get_chats,
     get_connection,
+    get_documents,
     get_messages,
     rename_chat,
 )
 from database.db import delete_chat as db_delete_chat
 from middleware.auth import require_auth
+from services.rag import retrieve_context
 from services.streaming import sse_event, stream_agent_response, stream_llm_response
 from services.titles import generate_chat_title
 
@@ -55,6 +57,9 @@ def chat_stream() -> Response:
             # title generation in that case instead of only on creation.
             needs_title = chat_row["name"] == "New Chat"
         create_message(cnx, chat_id, "user", message)
+        # Files uploaded within this chat are scoped to it — they're the
+        # only documents used as context here (never other chats' uploads).
+        chat_doc_ids = [d["id"] for d in get_documents(cnx, user_id, chat_id=chat_id)]
     finally:
         cnx.close()
 
@@ -62,9 +67,18 @@ def chat_stream() -> Response:
         if is_new_chat:
             yield sse_event("session_id", {"session_id": chat_id})
 
+        llm_message = message
+        if chat_doc_ids:
+            context = retrieve_context(message, doc_ids=chat_doc_ids)
+            if context:
+                llm_message = (
+                    f"Context from attached documents:\n{context}\n\n"
+                    f"---\n\nUser question: {message}"
+                )
+
         accumulated_parts: list[str] = []
         yield from stream_agent_response(
-            message=message, cwd=cwd, model=model, on_text=accumulated_parts.append,
+            message=llm_message, cwd=cwd, model=model, on_text=accumulated_parts.append,
         )
         accumulated = "".join(accumulated_parts)
 
@@ -107,6 +121,20 @@ def chat() -> tuple:
     except Exception as exc:
         print(f"Chat error: {exc}")
         return jsonify({"error": "Internal server error"}), 500
+
+
+@chat_bp.post("/sessions")
+@require_auth
+def create_session() -> tuple:
+    """Create an empty chat — used when a file is attached before any message
+    is sent, so the upload has a chat to attach to."""
+    user_id = int(get_jwt_identity())
+    cnx = get_connection()
+    try:
+        chat_id = create_chat(cnx, user_id)
+    finally:
+        cnx.close()
+    return jsonify({"sessionId": str(chat_id)}), 201
 
 
 @chat_bp.get("/sessions")

@@ -66,6 +66,79 @@ def test_chat_stream_existing_session(client, auth_headers):
     assert "session_id" not in body
 
 
+def test_chat_stream_injects_document_context(client, auth_headers):
+    """Documents attached to this chat should be retrieved and fed to the
+    model as context, scoped only to that chat's own uploads."""
+    chat_row = {"id": 1, "name": "Existing Topic", "created_at": datetime.datetime(2024, 1, 1)}
+    docs = [{"id": "doc-uuid-1"}]
+    captured = {}
+
+    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None):
+        captured["message"] = message
+        if on_text:
+            on_text("An answer.")
+        yield 'event: text\ndata: {"type": "text", "text": "An answer."}\n\n'
+
+    with patch(
+        "api_endpoints.chat.handler.get_connection",
+        return_value=_mock_cnx(fetchone=chat_row),
+    ), patch(
+        "api_endpoints.chat.handler.get_documents", return_value=docs,
+    ), patch(
+        "api_endpoints.chat.handler.retrieve_context", return_value="relevant chunk",
+    ) as mock_retrieve, patch(
+        "api_endpoints.chat.handler.stream_agent_response", side_effect=fake_stream,
+    ):
+        resp = client.post(
+            "/api/chat/stream",
+            json={"message": "hi", "session_id": 1},
+            headers=auth_headers,
+        )
+        resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    mock_retrieve.assert_called_once_with("hi", doc_ids=["doc-uuid-1"])
+    assert "relevant chunk" in captured["message"]
+    assert "hi" in captured["message"]
+
+
+def test_chat_stream_no_documents_skips_context(client, auth_headers):
+    chat_row = {"id": 1, "name": "Existing Topic", "created_at": datetime.datetime(2024, 1, 1)}
+    captured = {}
+
+    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None):
+        captured["message"] = message
+        yield 'event: done\ndata: {"type": "done"}\n\n'
+
+    with patch(
+        "api_endpoints.chat.handler.get_connection",
+        return_value=_mock_cnx(fetchone=chat_row, fetchall=[]),
+    ), patch(
+        "api_endpoints.chat.handler.retrieve_context",
+    ) as mock_retrieve, patch(
+        "api_endpoints.chat.handler.stream_agent_response", side_effect=fake_stream,
+    ):
+        resp = client.post(
+            "/api/chat/stream",
+            json={"message": "hi", "session_id": 1},
+            headers=auth_headers,
+        )
+        resp.get_data(as_text=True)
+    assert captured["message"] == "hi"
+    mock_retrieve.assert_not_called()
+
+
+def test_create_session(client, auth_headers):
+    with patch("api_endpoints.chat.handler.get_connection", return_value=_mock_cnx(lastrowid=7)):
+        resp = client.post("/api/chat/sessions", headers=auth_headers)
+    assert resp.status_code == 201
+    assert resp.get_json()["sessionId"] == "7"
+
+
+def test_create_session_no_auth(client):
+    resp = client.post("/api/chat/sessions")
+    assert resp.status_code == 401
+
+
 def test_chat_stream_retitles_existing_untitled_session(client, auth_headers):
     """A prior attempt may have failed before producing a reply, leaving the
     chat named 'New Chat' — a later successful retry should still title it."""

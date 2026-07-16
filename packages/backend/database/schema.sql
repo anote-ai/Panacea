@@ -45,12 +45,14 @@ CREATE TABLE IF NOT EXISTS documents (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     user_id     INT NOT NULL,
     folder_id   INT NULL,
+    chat_id     INT NULL,
     doc_uuid    VARCHAR(36) NOT NULL UNIQUE,
     filename    VARCHAR(500) NOT NULL,
     chunk_count INT DEFAULT 0,
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL,
+    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (

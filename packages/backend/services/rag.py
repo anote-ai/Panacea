@@ -36,15 +36,12 @@ def ingest_document(doc_id: str, file_path: Path) -> int:
     return len(chunks)
 
 
-def query_documents(
+def retrieve_context(
     question: str,
     doc_ids: list[str] | None = None,
-    model: str = "claude-sonnet-4-6",
     top_k: int = 5,
 ) -> str:
-    """Answer a question using RAG."""
-    import os
-    context = ""
+    """Return the most relevant chunks for `question`, scoped to `doc_ids` if given."""
     try:
         import chromadb
         from chromadb.utils import embedding_functions
@@ -57,9 +54,19 @@ def query_documents(
         results = collection.query(query_texts=[question], n_results=top_k, where=where)
         raw_docs = results.get("documents")
         docs: list[str] = raw_docs[0] if raw_docs else []  # type: ignore[index]
-        context = "\n\n".join(docs)
+        return "\n\n".join(docs)
     except Exception:
-        pass
+        return ""
+
+
+def query_documents(
+    question: str,
+    doc_ids: list[str] | None = None,
+    model: str = "claude-sonnet-4-6",
+    top_k: int = 5,
+) -> str:
+    """Answer a question using RAG."""
+    context = retrieve_context(question, doc_ids, top_k)
 
     if not context:
         return "I could not find relevant information in the documents."
