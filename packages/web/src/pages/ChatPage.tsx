@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import { useAuth, useTheme } from '../App';
+import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
 
@@ -719,7 +720,7 @@ export default function ChatPage() {
       {/* Documents attached to this chat */}
       {docsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white dark:bg-[#2F2F2F] rounded-2xl shadow-xl max-w-md w-full p-6">
+          <div className="bg-white dark:bg-[#2F2F2F] rounded-2xl shadow-xl max-w-lg w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold">Documents</h2>
               <button
@@ -735,30 +736,32 @@ export default function ChatPage() {
                 No files attached to this chat yet.
               </p>
             ) : (
-              <div className="space-y-1 max-h-80 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-3 max-h-80 overflow-y-auto">
                 {chatDocs.map((d) => (
                   <div
                     key={d.id}
                     onClick={() => setViewingDoc(d)}
-                    className="group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors"
+                    className="group relative flex flex-col rounded-lg p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors"
                   >
-                    <span className="text-base flex-shrink-0">📄</span>
-                    <span
-                      className="flex-1 min-w-0 text-sm truncate text-gray-900 dark:text-white"
-                      title={d.filename}
-                    >
-                      {d.filename}
-                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         removeAttachedDoc(d.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
+                      className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-white/90 dark:bg-black/50 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex items-center justify-center transition-opacity"
                       title="Remove from this chat"
                     >
                       ✕
                     </button>
+                    <div className="aspect-[3/4] w-full rounded-lg overflow-hidden">
+                      <DocThumbnail docId={d.id} token={token} size="lg" />
+                    </div>
+                    <span
+                      className="text-xs truncate mt-1.5 px-0.5 text-gray-900 dark:text-white"
+                      title={d.filename}
+                    >
+                      {d.filename}
+                    </span>
                   </div>
                 ))}
               </div>

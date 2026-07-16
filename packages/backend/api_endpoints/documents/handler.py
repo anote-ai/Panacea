@@ -21,6 +21,7 @@ from database.db import (
 )
 from middleware.auth import require_auth
 from services.rag import UPLOAD_FOLDER, ingest_document, query_documents
+from services.thumbnails import generate_thumbnail, thumbnail_path
 
 documents_bp = Blueprint("documents", __name__, url_prefix="/api/documents")
 
@@ -76,6 +77,10 @@ def upload() -> tuple:  # type: ignore[type-arg]
         save_path.unlink(missing_ok=True)
         print(f"Ingestion failed: {exc}")
         return jsonify({"error": "Internal server error"}), 500
+
+    # Best-effort — a missing thumbnail just means the UI falls back to a
+    # generic file icon, so failures here should never fail the upload.
+    generate_thumbnail(doc_id, save_path, UPLOAD_FOLDER)
 
     original_name = file.filename or f"upload{ext}"
 
@@ -152,6 +157,25 @@ def get_document_file(doc_id: str) -> Any:
     )
 
 
+@documents_bp.get("/<doc_id>/thumbnail")
+@require_auth
+def get_document_thumbnail(doc_id: str) -> Any:
+    try:
+        cnx = get_connection()
+        doc = get_document_by_uuid(cnx, int(get_jwt_identity()), doc_id)
+        cnx.close()
+    except Exception:
+        return jsonify({"error": "Internal server error"}), 500
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+
+    thumb_path = thumbnail_path(UPLOAD_FOLDER, doc_id)
+    if not thumb_path.exists():
+        return jsonify({"error": "No thumbnail available"}), 404
+
+    return send_file(thumb_path, mimetype="image/png", as_attachment=False)
+
+
 @documents_bp.delete("/<doc_id>")
 @require_auth
 def remove_document(doc_id: str) -> tuple:  # type: ignore[type-arg]
@@ -165,6 +189,7 @@ def remove_document(doc_id: str) -> tuple:  # type: ignore[type-arg]
         cnx.close()
         for ext in (".pdf", ".txt", ".md", ".csv", ".docx"):
             Path(UPLOAD_FOLDER / f"{doc_id}{ext}").unlink(missing_ok=True)
+        thumbnail_path(UPLOAD_FOLDER, doc_id).unlink(missing_ok=True)
         return jsonify({"deleted": True}), 200
     except Exception:
         return jsonify({"error": "Internal server error"}), 500
