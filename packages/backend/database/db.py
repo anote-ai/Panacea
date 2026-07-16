@@ -293,3 +293,50 @@ def get_messages(cnx: Any, chat_id: int) -> list[dict]:
     rows = cursor.fetchall()
     cursor.close()
     return rows  # type: ignore[return-value]
+
+
+# ---------------------------------------------------------------------------
+# Provider keys (user-supplied Anthropic/OpenAI/Gemini keys)
+# ---------------------------------------------------------------------------
+
+def upsert_provider_key(cnx: Any, user_id: int, provider: str, key_encrypted: str) -> None:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "INSERT INTO user_provider_keys (user_id, provider, key_encrypted) VALUES (%s, %s, %s) "
+        "ON DUPLICATE KEY UPDATE key_encrypted = VALUES(key_encrypted)",
+        (user_id, provider, key_encrypted),
+    )
+    cursor.close()
+
+
+def get_provider_keys(cnx: Any, user_id: int) -> list[dict]:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT provider, key_encrypted FROM user_provider_keys WHERE user_id = %s",
+        (user_id,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows  # type: ignore[return-value]
+
+
+def get_provider_key(cnx: Any, user_id: int, provider: str) -> str | None:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT key_encrypted FROM user_provider_keys WHERE user_id = %s AND provider = %s",
+        (user_id, provider),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    return row["key_encrypted"] if row else None
+
+
+def delete_provider_key(cnx: Any, user_id: int, provider: str) -> bool:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "DELETE FROM user_provider_keys WHERE user_id = %s AND provider = %s",
+        (user_id, provider),
+    )
+    deleted = cursor.rowcount > 0
+    cursor.close()
+    return deleted

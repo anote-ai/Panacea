@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
-import { type ThemeMode, useAuth, useTheme } from '../App';
+import { type ThemeMode, useAuth, useModel, useTheme } from '../App';
+import { MODELS } from '../constants/models';
 import UserAvatar from './UserAvatar';
 
 interface Props {
@@ -8,17 +9,26 @@ interface Props {
   onClose: () => void;
 }
 
-type Section = 'general' | 'account' | 'display';
+type Section = 'general' | 'account' | 'apiUsage' | 'display' | 'billing';
 
 const NAV_ITEMS: { id: Section; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'account', label: 'Account' },
+  { id: 'apiUsage', label: 'API Usage' },
   { id: 'display', label: 'Display' },
+  { id: 'billing', label: 'Billing' },
+];
+
+const PROVIDERS: { id: string; label: string }[] = [
+  { id: 'anthropic', label: 'Anthropic (Claude)' },
+  { id: 'openai', label: 'OpenAI (GPT)' },
+  { id: 'google', label: 'Google (Gemini)' },
 ];
 
 export default function SettingsModal({ open, onClose }: Props) {
   const { token, user, refreshUser, avatarVersion, bumpAvatarVersion } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
+  const { model, setModel } = useModel();
   const [section, setSection] = useState<Section>('general');
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
@@ -26,14 +36,102 @@ export default function SettingsModal({ open, onClose }: Props) {
   const [nameError, setNameError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [providerKeys, setProviderKeys] = useState<Record<string, string>>({});
+  const [providerKeysLoading, setProviderKeysLoading] = useState(false);
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
+  const [keySaving, setKeySaving] = useState<Record<string, boolean>>({});
+  const [openProviders, setOpenProviders] = useState<Record<string, boolean>>({});
+
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+
   useEffect(() => {
     if (open) {
       setSection('general');
       setName(user?.name || '');
       setAvatarError(null);
       setNameError(null);
+      setKeyInputs({});
+      setKeyErrors({});
+      setOpenProviders({});
+      setBillingError(null);
     }
   }, [open, user?.name]);
+
+  useEffect(() => {
+    if (open && section === 'apiUsage') {
+      setProviderKeysLoading(true);
+      axios
+        .get('/api/user/provider-keys', { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => setProviderKeys(res.data.keys || {}))
+        .catch(() => {})
+        .finally(() => setProviderKeysLoading(false));
+    }
+  }, [open, section, token]);
+
+  const saveProviderKey = async (provider: string) => {
+    const key = (keyInputs[provider] || '').trim();
+    if (!key) return;
+    setKeySaving((s) => ({ ...s, [provider]: true }));
+    setKeyErrors((e) => ({ ...e, [provider]: '' }));
+    try {
+      const res = await axios.put(
+        '/api/user/provider-keys',
+        { provider, key },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setProviderKeys((keys) => ({ ...keys, [provider]: res.data.masked }));
+      setKeyInputs((inputs) => ({ ...inputs, [provider]: '' }));
+      setOpenProviders((open) => ({ ...open, [provider]: false }));
+    } catch (err: any) {
+      setKeyErrors((e) => ({
+        ...e,
+        [provider]: err?.response?.data?.error || err?.message || 'Failed to save key.',
+      }));
+    } finally {
+      setKeySaving((s) => ({ ...s, [provider]: false }));
+    }
+  };
+
+  const removeProviderKey = async (provider: string) => {
+    setKeyErrors((e) => ({ ...e, [provider]: '' }));
+    try {
+      await axios.delete(`/api/user/provider-keys/${provider}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProviderKeys((keys) => {
+        const next = { ...keys };
+        delete next[provider];
+        return next;
+      });
+      setOpenProviders((open) => ({ ...open, [provider]: false }));
+    } catch (err: any) {
+      setKeyErrors((e) => ({
+        ...e,
+        [provider]: err?.response?.data?.error || err?.message || 'Failed to remove key.',
+      }));
+    }
+  };
+
+  const openBillingPortal = async () => {
+    setBillingLoading(true);
+    setBillingError(null);
+    try {
+      const res = await axios.post(
+        '/api/payments/portal',
+        { returnUrl: window.location.href },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      window.location.href = res.data.url;
+    } catch (err: any) {
+      setBillingError(
+        err?.response?.data?.error || err?.message || 'Billing is not configured yet.',
+      );
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -251,6 +349,136 @@ export default function SettingsModal({ open, onClose }: Props) {
               <p className="text-xs text-gray-400 dark:text-gray-500">
                 More display settings coming soon.
               </p>
+            )}
+
+            {section === 'apiUsage' && (
+              <div className="space-y-8">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    Default model
+                  </h4>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                    Used for new messages across all chats.
+                  </p>
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="w-full max-w-xs bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                  >
+                    {MODELS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    API keys
+                  </h4>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                    Bring your own provider keys — used for your chats instead of the shared
+                    default. Ollama runs locally and doesn't need a key.
+                  </p>
+                  {providerKeysLoading ? (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Loading…</p>
+                  ) : (
+                    <div className="space-y-2 max-w-sm">
+                      {PROVIDERS.map((p) => {
+                        const isSet = !!providerKeys[p.id];
+                        const isOpen = !!openProviders[p.id];
+                        return (
+                          <div key={p.id}>
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                {p.label}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`text-xs ${
+                                    isSet
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-gray-400 dark:text-gray-500'
+                                  }`}
+                                >
+                                  {isSet ? 'API set' : 'Not set'}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setOpenProviders((open) => ({ ...open, [p.id]: !isOpen }))
+                                  }
+                                  className="text-xs text-gray-600 dark:text-gray-300 hover:underline"
+                                >
+                                  {isOpen ? 'Cancel' : isSet ? 'Edit' : 'Set'}
+                                </button>
+                              </div>
+                            </div>
+                            {isOpen && (
+                              <div className="mt-2">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="password"
+                                    autoFocus
+                                    value={keyInputs[p.id] || ''}
+                                    onChange={(e) =>
+                                      setKeyInputs((inputs) => ({ ...inputs, [p.id]: e.target.value }))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') saveProviderKey(p.id);
+                                    }}
+                                    placeholder={isSet ? 'Replace key…' : 'Enter API key…'}
+                                    className="flex-1 bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={() => saveProviderKey(p.id)}
+                                    disabled={keySaving[p.id] || !keyInputs[p.id]?.trim()}
+                                    className="px-3 py-2 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  {isSet && (
+                                    <button
+                                      onClick={() => removeProviderKey(p.id)}
+                                      className="px-2 py-2 text-xs text-red-500 hover:text-red-600"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                                {keyErrors[p.id] && (
+                                  <p className="text-xs text-red-500 mt-1">{keyErrors[p.id]}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {section === 'billing' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    Subscription
+                  </h4>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                    Manage your plan and payment method via Stripe.
+                  </p>
+                  <button
+                    onClick={openBillingPortal}
+                    disabled={billingLoading}
+                    className="px-3 py-1.5 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {billingLoading ? 'Opening…' : 'Manage billing'}
+                  </button>
+                  {billingError && <p className="text-xs text-red-500 mt-2">{billingError}</p>}
+                </div>
+              </div>
             )}
           </div>
         </div>

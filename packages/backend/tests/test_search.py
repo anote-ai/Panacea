@@ -164,20 +164,38 @@ def test_delete_avatar(client, auth_headers, tmp_path):
     assert not avatar_file.exists()
 
 
-def test_api_keys_list(client, auth_headers):
-    resp = client.get("/api/user/api-keys", headers=auth_headers)
+def test_provider_keys_list(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx(fetchall=[])):
+        resp = client.get("/api/user/provider-keys", headers=auth_headers)
     assert resp.status_code == 200
-    assert "keys" in resp.get_json()
+    assert resp.get_json()["keys"] == {}
 
 
-def test_api_keys_create(client, auth_headers):
-    resp = client.post("/api/user/api-keys", headers=auth_headers)
-    assert resp.status_code == 201
-    assert resp.get_json()["key"].startswith("ak-")
+def test_provider_keys_set(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.put(
+            "/api/user/provider-keys",
+            json={"provider": "anthropic", "key": "sk-test-key-12345"},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["provider"] == "anthropic"
+    assert "..." in body["masked"]
 
 
-def test_api_keys_delete_not_found(client, auth_headers):
-    resp = client.delete("/api/user/api-keys/nonexistent-prefix", headers=auth_headers)
+def test_provider_keys_set_unsupported_provider(client, auth_headers):
+    resp = client.put(
+        "/api/user/provider-keys",
+        json={"provider": "bogus", "key": "abc"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_provider_keys_delete_not_found(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx(rowcount=0)):
+        resp = client.delete("/api/user/provider-keys/anthropic", headers=auth_headers)
     assert resp.status_code == 404
 
 

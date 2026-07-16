@@ -80,6 +80,7 @@ def chat_stream() -> Response:
         accumulated_parts: list[str] = []
         yield from stream_agent_response(
             message=llm_message, cwd=cwd, model=model, on_text=accumulated_parts.append,
+            user_id=user_id,
         )
         accumulated = "".join(accumulated_parts)
 

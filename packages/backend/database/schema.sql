@@ -64,6 +64,17 @@ CREATE TABLE IF NOT EXISTS api_keys (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS user_provider_keys (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT NOT NULL,
+    provider       VARCHAR(20) NOT NULL,
+    key_encrypted  TEXT NOT NULL,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_provider (user_id, provider),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS stripe_customers (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     user_id     INT NOT NULL UNIQUE,
@@ -83,3 +94,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 INSERT IGNORE INTO schema_migrations (version) VALUES ('0001_add_folders_and_document_columns.sql');
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0002_add_user_provider_keys.sql');

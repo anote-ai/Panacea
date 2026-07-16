@@ -73,7 +73,7 @@ def test_chat_stream_injects_document_context(client, auth_headers):
     docs = [{"id": "doc-uuid-1"}]
     captured = {}
 
-    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None):
+    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None, user_id=None):
         captured["message"] = message
         if on_text:
             on_text("An answer.")
@@ -105,7 +105,7 @@ def test_chat_stream_no_documents_skips_context(client, auth_headers):
     chat_row = {"id": 1, "name": "Existing Topic", "created_at": datetime.datetime(2024, 1, 1)}
     captured = {}
 
-    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None):
+    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None, user_id=None):
         captured["message"] = message
         yield 'event: done\ndata: {"type": "done"}\n\n'
 
@@ -223,7 +223,7 @@ def test_chat_stream_retitles_existing_untitled_session(client, auth_headers):
     chat named 'New Chat' — a later successful retry should still title it."""
     chat_row = {"id": 1, "name": "New Chat", "created_at": datetime.datetime(2024, 1, 1)}
 
-    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None):
+    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None, user_id=None):
         if on_text:
             on_text("Hello!")
         yield 'event: text\ndata: {"type": "text", "text": "Hello!"}\n\n'
@@ -250,7 +250,7 @@ def test_chat_stream_retitles_existing_untitled_session(client, auth_headers):
 def test_chat_stream_does_not_retitle_named_session(client, auth_headers):
     chat_row = {"id": 1, "name": "Existing Topic", "created_at": datetime.datetime(2024, 1, 1)}
 
-    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None):
+    def fake_stream(message, cwd=".", model="claude-sonnet-4-6", on_text=None, user_id=None):
         if on_text:
             on_text("More info.")
         yield 'event: text\ndata: {"type": "text", "text": "More info."}\n\n'

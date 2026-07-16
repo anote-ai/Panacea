@@ -7,6 +7,7 @@ gunicorn==22.0.0
 # AI / LLM
 anthropic==0.40.0
 openai==1.58.1
+google-generativeai==0.8.3
 langchain==0.3.30
 langchain-anthropic==0.3.0
 langchain-openai==0.2.1
@@ -25,6 +26,7 @@ mysql-connector-python==8.4.0
 
 # Auth
 bcrypt==4.2.0
+cryptography==43.0.3
 
 # Payments
 stripe==10.12.0

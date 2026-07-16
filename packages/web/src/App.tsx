@@ -11,6 +11,7 @@ import PrivacyPolicyPage from "./landing_page/PrivacyPolicyPage";
 import BlogPage from "./landing_page/BlogPage";
 import CareersPage from "./landing_page/CareersPage";
 import CaseStudiesPage from "./landing_page/CaseStudiesPage";
+import { DEFAULT_MODEL, MODELS } from "./constants/models";
 
 // Theme
 export type ThemeMode = "light" | "dark" | "system";
@@ -21,6 +22,12 @@ export const ThemeContext = createContext<{
   setThemeMode: (m: ThemeMode) => void;
   toggle: () => void;
 }>({ dark: false, themeMode: "system", setThemeMode: () => {}, toggle: () => {} });
+
+// Model
+export const ModelContext = createContext<{
+  model: string;
+  setModel: (m: string) => void;
+}>({ model: DEFAULT_MODEL, setModel: () => {} });
 
 // Auth
 export interface UserProfile {
@@ -47,6 +54,7 @@ export const AuthContext = createContext<{
 
 export function useTheme() { return useContext(ThemeContext); }
 export function useAuth() { return useContext(AuthContext); }
+export function useModel() { return useContext(ModelContext); }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -71,6 +79,15 @@ export default function App() {
   );
   const [user, setUser] = useState<UserProfile | null>(null);
   const [avatarVersion, setAvatarVersion] = useState(0);
+
+  const [model, setModelState] = useState<string>(() => {
+    const stored = localStorage.getItem("model");
+    return stored && MODELS.includes(stored) ? stored : DEFAULT_MODEL;
+  });
+  const setModel = (m: string) => {
+    setModelState(m);
+    localStorage.setItem("model", m);
+  };
 
   const dark = themeMode === "system" ? systemDark : themeMode === "dark";
 
@@ -124,6 +141,7 @@ export default function App() {
 
   return (
     <ThemeContext.Provider value={{ dark, themeMode, setThemeMode, toggle }}>
+      <ModelContext.Provider value={{ model, setModel }}>
       <AuthContext.Provider
         value={{ token, setToken, user, refreshUser, avatarVersion, bumpAvatarVersion }}
       >
@@ -143,6 +161,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthContext.Provider>
+      </ModelContext.Provider>
     </ThemeContext.Provider>
   );
 }

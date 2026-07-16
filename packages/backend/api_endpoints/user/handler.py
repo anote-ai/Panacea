@@ -1,19 +1,24 @@
-"""User profile, avatar, and API key management."""
+"""User profile, avatar, and provider-key management."""
 from __future__ import annotations
 
 import os
-import secrets
 from typing import Any
 
 from flask import Blueprint, jsonify, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from database.db import get_connection, get_user_by_id, update_user_name
+from database.db import (
+    delete_provider_key,
+    get_connection,
+    get_provider_keys,
+    get_user_by_id,
+    update_user_name,
+    upsert_provider_key,
+)
 from services.avatars import avatar_path, delete_avatar, save_avatar
+from services.provider_keys import PROVIDERS, encrypt_key, decrypt_key, mask_key
 
 user_bp = Blueprint("user", __name__, url_prefix="/api/user")
-
-_api_keys: dict[str, list[str]] = {}
 
 _ALLOWED_AVATAR_TYPES = {"image/png", "image/jpeg", "image/webp"}
 _MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5MB
@@ -103,32 +108,53 @@ def remove_avatar() -> tuple:
     return jsonify({"deleted": True}), 200
 
 
-@user_bp.get("/api-keys")
+@user_bp.get("/provider-keys")
 @jwt_required()
-def list_api_keys() -> tuple:
-    user_id = get_jwt_identity()
-    keys = _api_keys.get(user_id, [])
-    masked = [f"{k[:8]}...{k[-4:]}" for k in keys]
+def list_provider_keys() -> tuple:
+    """Masked view of the caller's own bring-your-own LLM provider keys."""
+    user_id = int(get_jwt_identity())
+    cnx = get_connection()
+    try:
+        rows = get_provider_keys(cnx, user_id)
+    finally:
+        cnx.close()
+    masked: dict[str, str] = {}
+    for row in rows:
+        try:
+            masked[row["provider"]] = mask_key(decrypt_key(row["key_encrypted"]))
+        except Exception:
+            continue
     return jsonify({"keys": masked}), 200
 
 
-@user_bp.post("/api-keys")
+@user_bp.put("/provider-keys")
 @jwt_required()
-def create_api_key() -> tuple:
-    user_id = get_jwt_identity()
-    key = f"ak-{secrets.token_urlsafe(32)}"
-    _api_keys.setdefault(user_id, []).append(key)
-    return jsonify({"key": key}), 201
+def set_provider_key() -> tuple:
+    data = request.get_json(silent=True) or {}
+    provider = data.get("provider", "")
+    key = (data.get("key") or "").strip()
+    if provider not in PROVIDERS:
+        return jsonify({"error": "Unsupported provider"}), 400
+    if not key:
+        return jsonify({"error": "key is required"}), 400
+    user_id = int(get_jwt_identity())
+    cnx = get_connection()
+    try:
+        upsert_provider_key(cnx, user_id, provider, encrypt_key(key))
+    finally:
+        cnx.close()
+    return jsonify({"provider": provider, "masked": mask_key(key)}), 200
 
 
-@user_bp.delete("/api-keys/<key_prefix>")
+@user_bp.delete("/provider-keys/<provider>")
 @jwt_required()
-def delete_api_key(key_prefix: str) -> tuple:
-    user_id = get_jwt_identity()
-    keys = _api_keys.get(user_id, [])
-    original_len = len(keys)
-    _api_keys[user_id] = [k for k in keys if not k.startswith(key_prefix)]
-    deleted = original_len - len(_api_keys.get(user_id, []))
+def remove_provider_key(provider: str) -> tuple:
+    user_id = int(get_jwt_identity())
+    cnx = get_connection()
+    try:
+        deleted = delete_provider_key(cnx, user_id, provider)
+    finally:
+        cnx.close()
     if not deleted:
         return jsonify({"error": "Key not found"}), 404
-    return jsonify({"deleted": deleted}), 200
+    return jsonify({"deleted": True}), 200

@@ -6,6 +6,7 @@ import os
 from collections.abc import Callable, Generator
 
 from services.llm import get_provider_for_model
+from services.provider_keys import get_user_provider_key
 
 _ENV_KEY_FOR_PROVIDER = {
     "anthropic": "ANTHROPIC_API_KEY",
@@ -24,9 +25,13 @@ def sse_event(event: str, data: dict) -> str:  # type: ignore[type-arg]
 _sse = sse_event
 
 
-def _require_api_key(provider: str) -> str:
+def _require_api_key(provider: str, user_id: int | None = None) -> str:
     if provider == "ollama":
         return ""
+    if user_id is not None:
+        user_key = get_user_provider_key(user_id, provider)
+        if user_key:
+            return user_key
     env_key = _ENV_KEY_FOR_PROVIDER.get(provider)
     if not env_key:
         raise RuntimeError(f"Streaming is not supported for provider '{provider}'")
@@ -41,15 +46,18 @@ def stream_agent_response(
     cwd: str = ".",
     model: str = "claude-sonnet-4-6",
     on_text: Callable[[str], None] | None = None,
+    user_id: int | None = None,
 ) -> Generator[str, None, None]:
     """Stream an agent response via SSE, routed to the provider for `model`.
 
     `on_text` is invoked with each text delta as it streams, so callers can
     accumulate the full reply for persistence without re-parsing SSE frames.
+    `user_id`, if given, is checked first for a user-supplied provider key
+    before falling back to the server's env-configured key.
     """
     provider = get_provider_for_model(model)
     try:
-        api_key = _require_api_key(provider)
+        api_key = _require_api_key(provider, user_id)
     except RuntimeError as exc:
         yield _sse("error", {"message": str(exc)})
         return
@@ -122,11 +130,12 @@ def stream_llm_response(
     message: str,
     model: str = "claude-sonnet-4-6",
     history: list[dict] | None = None,  # type: ignore[type-arg]
+    user_id: int | None = None,
 ) -> str:
     """Non-streaming LLM completion, routed to the provider for `model`."""
     history = history or []
     provider = get_provider_for_model(model)
-    api_key = _require_api_key(provider)
+    api_key = _require_api_key(provider, user_id)
     if provider == "anthropic":
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)

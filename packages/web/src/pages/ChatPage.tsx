@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
-import { useAuth } from '../App';
+import { useAuth, useModel } from '../App';
 import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
@@ -43,15 +43,6 @@ interface ChatSearchResult {
   title: string;
   snippet: string | null;
 }
-
-const MODELS = [
-  'claude-sonnet-4-6',
-  'claude-haiku-4-5-20251001',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'gemini-1.5-pro',
-  'llama3',
-];
 
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -129,11 +120,11 @@ export default function ChatPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const nav = useNavigate();
   const { token } = useAuth();
+  const { model } = useModel();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [model, setModel] = useState(MODELS[0]);
   const [streaming, setStreaming] = useState(false);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(
     null,
@@ -748,17 +739,6 @@ export default function ChatPage() {
                 />
               </svg>
             </button>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] focus:outline-none transition-colors"
-            >
-              {MODELS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
             <button
               onClick={() => setDocsModalOpen(true)}
               className="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
