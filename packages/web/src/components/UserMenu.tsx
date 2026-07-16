@@ -103,7 +103,7 @@ export default function UserMenu({ sidebarOpen }: Props) {
                 onClick={logout}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] transition-colors flex items-center gap-2"
               >
-                <span>🚪</span> Sign out
+                <span></span> Sign Out
               </button>
             </div>
           </>,
