@@ -73,3 +73,13 @@ CREATE TABLE IF NOT EXISTS stripe_customers (
     period_end  DATETIME,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Tracks which database/migrations/*.sql files have been applied (see
+-- database/migrate.py). Fresh installs get the final schema directly from
+-- the CREATE TABLE statements above, so migrations that are already
+-- reflected here must be pre-marked as applied to avoid re-running them.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     VARCHAR(255) PRIMARY KEY,
+    applied_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0001_add_folders_and_document_columns.sql');
