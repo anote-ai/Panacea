@@ -1,9 +1,13 @@
+# Local dev stack only — production deploys packages/backend and packages/web
+# directly via ECS/CloudFront (see terraform/ and .github/workflows/deploy.yml),
+# not this file. restart: "no" everywhere is intentional so a crashed
+# container surfaces immediately in the terminal instead of restart-looping.
 version: "3.9"
 
 services:
   db:
     image: mysql:8.0
-    restart: always
+    restart: "no"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-anote}
       MYSQL_DATABASE: ${DB_NAME:-anote}
