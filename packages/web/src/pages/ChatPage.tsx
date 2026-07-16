@@ -650,6 +650,164 @@ export default function ChatPage() {
     setDeleteTarget(null);
   };
 
+  const uploadsRow = uploads.length > 0 && (
+    <div className="px-4 pt-3 max-w-3xl mx-auto w-full flex gap-2 overflow-x-auto pb-1 scrollbar-thin-x">
+      {uploads.map((u) => (
+        <div
+          key={u.id}
+          className="group relative w-48 min-w-[160px] flex-shrink-0 bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-3 py-2 flex items-center gap-2"
+        >
+          <span className="text-base flex-shrink-0">📄</span>
+          <span
+            className="flex-1 min-w-0 text-xs font-medium truncate text-gray-900 dark:text-white"
+            title={u.step === 'error' ? u.error : u.name}
+          >
+            {u.name}
+          </span>
+          {u.step === 'error' ? (
+            <button
+              onClick={() => retryUpload(u.id)}
+              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors"
+              title="Retry upload"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </button>
+          ) : (
+            <UploadRing step={u.step} pct={u.pct} />
+          )}
+          <button
+            onClick={() => cancelUpload(u.id)}
+            className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 text-white text-[10px] flex items-center justify-center hover:bg-red-500 transition-colors"
+            title={
+              u.step === 'done' || u.step === 'error' ? 'Dismiss' : 'Cancel upload'
+            }
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
+  const composerBox = (
+    <div className="max-w-3xl mx-auto w-full">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_EXT}
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+      <div className="relative flex flex-col bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-2xl border border-gray-300 dark:border-gray-600">
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            autoResize();
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Message Anote AI..."
+          rows={1}
+          className="w-full bg-transparent px-4 pt-3.5 pb-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px] resize-none"
+        />
+        <div className="flex items-center justify-between px-2 pb-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
+              aria-label="Upload file"
+              title={`Upload file — ${ACCEPTED_LABEL}`}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                />
+              </svg>
+            </button>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] focus:outline-none transition-colors"
+            >
+              {MODELS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setDocsModalOpen(true)}
+              className="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
+              aria-label="Documents"
+              title="Documents attached to this chat"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              {chatDocs.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-medium flex items-center justify-center">
+                  {chatDocs.length}
+                </span>
+              )}
+            </button>
+          </div>
+          <button
+            onClick={streaming ? () => abortRef.current?.abort() : sendMessage}
+            disabled={!streaming && (!input.trim() || isUploading)}
+            className="p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            aria-label={streaming ? 'Stop' : 'Send'}
+            title={
+              isUploading && !streaming ? 'Waiting for uploads to finish...' : undefined
+            }
+          >
+            {streaming ? (
+              <span className="w-4 h-4 flex items-center justify-center">■</span>
+            ) : (
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-2">
+        Anote AI can make mistakes. Verify important information.
+      </p>
+    </div>
+  );
+
   return (
     <div
       className="flex h-screen bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative"
@@ -938,7 +1096,7 @@ export default function ChatPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
+            <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
               <RocketLogo className="w-16 h-16 opacity-30" />
               <p className="text-gray-400 dark:text-gray-500 text-lg">
                 How can I help you today?
@@ -946,6 +1104,10 @@ export default function ChatPage() {
               <p className="text-xs text-gray-400 dark:text-gray-500">
                 Drop a file anywhere to upload — {ACCEPTED_LABEL}
               </p>
+              <div className="w-full mt-2">
+                {uploadsRow}
+                {composerBox}
+              </div>
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -1075,177 +1237,14 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Upload progress cards */}
-        {uploads.length > 0 && (
-          <div className="px-4 pt-3 max-w-3xl mx-auto w-full flex gap-2 overflow-x-auto pb-1 scrollbar-thin-x">
-            {uploads.map((u) => (
-              <div
-                key={u.id}
-                className="group relative w-48 min-w-[160px] flex-shrink-0 bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-xl px-3 py-2 flex items-center gap-2"
-              >
-                <span className="text-base flex-shrink-0">📄</span>
-                <span
-                  className="flex-1 min-w-0 text-xs font-medium truncate text-gray-900 dark:text-white"
-                  title={u.step === 'error' ? u.error : u.name}
-                >
-                  {u.name}
-                </span>
-                {u.step === 'error' ? (
-                  <button
-                    onClick={() => retryUpload(u.id)}
-                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors"
-                    title="Retry upload"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                  </button>
-                ) : (
-                  <UploadRing step={u.step} pct={u.pct} />
-                )}
-                <button
-                  onClick={() => cancelUpload(u.id)}
-                  className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 text-white text-[10px] flex items-center justify-center hover:bg-red-500 transition-colors"
-                  title={
-                    u.step === 'done' || u.step === 'error'
-                      ? 'Dismiss'
-                      : 'Cancel upload'
-                  }
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Input */}
-        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 mt-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_EXT}
-            multiple
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-          <div className="max-w-3xl mx-auto">
-            <div className="relative flex flex-col bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-2xl border border-gray-300 dark:border-gray-600">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  autoResize();
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Message Anote AI..."
-                rows={1}
-                className="w-full bg-transparent px-4 pt-3.5 pb-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px] resize-none"
-              />
-              <div className="flex items-center justify-between px-2 pb-2">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
-                    aria-label="Upload file"
-                    title={`Upload file — ${ACCEPTED_LABEL}`}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                      />
-                    </svg>
-                  </button>
-                  <select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] focus:outline-none transition-colors"
-                  >
-                    {MODELS.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => setDocsModalOpen(true)}
-                    className="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
-                    aria-label="Documents"
-                    title="Documents attached to this chat"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    {chatDocs.length > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-medium flex items-center justify-center">
-                        {chatDocs.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                <button
-                  onClick={
-                    streaming ? () => abortRef.current?.abort() : sendMessage
-                  }
-                  disabled={!streaming && (!input.trim() || isUploading)}
-                  className="p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                  aria-label={streaming ? 'Stop' : 'Send'}
-                  title={
-                    isUploading && !streaming
-                      ? 'Waiting for uploads to finish...'
-                      : undefined
-                  }
-                >
-                  {streaming ? (
-                    <span className="w-4 h-4 flex items-center justify-center">
-                      ■
-                    </span>
-                  ) : (
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
+        {messages.length > 0 && (
+          <>
+            {uploadsRow}
+            <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 mt-2">
+              {composerBox}
             </div>
-            <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-2">
-              Anote AI can make mistakes. Verify important information.
-            </p>
-          </div>
-        </div>
+          </>
+        )}
       </div>
       <FileViewerModal
         doc={viewingDoc}
