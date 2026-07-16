@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth, useTheme } from '../App';
+import { useAuth } from '../App';
 import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
+import UserMenu from '../components/UserMenu';
 
 interface Folder {
   id: number;
@@ -26,8 +27,7 @@ interface RubberBand {
 }
 
 export default function DocumentsPage() {
-  const { token, setToken } = useAuth();
-  const { dark, toggle } = useTheme();
+  const { token } = useAuth();
   const nav = useNavigate();
 
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -275,11 +275,6 @@ export default function DocumentsPage() {
     setDraggingOver(null);
   };
 
-  const logout = () => {
-    setToken(null);
-    nav('/login');
-  };
-
   const displayDocs = selectedFolder
     ? documents.filter((d) => d.folder_id === selectedFolder.id)
     : documents;
@@ -438,17 +433,7 @@ export default function DocumentsPage() {
         </div>
         </>
         )}
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={logout}
-            title="Sign out"
-            className={`w-full rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2F2F2F] transition-colors flex items-center gap-2 ${
-              sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
-            }`}
-          >
-            <span>🚪</span> {sidebarOpen && 'Sign out'}
-          </button>
-        </div>
+        <UserMenu sidebarOpen={sidebarOpen} />
       </aside>
 
       {/* Main panel */}
@@ -477,14 +462,6 @@ export default function DocumentsPage() {
                 </>
               )}
             </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggle}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
-            >
-              {dark ? '☀️' : '🌙'}
-            </button>
           </div>
         </header>
 
