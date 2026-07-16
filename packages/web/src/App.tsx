@@ -5,12 +5,12 @@ import ChatPage from "./pages/ChatPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import LandingPage from "./landing_page/LandingPage.js";
-import ContactPage from "./landing_page/ContactPage.js";
-import PrivacyPolicyPage from "./landing_page/PrivacyPolicyPage.js";
-import BlogPage from "./landing_page/BlogPage.js";
-import CareersPage from "./landing_page/CareersPage.js";
-import CaseStudiesPage from "./landing_page/CaseStudiesPage.js";
+import LandingPage from "./landing_page/LandingPage";
+import ContactPage from "./landing_page/ContactPage";
+import PrivacyPolicyPage from "./landing_page/PrivacyPolicyPage";
+import BlogPage from "./landing_page/BlogPage";
+import CareersPage from "./landing_page/CareersPage";
+import CaseStudiesPage from "./landing_page/CaseStudiesPage";
 
 // Theme
 export type ThemeMode = "light" | "dark" | "system";
