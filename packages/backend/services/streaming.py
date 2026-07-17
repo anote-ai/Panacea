@@ -83,8 +83,8 @@ def stream_agent_response(
                 max_tokens=4096,
                 stream=True,
             )
-            for chunk in oa_stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
+            for oa_chunk in oa_stream:
+                delta = oa_chunk.choices[0].delta.content if oa_chunk.choices else None
                 if delta:
                     if on_text:
                         on_text(delta)
@@ -93,14 +93,14 @@ def stream_agent_response(
             import google.generativeai as genai
             genai.configure(api_key=api_key)
             gm = genai.GenerativeModel(model)
-            for chunk in gm.generate_content(message, stream=True):
-                text = chunk.text
+            for gm_chunk in gm.generate_content(message, stream=True):
+                text = gm_chunk.text
                 if text:
                     if on_text:
                         on_text(text)
                     yield _sse("text", {"text": text})
         elif provider == "ollama":
-            import requests
+            import requests  # type: ignore[import-untyped]
             base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
             with requests.post(
                 f"{base_url}/api/generate",
@@ -112,8 +112,8 @@ def stream_agent_response(
                 for line in resp.iter_lines():
                     if not line:
                         continue
-                    chunk = json.loads(line)
-                    text = chunk.get("response", "")
+                    payload_chunk = json.loads(line)
+                    text = payload_chunk.get("response", "")
                     if text:
                         if on_text:
                             on_text(text)
@@ -166,10 +166,10 @@ def stream_llm_response(
             {"role": "model" if h.get("role") == "assistant" else "user", "parts": [h["content"]]}
             for h in history
         ]
-        chat = gm.start_chat(history=gm_history)
+        chat = gm.start_chat(history=gm_history)  # type: ignore[arg-type]
         return chat.send_message(message).text or ""
     if provider == "ollama":
-        import requests
+        import requests  # type: ignore[import-untyped]
         base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
         messages = [*history, {"role": "user", "content": message}]
         resp = requests.post(

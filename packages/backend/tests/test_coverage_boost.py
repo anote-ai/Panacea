@@ -531,3 +531,166 @@ def test_db_functions_with_none_connection():
         db.get_user_by_email(None, "test@test.com")  # type: ignore[arg-type]
     with pytest.raises(AttributeError):
         db.create_user(None, "test@test.com", "hash")  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# services/streaming.py — openai/google/ollama branches
+# ---------------------------------------------------------------------------
+
+def test_stream_agent_openai_mock():
+    mock_chunk = MagicMock()
+    mock_chunk.choices = [MagicMock(delta=MagicMock(content="Hi"))]
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = iter([mock_chunk])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+        with patch("openai.OpenAI", return_value=mock_client):
+            import services.streaming as mod
+            reload(mod)
+            events = list(mod.stream_agent_response("hello", model="gpt-4o"))
+            assert any("Hi" in e for e in events)
+            assert any("done" in e for e in events)
+
+
+def test_stream_agent_google_mock():
+    mock_genai = MagicMock()
+    mock_chunk = MagicMock()
+    mock_chunk.text = "Bonjour"
+    mock_genai.GenerativeModel.return_value.generate_content.return_value = iter([mock_chunk])
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "gm-test"}):
+        with patch.dict("sys.modules", {"google.generativeai": mock_genai}):
+            import services.streaming as mod
+            reload(mod)
+            events = list(mod.stream_agent_response("hello", model="gemini-1.5-pro"))
+            assert any("Bonjour" in e for e in events)
+            assert any("done" in e for e in events)
+
+
+def test_stream_agent_ollama_mock():
+    mock_resp = MagicMock()
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.iter_lines.return_value = [b'{"response": "hey"}', b'']
+
+    with patch("requests.post", return_value=mock_resp):
+        import services.streaming as mod
+        reload(mod)
+        events = list(mod.stream_agent_response("hello", model="llama3"))
+        assert any("hey" in e for e in events)
+        assert any("done" in e for e in events)
+
+
+def test_stream_agent_prefers_user_key_over_env():
+    """A user-supplied provider key should be used instead of the env key."""
+    mock_stream = MagicMock()
+    mock_stream.__enter__ = MagicMock(return_value=mock_stream)
+    mock_stream.__exit__ = MagicMock(return_value=False)
+    mock_stream.text_stream = iter(["hi"])
+    mock_client = MagicMock()
+    mock_client.messages.stream.return_value = mock_stream
+
+    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}):
+        with patch("services.provider_keys.get_user_provider_key", return_value="user-key"):
+            with patch("anthropic.Anthropic", return_value=mock_client) as mock_anthropic:
+                import services.streaming as mod
+                reload(mod)
+                list(mod.stream_agent_response("hello", user_id=1))
+                mock_anthropic.assert_called_once_with(api_key="user-key")
+
+
+def test_stream_llm_openai_mock():
+    mock_choice = MagicMock()
+    mock_choice.message.content = "openai reply"
+    mock_response = MagicMock()
+    mock_response.choices = [mock_choice]
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+        with patch("openai.OpenAI", return_value=mock_client):
+            import services.streaming as mod
+            reload(mod)
+            result = mod.stream_llm_response("hello", model="gpt-4o")
+            assert result == "openai reply"
+
+
+def test_stream_llm_google_mock():
+    mock_genai = MagicMock()
+    mock_chat = MagicMock()
+    mock_chat.send_message.return_value = MagicMock(text="hola")
+    mock_genai.GenerativeModel.return_value.start_chat.return_value = mock_chat
+
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "gm-test"}):
+        with patch.dict("sys.modules", {"google.generativeai": mock_genai}):
+            import services.streaming as mod
+            reload(mod)
+            result = mod.stream_llm_response(
+                "hello", model="gemini-1.5-pro", history=[{"role": "assistant", "content": "hi"}],
+            )
+            assert result == "hola"
+
+
+def test_stream_llm_ollama_mock():
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {"message": {"content": "ollama reply"}}
+
+    with patch("requests.post", return_value=mock_resp):
+        import services.streaming as mod
+        reload(mod)
+        result = mod.stream_llm_response("hello", model="llama3")
+        assert result == "ollama reply"
+
+
+# ---------------------------------------------------------------------------
+# services/provider_keys.py
+# ---------------------------------------------------------------------------
+
+def test_provider_keys_encrypt_decrypt_roundtrip():
+    from services import provider_keys as mod
+    encrypted = mod.encrypt_key("sk-my-secret")
+    assert encrypted != "sk-my-secret"
+    assert mod.decrypt_key(encrypted) == "sk-my-secret"
+
+
+def test_provider_keys_mask_short():
+    from services.provider_keys import mask_key
+    assert mask_key("short") == "*****"
+
+
+def test_provider_keys_mask_long():
+    from services.provider_keys import mask_key
+    assert mask_key("sk-abcdefgh12345") == "sk-a...2345"
+
+
+def test_get_user_provider_key_found():
+    from services import provider_keys as mod
+    encrypted = mod.encrypt_key("sk-user-key")
+    mock_cnx = MagicMock()
+    with patch("database.db.get_connection", return_value=mock_cnx), \
+         patch("database.db.get_provider_key", return_value=encrypted):
+        assert mod.get_user_provider_key(1, "anthropic") == "sk-user-key"
+
+
+def test_get_user_provider_key_not_set():
+    from services import provider_keys as mod
+    mock_cnx = MagicMock()
+    with patch("database.db.get_connection", return_value=mock_cnx), \
+         patch("database.db.get_provider_key", return_value=None):
+        assert mod.get_user_provider_key(1, "anthropic") is None
+
+
+def test_get_user_provider_key_db_unavailable():
+    from services import provider_keys as mod
+    with patch("database.db.get_connection", side_effect=RuntimeError("no db")):
+        assert mod.get_user_provider_key(1, "anthropic") is None
+
+
+def test_get_user_provider_key_invalid_token():
+    from services import provider_keys as mod
+    mock_cnx = MagicMock()
+    with patch("database.db.get_connection", return_value=mock_cnx), \
+         patch("database.db.get_provider_key", return_value="not-a-valid-fernet-token"):
+        assert mod.get_user_provider_key(1, "anthropic") is None

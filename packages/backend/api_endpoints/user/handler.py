@@ -16,7 +16,7 @@ from database.db import (
     upsert_provider_key,
 )
 from services.avatars import avatar_path, delete_avatar, save_avatar
-from services.provider_keys import PROVIDERS, encrypt_key, decrypt_key, mask_key
+from services.provider_keys import PROVIDERS, decrypt_key, encrypt_key, mask_key
 
 user_bp = Blueprint("user", __name__, url_prefix="/api/user")
 
