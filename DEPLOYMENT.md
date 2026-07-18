@@ -103,29 +103,40 @@ which no amount of pipeline scaffolding can substitute for.
 
 ## Legacy manual deployment (anote.ai / chat.anote.ai)
 
+This is the **root-level `backend/` + `frontend/` folders** — not
+`packages/backend`/`packages/web`, and not the Panacea stack above.
+`backend/app.py` hardcodes `https://chat.anote.ai` as an allowed CORS
+origin, which is how you can tell these are the ones actually serving it.
+
 Tutorial reference: [How to deploy a website on AWS with Docker, Flask, React](https://adamraudonis.medium.com/how-to-deploy-a-website-on-aws-with-docker-flask-react-from-scratch-d0845ebd9da4)
 
 ### Frontend — AWS S3
 
 Prod URL: `https://anote-frontend.s3.amazonaws.com/index.html`
 
-From the frontend folder:
+From the `frontend/` folder. The app reads its backend URL from
+`REACT_APP_BACK_END_HOST` (see `frontend/src/http/RequestConfig.js`) — an
+earlier version of this guide said `REACT_APP_API_ENDPOINT`, which the
+frontend code doesn't actually read, so it silently no-ops and leaves the
+API endpoint blank. Use the name below.
 
 **Staging**
 ```bash
-export REACT_APP_API_ENDPOINT=https://api.tryanote-staging.com
+export REACT_APP_BACK_END_HOST=https://api.tryanote-staging.com
 npm run build
 aws s3 sync build/ s3://anote-staging-frontend --acl public-read
 ```
 
 **Prod**
 ```bash
-REACT_APP_API_ENDPOINT=https://api.anote.ai npm run build && \
+REACT_APP_BACK_END_HOST=https://api.anote.ai npm run build && \
 for file in ./build/static/js/*.js; do uglifyjs "$file" --compress --mangle -o "$file"; done && \
 aws s3 sync build/ s3://anote-product-frontend --acl public-read
 ```
 
-Chatbot frontend bucket: `anote-chatbot-frontend`.
+Chatbot frontend bucket: `anote-chatbot-frontend` — same build command,
+`REACT_APP_BACK_END_HOST` pointed at whatever backend URL chat.anote.ai's
+CORS config expects (see `backend/app.py`'s `ORIGINS` list).
 
 ### Documentation
 
@@ -146,7 +157,7 @@ export APP_ENV=local
 flask run
 ```
 
-Make sure `requirements.txt` is up to date. From the server folder:
+Make sure `requirements.txt` is up to date. From the `backend/` folder:
 ```bash
 docker build -t anote-backend . --platform linux/amd64
 docker run -p 5000:5000 anote-backend   # manual smoke test against the React frontend
@@ -162,10 +173,12 @@ If not logged into AWS/ECR:
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 730335449740.dkr.ecr.us-east-1.amazonaws.com
 ```
 
-Then from `server/aws_deploy` (contains `Dockerrun.aws.json`, which references
-the ECR image):
+Then from `backend/aws_deploy` (contains `Dockerrun.aws.json`, which
+references the ECR image — this file wasn't checked into the repo before
+and `eb deploy` couldn't run from a fresh checkout without it; it now is):
 ```bash
-eb init   # select Anote2
+eb init   # select Anote2 — this also writes .elasticbeanstalk/config.yml,
+          # which is developer-machine-local and (correctly) not committed
 eb deploy
 ```
 

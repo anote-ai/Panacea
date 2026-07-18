@@ -48,6 +48,9 @@ Thumbs.db
 # Docker
 .docker/
 
+# Elastic Beanstalk (created locally by `eb init`, machine/user-specific)
+.elasticbeanstalk/
+
 # Secrets
 *.pem
 *.key
