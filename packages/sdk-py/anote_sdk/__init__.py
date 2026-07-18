@@ -5,34 +5,31 @@ Example::
 
     from anote_sdk import AnoteClient
 
-    client = AnoteClient(api_key="ant-...", base_url="http://localhost:5000")
+    client = AnoteClient(api_key="<jwt-access-token>", base_url="http://localhost:5000")
 
     result = client.chat("Explain this codebase")
-    print(result.result)
+    print(result.response)
 """
 
-from .client import AnoteClient, AnoteError
+from .client import AnoteClient, AsyncAnoteClient, AnoteError
 from .models import (
+    ChatMessage,
     ChatResult,
-    SessionSummary,
-    Message,
+    SessionMessages,
     SearchResult,
-    UsageSummary,
-    MonthlyUsage,
-    UsageQuota,
-    ShareResult,
+    SearchResponse,
+    HealthResult,
 )
 
 __all__ = [
     "AnoteClient",
+    "AsyncAnoteClient",
     "AnoteError",
+    "ChatMessage",
     "ChatResult",
-    "SessionSummary",
-    "Message",
+    "SessionMessages",
     "SearchResult",
-    "UsageSummary",
-    "MonthlyUsage",
-    "UsageQuota",
-    "ShareResult",
+    "SearchResponse",
+    "HealthResult",
 ]
 __version__ = "1.0.0"

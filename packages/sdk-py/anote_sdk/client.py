@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Generator, Optional
+import json
 import httpx
 
 from .models import (
+    ChatMessage,
     ChatResult,
-    SessionSummary,
-    Message,
-    SearchResult,
-    UsageSummary,
-    ShareResult,
+    SessionMessages,
+    SearchResponse,
     HealthResult,
 )
 
@@ -37,6 +36,21 @@ def _raise_for_status(response: httpx.Response) -> dict:
     return data
 
 
+def _parse_sse_events(raw: str) -> Generator[tuple[str, dict], None, None]:
+    for event in raw.split("\n\n"):
+        if not event.strip():
+            continue
+        event_type = "text"
+        data = None
+        for line in event.split("\n"):
+            if line.startswith("event: "):
+                event_type = line[len("event: "):]
+            elif line.startswith("data: "):
+                data = json.loads(line[len("data: "):])
+        if data is not None:
+            yield event_type, data
+
+
 _DEFAULT_BASE = "https://api.anote.ai"
 _USER_AGENT = "anote-sdk-python/1.0.0"
 
@@ -45,7 +59,7 @@ class AnoteClient:
     """Synchronous Anote API client.
 
     Args:
-        api_key: Your Anote API key.
+        api_key: Bearer token (JWT access token from ``/auth/login``).
         base_url: Server base URL. Defaults to ``https://api.anote.ai``.
         timeout: Request timeout in seconds. Defaults to 60.
     """
@@ -58,7 +72,7 @@ class AnoteClient:
     ) -> None:
         if not api_key:
             raise ValueError("api_key is required")
-        self._base = base_url.rstrip("/") + "/api/v1"
+        self._base = base_url.rstrip("/")
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "User-Agent": _USER_AGENT,
@@ -84,45 +98,72 @@ class AnoteClient:
         self,
         message: str,
         *,
-        cwd: Optional[str] = None,
         model: str = "claude-sonnet-4-6",
-        tools: Optional[list[str]] = None,
+        history: Optional[list[ChatMessage]] = None,
     ) -> ChatResult:
-        """Send a message and receive a complete AI response."""
+        """Send a message and receive a complete (non-streaming) AI response."""
+        payload: dict = {"message": message, "model": model}
+        if history:
+            payload["history"] = [h.model_dump(by_alias=True) for h in history]
+        return ChatResult.model_validate(self._post("/api/chat", payload))
+
+    def chat_stream(
+        self,
+        message: str,
+        *,
+        model: str = "claude-sonnet-4-6",
+        cwd: Optional[str] = None,
+    ) -> Generator[str, None, None]:
+        """Send a message and yield text chunks as they're generated over SSE."""
         payload: dict = {"message": message, "model": model}
         if cwd:
             payload["cwd"] = cwd
-        if tools:
-            payload["tools"] = tools
-        return ChatResult.model_validate(self._post("/chat", payload))
+        with httpx.Client(timeout=self._timeout) as http:
+            with http.stream(
+                "POST", f"{self._base}/api/chat/stream", headers=self._headers, json=payload
+            ) as r:
+                if r.is_error:
+                    r.read()
+                    _raise_for_status(r)
+                buffer = ""
+                for chunk in r.iter_text():
+                    buffer += chunk
+                    while "\n\n" in buffer:
+                        event, buffer = buffer.split("\n\n", 1)
+                        for event_type, data in _parse_sse_events(event + "\n\n"):
+                            if event_type == "text" and data.get("text"):
+                                yield data["text"]
+                            elif event_type == "error":
+                                raise AnoteError(data.get("message", "stream error"), 0, data)
 
-    def list_sessions(self) -> list[SessionSummary]:
-        """List all chat sessions."""
-        data = self._get("/sessions")
-        return [SessionSummary.model_validate(s) for s in data]
+    # ── Sessions ──────────────────────────────────────────────────────────────
+    # Note: sessions are currently just server-side placeholders — creating
+    # one doesn't yet link it to chat()/chat_stream() calls.
 
-    def get_session_messages(self, session_id: str) -> list[Message]:
-        """Get full message history for a session."""
-        data = self._get(f"/sessions/{session_id}/messages")
-        return [Message.model_validate(m) for m in data.get("history", [])]
+    def create_session(self) -> str:
+        """Create a new (empty) chat session. Returns the new session ID."""
+        return self._post("/api/chat/sessions")["sessionId"]
+
+    def list_sessions(self) -> list[str]:
+        """List all chat session IDs on the server."""
+        return self._get("/api/chat/sessions").get("sessions", [])
+
+    def get_session_messages(self, session_id: str) -> SessionMessages:
+        """Get the message history of a session."""
+        return SessionMessages.model_validate(self._get(f"/api/chat/sessions/{session_id}"))
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session. Returns True on success."""
-        data = self._delete(f"/sessions/{session_id}")
-        return bool(data.get("ok"))
+        return bool(self._delete(f"/api/chat/sessions/{session_id}").get("deleted"))
 
-    def share_session(self, session_id: str) -> ShareResult:
-        """Mint a shareable read-only link for a session."""
-        return ShareResult.model_validate(self._post(f"/sessions/{session_id}/share"))
+    # ── Search ────────────────────────────────────────────────────────────────
 
-    def search(self, query: str, limit: int = 20) -> list[SearchResult]:
-        """Full-text search across all session histories."""
-        data = self._get("/search", params={"q": query, "limit": limit})
-        return [SearchResult.model_validate(r) for r in data.get("results", [])]
-
-    def get_usage(self) -> UsageSummary:
-        """Get current month usage and remaining quota."""
-        return UsageSummary.model_validate(self._get("/usage"))
+    def search(self, query: str, cwd: Optional[str] = None, top: int = 10) -> SearchResponse:
+        """TF-IDF search over the codebase index built by `anote index`."""
+        params: dict = {"q": query, "top": top}
+        if cwd:
+            params["cwd"] = cwd
+        return SearchResponse.model_validate(self._get("/api/search", params=params))
 
     def health(self) -> HealthResult:
         """Check server liveness. Does not require authentication."""
@@ -142,7 +183,7 @@ class AsyncAnoteClient:
     ) -> None:
         if not api_key:
             raise ValueError("api_key is required")
-        self._base = base_url.rstrip("/") + "/api/v1"
+        self._base = base_url.rstrip("/")
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "User-Agent": _USER_AGENT,
@@ -175,33 +216,62 @@ class AsyncAnoteClient:
         r = await self._client().delete(f"{self._base}{path}", headers=self._headers)
         return _raise_for_status(r)
 
-    async def chat(self, message: str, *, cwd: Optional[str] = None, model: str = "claude-sonnet-4-6", tools: Optional[list[str]] = None) -> ChatResult:
+    async def chat(
+        self,
+        message: str,
+        *,
+        model: str = "claude-sonnet-4-6",
+        history: Optional[list[ChatMessage]] = None,
+    ) -> ChatResult:
+        payload: dict = {"message": message, "model": model}
+        if history:
+            payload["history"] = [h.model_dump(by_alias=True) for h in history]
+        return ChatResult.model_validate(await self._post("/api/chat", payload))
+
+    async def chat_stream(
+        self,
+        message: str,
+        *,
+        model: str = "claude-sonnet-4-6",
+        cwd: Optional[str] = None,
+    ) -> AsyncGenerator[str, None]:
         payload: dict = {"message": message, "model": model}
         if cwd:
             payload["cwd"] = cwd
-        if tools:
-            payload["tools"] = tools
-        return ChatResult.model_validate(await self._post("/chat", payload))
+        async with self._client().stream(
+            "POST", f"{self._base}/api/chat/stream", headers=self._headers, json=payload
+        ) as r:
+            if r.is_error:
+                await r.aread()
+                _raise_for_status(r)
+            buffer = ""
+            async for chunk in r.aiter_text():
+                buffer += chunk
+                while "\n\n" in buffer:
+                    event, buffer = buffer.split("\n\n", 1)
+                    for event_type, data in _parse_sse_events(event + "\n\n"):
+                        if event_type == "text" and data.get("text"):
+                            yield data["text"]
+                        elif event_type == "error":
+                            raise AnoteError(data.get("message", "stream error"), 0, data)
 
-    async def list_sessions(self) -> list[SessionSummary]:
-        return [SessionSummary.model_validate(s) for s in await self._get("/sessions")]
+    async def create_session(self) -> str:
+        return (await self._post("/api/chat/sessions"))["sessionId"]
 
-    async def get_session_messages(self, session_id: str) -> list[Message]:
-        data = await self._get(f"/sessions/{session_id}/messages")
-        return [Message.model_validate(m) for m in data.get("history", [])]
+    async def list_sessions(self) -> list[str]:
+        return (await self._get("/api/chat/sessions")).get("sessions", [])
+
+    async def get_session_messages(self, session_id: str) -> SessionMessages:
+        return SessionMessages.model_validate(await self._get(f"/api/chat/sessions/{session_id}"))
 
     async def delete_session(self, session_id: str) -> bool:
-        return bool((await self._delete(f"/sessions/{session_id}")).get("ok"))
+        return bool((await self._delete(f"/api/chat/sessions/{session_id}")).get("deleted"))
 
-    async def share_session(self, session_id: str) -> ShareResult:
-        return ShareResult.model_validate(await self._post(f"/sessions/{session_id}/share"))
-
-    async def search(self, query: str, limit: int = 20) -> list[SearchResult]:
-        data = await self._get("/search", params={"q": query, "limit": limit})
-        return [SearchResult.model_validate(r) for r in data.get("results", [])]
-
-    async def get_usage(self) -> UsageSummary:
-        return UsageSummary.model_validate(await self._get("/usage"))
+    async def search(self, query: str, cwd: Optional[str] = None, top: int = 10) -> SearchResponse:
+        params: dict = {"q": query, "top": top}
+        if cwd:
+            params["cwd"] = cwd
+        return SearchResponse.model_validate(await self._get("/api/search", params=params))
 
     async def health(self) -> HealthResult:
         r = await self._client().get(f"{self._base}/health", headers={"User-Agent": _USER_AGENT})

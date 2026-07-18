@@ -1,10 +1,10 @@
 # Terraform
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/*.tfvars
-terraform/.terraform.lock.hcl
-terraform/crash.log
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/*.tfvars
+terraform/**/.terraform.lock.hcl
+terraform/**/crash.log
 
 # Node
 node_modules/
@@ -48,9 +48,13 @@ Thumbs.db
 # Docker
 .docker/
 
+# Elastic Beanstalk (created locally by `eb init`, machine/user-specific)
+.elasticbeanstalk/
+
 # Secrets
 *.pem
 *.key
 .env.local
 .env.production
+.env.panacea
 .claude/worktrees/

@@ -1,7 +1,9 @@
 name: Release
 
-# Triggered by pushing a tag like v1.2.3. Publishes the CLI to npm, the
-# VS Code extension to the Marketplace, and the desktop app to GitHub Releases.
+# Triggered by pushing a tag like v1.2.3. Publishes the CLI, TypeScript SDK
+# to npm, the Python SDK to PyPI, builds the mobile app via EAS, publishes
+# the VS Code extension to the Marketplace, and the desktop app to GitHub
+# Releases.
 on:
   push:
     tags:
@@ -25,6 +27,61 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-sdk-ts:
+    name: Publish TypeScript SDK to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          registry-url: "https://registry.npmjs.org"
+      - working-directory: packages/sdk
+        run: npm install
+      - working-directory: packages/sdk
+        run: npm run build
+      - working-directory: packages/sdk
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-sdk-py:
+    name: Publish Python SDK to PyPI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - working-directory: packages/sdk-py
+        run: pip install build
+      - working-directory: packages/sdk-py
+        run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/sdk-py/dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  publish-mobile:
+    name: Build mobile app (EAS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+      - working-directory: packages/mobile
+        run: npm install
+      - run: npm install -g eas-cli
+      # `eas submit` needs Apple/Google credentials wired into
+      # packages/mobile/eas.json (currently an empty submit.production
+      # stub) — see DEPLOYMENT.md. Until that's filled in, this only
+      # builds the binaries; add `--auto-submit` once submit is configured.
+      - working-directory: packages/mobile
+        run: eas build --platform all --profile production --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
   publish-vscode:
     name: Publish VS Code extension

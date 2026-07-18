@@ -29,6 +29,29 @@ event: done
 data: {}
 ```
 
+## Chat (non-streaming)
+
+```http
+POST /api/chat
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "message": "Explain this codebase",
+  "model": "claude-sonnet-4-6",
+  "history": [{"role": "user", "content": "earlier turn"}]
+}
+```
+
+Returns the complete response in one shot — best for scripting:
+
+```json
+{
+  "response": "This codebase...",
+  "model": "claude-sonnet-4-6"
+}
+```
+
 ## List Sessions
 
 ```http

@@ -1,27 +1,56 @@
 # Python SDK
 
-A Python client is available via the `anoteai` package (part of the Anote-Product repo).
+The `anote-sdk` package (`packages/sdk-py`) provides a typed client for the
+Anote backend REST API — the same API described in [API Reference](../api/overview.md).
 
 ## Installation
 
 ```bash
-pip install anoteai
+pip install anote-sdk
 ```
 
 ## Usage
 
 ```python
-from anoteai import Anote
+from anote_sdk import AnoteClient
 
-client = Anote(api_key="your-api-key")
+client = AnoteClient(api_key="<jwt-access-token>", base_url="http://localhost:5000")
 
-# Classify text
-result = client.classify(
-    data_type="text",
-    data=["This is great!", "This is terrible."],
-    labels=["positive", "negative"],
-)
-print(result)
+# Non-streaming chat
+result = client.chat("Explain this codebase")
+print(result.response)
+
+# Streaming chat
+for chunk in client.chat_stream("Explain this codebase"):
+    print(chunk, end="", flush=True)
+
+# Codebase search (TF-IDF, requires `anote index` to have run first)
+search = client.search("authentication logic")
+for hit in search.results:
+    print(hit.file, hit.start_line, hit.score)
 ```
 
-See the [Anote-Product repository](https://github.com/anote-ai/anote-product) for full SDK documentation.
+An async client is also available:
+
+```python
+from anote_sdk import AsyncAnoteClient
+
+async with AsyncAnoteClient(api_key="<jwt-access-token>") as client:
+    result = await client.chat("Explain this codebase")
+    print(result.response)
+```
+
+## API Reference
+
+| Method | Description |
+|--------|-------------|
+| `chat(message, model=..., history=...)` | Send a message, get a complete response |
+| `chat_stream(message, model=..., cwd=...)` | Send a message, yield response text chunks over SSE |
+| `create_session()` | Create a new chat session, returns its ID |
+| `list_sessions()` | List all chat session IDs |
+| `get_session_messages(session_id)` | Get a session's message history |
+| `delete_session(session_id)` | Delete a session |
+| `search(query, cwd=..., top=...)` | TF-IDF search over the codebase index |
+| `health()` | Health check (no auth required) |
+
+See [`packages/sdk-py`](https://github.com/anote-ai/Panacea/tree/main/packages/sdk-py) for source and tests.
