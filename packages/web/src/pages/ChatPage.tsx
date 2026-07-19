@@ -739,31 +739,31 @@ export default function ChatPage() {
                 />
               </svg>
             </button>
-            <button
-              onClick={() => setDocsModalOpen(true)}
-              className="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
-              aria-label="Documents"
-              title="Documents attached to this chat"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            {chatDocs.length > 0 && (
+              <button
+                onClick={() => setDocsModalOpen(true)}
+                className="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3F3F3F] transition-colors flex-shrink-0"
+                aria-label="Documents"
+                title="Documents attached to this chat"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              {chatDocs.length > 0 && (
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-medium flex items-center justify-center">
                   {chatDocs.length}
                 </span>
-              )}
-            </button>
+              </button>
+            )}
           </div>
           <button
             onClick={streaming ? () => abortRef.current?.abort() : sendMessage}

@@ -7,7 +7,9 @@ from collections.abc import Generator
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 from flask_jwt_extended import get_jwt_identity
 
+from constants import PLAN_SEARCHES
 from database.db import (
+    count_monthly_requests,
     create_chat,
     create_message,
     get_chat,
@@ -15,8 +17,10 @@ from database.db import (
     get_connection,
     get_documents,
     get_messages,
+    get_user_by_id,
     rename_chat,
     search_chats,
+    user_has_credits,
 )
 from database.db import delete_chat as db_delete_chat
 from middleware.auth import require_auth
@@ -57,6 +61,18 @@ def chat_stream() -> Response:
             # producing a reply, leaving the default name in place — retry
             # title generation in that case instead of only on creation.
             needs_title = chat_row["name"] == "New Chat"
+
+        user_row = get_user_by_id(cnx, user_id)
+        plan = (user_row or {}).get("plan") or "free"
+        monthly_limit = PLAN_SEARCHES.get(plan, 0)
+        if monthly_limit > 0 and count_monthly_requests(cnx, user_id) >= monthly_limit:
+            return jsonify({
+                "error": f"Monthly usage quota exceeded ({monthly_limit} messages/month on your plan). "
+                         "Upgrade your plan to continue.",
+            }), 429  # type: ignore[return-value]
+        if not user_has_credits(cnx, user_id, min_credits=1):
+            return jsonify({"error": "Insufficient credits. You need 1 credit to send a message."}), 402  # type: ignore[return-value]
+
         create_message(cnx, chat_id, "user", message)
         # Files uploaded within this chat are scoped to it — they're the
         # only documents used as context here (never other chats' uploads).

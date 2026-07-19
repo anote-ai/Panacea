@@ -340,3 +340,175 @@ def delete_provider_key(cnx: Any, user_id: int, provider: str) -> bool:
     deleted = cursor.rowcount > 0
     cursor.close()
     return deleted
+
+
+# ---------------------------------------------------------------------------
+# API usage metering (ported from the standalone backend/database/usage.py —
+# flat credits-per-request, token counts stored for display only)
+# ---------------------------------------------------------------------------
+
+def deduct_credits(cnx: Any, user_id: int, credits_to_deduct: int = 1) -> bool:
+    """Atomically deduct credits, refusing to go negative. Returns whether
+    the deduction happened (False if the user had insufficient credits)."""
+    cursor = cnx.cursor()
+    cursor.execute(
+        "UPDATE users SET credits = credits - %s WHERE id = %s AND credits >= %s",
+        (credits_to_deduct, user_id, credits_to_deduct),
+    )
+    deducted = cursor.rowcount > 0
+    cursor.close()
+    return deducted
+
+
+def log_api_usage(
+    cnx: Any,
+    user_id: int,
+    endpoint: str,
+    model: str | None,
+    prompt_tokens: int,
+    completion_tokens: int,
+    credits_used: int = 1,
+) -> None:
+    cursor = cnx.cursor()
+    total_tokens = prompt_tokens + completion_tokens
+    cursor.execute(
+        "INSERT INTO api_usage "
+        "(user_id, endpoint, model, prompt_tokens, completion_tokens, total_tokens, credits_used) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (user_id, endpoint, model, prompt_tokens, completion_tokens, total_tokens, credits_used),
+    )
+    cursor.close()
+
+
+def get_usage_rows(cnx: Any, user_id: int, limit: int = 50) -> list[dict]:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT id, endpoint, model, prompt_tokens, completion_tokens, total_tokens, "
+        "credits_used, created_at FROM api_usage WHERE user_id = %s "
+        "ORDER BY created_at DESC LIMIT %s",
+        (user_id, min(limit, 200)),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows  # type: ignore[return-value]
+
+
+def get_usage_summary(cnx: Any, user_id: int) -> dict:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT COUNT(*) AS total_requests, "
+        "COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens, "
+        "COALESCE(SUM(completion_tokens), 0) AS completion_tokens, "
+        "COALESCE(SUM(total_tokens), 0) AS total_tokens, "
+        "COALESCE(SUM(credits_used), 0) AS credits_used "
+        "FROM api_usage WHERE user_id = %s",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    return row  # type: ignore[return-value]
+
+
+def count_monthly_requests(cnx: Any, user_id: int) -> int:
+    """Chat requests logged for *user_id* so far in the current calendar
+    month — used to enforce the plan's monthly quota (constants.PLAN_SEARCHES)."""
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT COUNT(*) AS cnt FROM api_usage "
+        "WHERE user_id = %s AND endpoint IN ('/api/chat/stream', '/api/chat') "
+        "AND created_at >= DATE_FORMAT(CURRENT_TIMESTAMP, '%%Y-%%m-01')",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    return int(row["cnt"]) if row else 0
+
+
+# ---------------------------------------------------------------------------
+# Billing — credits, plan changes, Stripe customer linkage
+# ---------------------------------------------------------------------------
+
+def user_has_credits(cnx: Any, user_id: int, min_credits: int = 1) -> bool:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute("SELECT credits FROM users WHERE id = %s", (user_id,))
+    row = cursor.fetchone()
+    cursor.close()
+    return bool(row and row["credits"] >= min_credits)
+
+
+def add_purchased_credits(cnx: Any, user_id: int, credits_to_add: int) -> bool:
+    if credits_to_add <= 0:
+        return False
+    cursor = cnx.cursor()
+    cursor.execute(
+        "UPDATE users SET credits = credits + %s WHERE id = %s",
+        (credits_to_add, user_id),
+    )
+    updated = cursor.rowcount > 0
+    cursor.close()
+    return updated
+
+
+def set_plan_and_credits(cnx: Any, user_id: int, plan: str, credits: int) -> None:
+    """Set a user's plan and (re)grant their plan's credit allowance —
+    called on subscription checkout and on each renewal."""
+    cursor = cnx.cursor()
+    cursor.execute(
+        "UPDATE users SET plan = %s, credits = %s WHERE id = %s",
+        (plan, credits, user_id),
+    )
+    cursor.close()
+
+
+def downgrade_to_free(cnx: Any, user_id: int) -> None:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "UPDATE users SET plan = 'free', credits = 0 WHERE id = %s",
+        (user_id,),
+    )
+    cursor.close()
+
+
+def upsert_stripe_customer(
+    cnx: Any, user_id: int, stripe_id: str, plan: str, status: str, period_end: Any = None,
+) -> None:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "INSERT INTO stripe_customers (user_id, stripe_id, plan, status, period_end) "
+        "VALUES (%s, %s, %s, %s, %s) "
+        "ON DUPLICATE KEY UPDATE stripe_id = VALUES(stripe_id), plan = VALUES(plan), "
+        "status = VALUES(status), period_end = VALUES(period_end)",
+        (user_id, stripe_id, plan, status, period_end),
+    )
+    cursor.close()
+
+
+def update_stripe_customer_status(cnx: Any, stripe_id: str, status: str) -> None:
+    cursor = cnx.cursor()
+    cursor.execute(
+        "UPDATE stripe_customers SET status = %s WHERE stripe_id = %s",
+        (status, stripe_id),
+    )
+    cursor.close()
+
+
+def get_user_id_for_stripe_customer(cnx: Any, stripe_id: str) -> int | None:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT user_id FROM stripe_customers WHERE stripe_id = %s",
+        (stripe_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    return int(row["user_id"]) if row else None
+
+
+def get_stripe_customer(cnx: Any, user_id: int) -> dict | None:
+    cursor = cnx.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT stripe_id, plan, status, period_end FROM stripe_customers WHERE user_id = %s",
+        (user_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    return row  # type: ignore[return-value]

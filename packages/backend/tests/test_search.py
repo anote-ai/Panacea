@@ -204,14 +204,26 @@ def test_workspaces_non_hosted(client):
     assert resp.status_code == 501
 
 
-def test_payments_no_stripe(client):
-    resp = client.post("/api/payments/checkout", json={"priceId": "price_test"})
+def test_payments_no_stripe(client, auth_headers):
+    resp = client.post(
+        "/api/payments/checkout", json={"priceId": "price_test", "plan": "basic"}, headers=auth_headers,
+    )
     assert resp.status_code == 503
 
 
-def test_payments_portal_no_stripe(client):
-    resp = client.post("/api/payments/portal", json={"customerId": "cus_test"})
+def test_payments_portal_no_stripe(client, auth_headers):
+    resp = client.post("/api/payments/portal", json={}, headers=auth_headers)
     assert resp.status_code == 503
+
+
+def test_payments_checkout_no_auth(client):
+    resp = client.post("/api/payments/checkout", json={"priceId": "price_test", "plan": "basic"})
+    assert resp.status_code == 401
+
+
+def test_payments_portal_no_auth(client):
+    resp = client.post("/api/payments/portal", json={})
+    assert resp.status_code == 401
 
 
 def test_rate_limiter():

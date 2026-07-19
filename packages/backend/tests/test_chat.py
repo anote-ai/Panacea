@@ -27,13 +27,38 @@ def test_chat_stream_no_auth(client):
 
 
 def test_chat_stream_new_session(client, auth_headers):
-    with patch("api_endpoints.chat.handler.get_connection", return_value=_mock_cnx()):
+    with patch("api_endpoints.chat.handler.get_connection", return_value=_mock_cnx()), patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=True,
+    ):
         resp = client.post(
             "/api/chat/stream", json={"message": "hello"}, headers=auth_headers,
         )
         body = resp.get_data(as_text=True)
     assert resp.status_code == 200
     assert "session_id" in body
+
+
+def test_chat_stream_insufficient_credits(client, auth_headers):
+    with patch("api_endpoints.chat.handler.get_connection", return_value=_mock_cnx()), patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=False,
+    ):
+        resp = client.post(
+            "/api/chat/stream", json={"message": "hello"}, headers=auth_headers,
+        )
+    assert resp.status_code == 402
+
+
+def test_chat_stream_monthly_quota_exceeded(client, auth_headers):
+    with patch(
+        "api_endpoints.chat.handler.get_connection",
+        return_value=_mock_cnx(fetchone={"id": 1, "plan": "basic"}),
+    ), patch(
+        "api_endpoints.chat.handler.count_monthly_requests", return_value=750,
+    ):
+        resp = client.post(
+            "/api/chat/stream", json={"message": "hello"}, headers=auth_headers,
+        )
+    assert resp.status_code == 429
 
 
 def test_chat_stream_existing_session_not_found(client, auth_headers):
@@ -54,6 +79,8 @@ def test_chat_stream_existing_session(client, auth_headers):
     with patch(
         "api_endpoints.chat.handler.get_connection",
         return_value=_mock_cnx(fetchone=chat_row),
+    ), patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=True,
     ):
         resp = client.post(
             "/api/chat/stream",
@@ -88,6 +115,8 @@ def test_chat_stream_injects_document_context(client, auth_headers):
         "api_endpoints.chat.handler.retrieve_context", return_value="relevant chunk",
     ) as mock_retrieve, patch(
         "api_endpoints.chat.handler.stream_agent_response", side_effect=fake_stream,
+    ), patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=True,
     ):
         resp = client.post(
             "/api/chat/stream",
@@ -116,6 +145,8 @@ def test_chat_stream_no_documents_skips_context(client, auth_headers):
         "api_endpoints.chat.handler.retrieve_context",
     ) as mock_retrieve, patch(
         "api_endpoints.chat.handler.stream_agent_response", side_effect=fake_stream,
+    ), patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=True,
     ):
         resp = client.post(
             "/api/chat/stream",
@@ -235,6 +266,8 @@ def test_chat_stream_retitles_existing_untitled_session(client, auth_headers):
         "api_endpoints.chat.handler.stream_agent_response", side_effect=fake_stream,
     ), patch(
         "api_endpoints.chat.handler.generate_chat_title", return_value="Friendly Greeting",
+    ), patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=True,
     ):
         resp = client.post(
             "/api/chat/stream",
@@ -262,7 +295,9 @@ def test_chat_stream_does_not_retitle_named_session(client, auth_headers):
         "api_endpoints.chat.handler.stream_agent_response", side_effect=fake_stream,
     ), patch(
         "api_endpoints.chat.handler.generate_chat_title",
-    ) as mock_title:
+    ) as mock_title, patch(
+        "api_endpoints.chat.handler.user_has_credits", return_value=True,
+    ):
         resp = client.post(
             "/api/chat/stream",
             json={"message": "more", "session_id": 1},

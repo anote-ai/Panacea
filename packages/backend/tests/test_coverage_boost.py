@@ -8,6 +8,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+
+def _mock_cnx(fetchall=None, fetchone=None, lastrowid=1, rowcount=1):
+    cursor = MagicMock()
+    cursor.fetchall.return_value = fetchall if fetchall is not None else []
+    cursor.fetchone.return_value = fetchone
+    cursor.lastrowid = lastrowid
+    cursor.rowcount = rowcount
+    cnx = MagicMock()
+    cnx.cursor.return_value = cursor
+    return cnx
+
+
 # ---------------------------------------------------------------------------
 # middleware/auth.py
 # ---------------------------------------------------------------------------
@@ -434,14 +446,39 @@ def test_stream_llm_with_mock():
 # api_endpoints/payments/handler.py
 # ---------------------------------------------------------------------------
 
-def test_payments_checkout_no_stripe(client):
-    resp = client.post("/api/payments/checkout", json={"priceId": "price_test"})
+def test_payments_checkout_no_stripe(client, auth_headers):
+    resp = client.post(
+        "/api/payments/checkout", json={"priceId": "price_test", "plan": "basic"}, headers=auth_headers,
+    )
     assert resp.status_code == 503
 
 
-def test_payments_portal_no_stripe(client):
-    resp = client.post("/api/payments/portal", json={"customerId": "cus_test"})
+def test_payments_checkout_invalid_plan(client, auth_headers):
+    with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+        resp = client.post(
+            "/api/payments/checkout", json={"priceId": "price_test", "plan": "nope"}, headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+
+def test_payments_checkout_missing_price(client, auth_headers):
+    with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+        resp = client.post(
+            "/api/payments/checkout", json={"plan": "basic"}, headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+
+def test_payments_portal_no_stripe(client, auth_headers):
+    resp = client.post("/api/payments/portal", json={}, headers=auth_headers)
     assert resp.status_code == 503
+
+
+def test_payments_portal_no_customer(client, auth_headers):
+    with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+        with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+            resp = client.post("/api/payments/portal", json={}, headers=auth_headers)
+            assert resp.status_code == 404
 
 
 def test_payments_webhook_no_secret(client):
@@ -463,25 +500,31 @@ def test_payments_webhook_bad_signature(client):
             assert resp.status_code == 400
 
 
-def test_payments_checkout_stripe_error(client):
+def test_payments_checkout_stripe_error(client, auth_headers):
     with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
         mock_stripe = MagicMock()
         mock_stripe.checkout.Session.create.side_effect = Exception("stripe error")
         with patch.dict("sys.modules", {"stripe": mock_stripe}):
-            resp = client.post("/api/payments/checkout", json={"priceId": "price_test"})
+            resp = client.post(
+                "/api/payments/checkout",
+                json={"priceId": "price_test", "plan": "basic"},
+                headers=auth_headers,
+            )
             assert resp.status_code == 500
 
 
-def test_payments_portal_stripe_error(client):
+def test_payments_portal_stripe_error(client, auth_headers):
     with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
         mock_stripe = MagicMock()
         mock_stripe.billing_portal.Session.create.side_effect = Exception("stripe error")
+        customer = {"stripe_id": "cus_test", "plan": "basic", "status": "active", "period_end": None}
         with patch.dict("sys.modules", {"stripe": mock_stripe}):
-            resp = client.post("/api/payments/portal", json={"customerId": "cus_test"})
-            assert resp.status_code == 500
+            with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx(fetchone=customer)):
+                resp = client.post("/api/payments/portal", json={}, headers=auth_headers)
+                assert resp.status_code == 500
 
 
-def test_payments_checkout_success(client):
+def test_payments_checkout_success(client, auth_headers):
     with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
         mock_session = MagicMock()
         mock_session.url = "https://checkout.stripe.com/test"
@@ -490,24 +533,155 @@ def test_payments_checkout_success(client):
         with patch.dict("sys.modules", {"stripe": mock_stripe}):
             resp = client.post("/api/payments/checkout",
                                 json={"priceId": "price_123",
+                                      "plan": "basic",
                                       "successUrl": "http://localhost:3000/ok",
-                                      "cancelUrl": "http://localhost:3000/cancel"})
+                                      "cancelUrl": "http://localhost:3000/cancel"},
+                                headers=auth_headers)
             assert resp.status_code == 200
             assert "url" in resp.get_json()
 
 
-def test_payments_portal_success(client):
+def test_payments_portal_success(client, auth_headers):
     with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
         mock_session = MagicMock()
         mock_session.url = "https://billing.stripe.com/test"
         mock_stripe = MagicMock()
         mock_stripe.billing_portal.Session.create.return_value = mock_session
+        customer = {"stripe_id": "cus_123", "plan": "basic", "status": "active", "period_end": None}
         with patch.dict("sys.modules", {"stripe": mock_stripe}):
-            resp = client.post("/api/payments/portal",
-                                json={"customerId": "cus_123",
-                                      "returnUrl": "http://localhost:3000"})
+            with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx(fetchone=customer)):
+                resp = client.post("/api/payments/portal",
+                                    json={"returnUrl": "http://localhost:3000"},
+                                    headers=auth_headers)
+                assert resp.status_code == 200
+                assert "url" in resp.get_json()
+
+
+def test_payments_credits_checkout_invalid_pack(client, auth_headers):
+    with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+        resp = client.post(
+            "/api/payments/credits/checkout", json={"credits": 42}, headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+
+def test_payments_credits_checkout_success(client, auth_headers):
+    with patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test"}):
+        mock_session = MagicMock()
+        mock_session.url = "https://checkout.stripe.com/credits"
+        mock_stripe = MagicMock()
+        mock_stripe.checkout.Session.create.return_value = mock_session
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            resp = client.post(
+                "/api/payments/credits/checkout", json={"credits": 1000}, headers=auth_headers,
+            )
             assert resp.status_code == 200
             assert "url" in resp.get_json()
+
+
+def test_payments_webhook_credit_pack_completed(client):
+    with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+        mock_stripe = MagicMock()
+        event = {
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "mode": "payment",
+                "metadata": {"kind": "credit_pack", "user_id": "1", "credits": "1000"},
+            }},
+        }
+        mock_stripe.Webhook.construct_event.return_value = event
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx()), \
+                 patch("api_endpoints.payments.handler.add_purchased_credits") as mock_add:
+                resp = client.post("/api/payments/webhook", data=b"{}",
+                                    headers={"Stripe-Signature": "sig",
+                                             "Content-Type": "application/json"})
+                assert resp.status_code == 200
+                mock_add.assert_called_once_with(mock_add.call_args[0][0], 1, 1000)
+
+
+def test_payments_webhook_subscription_completed(client):
+    with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+        mock_stripe = MagicMock()
+        event = {
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "mode": "subscription",
+                "customer": "cus_1",
+                "metadata": {"user_id": "1", "plan": "basic"},
+            }},
+        }
+        mock_stripe.Webhook.construct_event.return_value = event
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx()), \
+                 patch("api_endpoints.payments.handler.upsert_stripe_customer") as mock_upsert, \
+                 patch("api_endpoints.payments.handler.set_plan_and_credits") as mock_set:
+                resp = client.post("/api/payments/webhook", data=b"{}",
+                                    headers={"Stripe-Signature": "sig",
+                                             "Content-Type": "application/json"})
+                assert resp.status_code == 200
+                mock_upsert.assert_called_once()
+                mock_set.assert_called_once_with(mock_set.call_args[0][0], 1, "basic", 200)
+
+
+def test_payments_webhook_invoice_paid_renews_credits(client):
+    with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+        mock_stripe = MagicMock()
+        event = {
+            "type": "invoice.payment_succeeded",
+            "data": {"object": {"customer": "cus_1"}},
+        }
+        mock_stripe.Webhook.construct_event.return_value = event
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx()), \
+                 patch("api_endpoints.payments.handler.get_user_id_for_stripe_customer", return_value=1), \
+                 patch("api_endpoints.payments.handler.get_stripe_customer", return_value={"plan": "pro"}), \
+                 patch("api_endpoints.payments.handler.set_plan_and_credits") as mock_set:
+                resp = client.post("/api/payments/webhook", data=b"{}",
+                                    headers={"Stripe-Signature": "sig",
+                                             "Content-Type": "application/json"})
+                assert resp.status_code == 200
+                mock_set.assert_called_once_with(mock_set.call_args[0][0], 1, "pro", 500)
+
+
+def test_payments_webhook_subscription_deleted_downgrades(client):
+    with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+        mock_stripe = MagicMock()
+        event = {
+            "type": "customer.subscription.deleted",
+            "data": {"object": {"customer": "cus_1"}},
+        }
+        mock_stripe.Webhook.construct_event.return_value = event
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            with patch("api_endpoints.payments.handler.get_connection", return_value=_mock_cnx()), \
+                 patch("api_endpoints.payments.handler.get_user_id_for_stripe_customer", return_value=1), \
+                 patch("api_endpoints.payments.handler.downgrade_to_free") as mock_downgrade, \
+                 patch("api_endpoints.payments.handler.update_stripe_customer_status") as mock_status:
+                resp = client.post("/api/payments/webhook", data=b"{}",
+                                    headers={"Stripe-Signature": "sig",
+                                             "Content-Type": "application/json"})
+                assert resp.status_code == 200
+                mock_downgrade.assert_called_once()
+                mock_status.assert_called_once_with(mock_status.call_args[0][0], "cus_1", "canceled")
+
+
+def test_payments_webhook_handler_error_still_acks(client):
+    """A bug in webhook side-effect handling must not make the webhook fail —
+    Stripe would otherwise retry it forever."""
+    with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+        mock_stripe = MagicMock()
+        event = {
+            "type": "checkout.session.completed",
+            "data": {"object": {"mode": "payment", "metadata": {"kind": "credit_pack"}}},
+        }
+        mock_stripe.Webhook.construct_event.return_value = event
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            resp = client.post("/api/payments/webhook", data=b"{}",
+                                headers={"Stripe-Signature": "sig",
+                                         "Content-Type": "application/json"})
+            # Missing user_id/credits in metadata raises KeyError internally —
+            # still must ack 200.
+            assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -694,3 +868,104 @@ def test_get_user_provider_key_invalid_token():
     with patch("database.db.get_connection", return_value=mock_cnx), \
          patch("database.db.get_provider_key", return_value="not-a-valid-fernet-token"):
         assert mod.get_user_provider_key(1, "anthropic") is None
+
+
+# ---------------------------------------------------------------------------
+# database/db.py — billing (credits, plan changes, Stripe customer linkage)
+# ---------------------------------------------------------------------------
+
+def test_user_has_credits_true():
+    from database import db
+    cnx = _mock_cnx(fetchone={"credits": 5})
+    assert db.user_has_credits(cnx, 1, min_credits=1) is True
+
+
+def test_user_has_credits_false():
+    from database import db
+    cnx = _mock_cnx(fetchone={"credits": 0})
+    assert db.user_has_credits(cnx, 1, min_credits=1) is False
+
+
+def test_user_has_credits_no_user():
+    from database import db
+    cnx = _mock_cnx(fetchone=None)
+    assert db.user_has_credits(cnx, 1) is False
+
+
+def test_add_purchased_credits_positive():
+    from database import db
+    cnx = _mock_cnx(rowcount=1)
+    assert db.add_purchased_credits(cnx, 1, 1000) is True
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params == (1000, 1)
+
+
+def test_add_purchased_credits_non_positive():
+    from database import db
+    cnx = _mock_cnx()
+    assert db.add_purchased_credits(cnx, 1, 0) is False
+    cnx.cursor.return_value.execute.assert_not_called()
+
+
+def test_set_plan_and_credits():
+    from database import db
+    cnx = _mock_cnx()
+    db.set_plan_and_credits(cnx, 1, "pro", 500)
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params == ("pro", 500, 1)
+
+
+def test_downgrade_to_free():
+    from database import db
+    cnx = _mock_cnx()
+    db.downgrade_to_free(cnx, 1)
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params == (1,)
+    assert "free" in executed_sql
+
+
+def test_upsert_stripe_customer():
+    from database import db
+    cnx = _mock_cnx()
+    db.upsert_stripe_customer(cnx, 1, "cus_1", "pro", "active", None)
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params == (1, "cus_1", "pro", "active", None)
+
+
+def test_update_stripe_customer_status():
+    from database import db
+    cnx = _mock_cnx()
+    db.update_stripe_customer_status(cnx, "cus_1", "canceled")
+    executed_sql, params = cnx.cursor.return_value.execute.call_args.args
+    assert params == ("canceled", "cus_1")
+
+
+def test_get_user_id_for_stripe_customer_found():
+    from database import db
+    cnx = _mock_cnx(fetchone={"user_id": 7})
+    assert db.get_user_id_for_stripe_customer(cnx, "cus_1") == 7
+
+
+def test_get_user_id_for_stripe_customer_not_found():
+    from database import db
+    cnx = _mock_cnx(fetchone=None)
+    assert db.get_user_id_for_stripe_customer(cnx, "cus_1") is None
+
+
+def test_get_stripe_customer():
+    from database import db
+    cnx = _mock_cnx(fetchone={"stripe_id": "cus_1", "plan": "pro", "status": "active", "period_end": None})
+    result = db.get_stripe_customer(cnx, 1)
+    assert result["stripe_id"] == "cus_1"
+
+
+def test_count_monthly_requests():
+    from database import db
+    cnx = _mock_cnx(fetchone={"cnt": 12})
+    assert db.count_monthly_requests(cnx, 1) == 12
+
+
+def test_count_monthly_requests_no_row():
+    from database import db
+    cnx = _mock_cnx(fetchone=None)
+    assert db.count_monthly_requests(cnx, 1) == 0

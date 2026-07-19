@@ -1,8 +1,8 @@
 -- Adds the folders table plus documents.folder_id / documents.chat_id,
 -- which the folders/chat-scoped documents feature depends on.
--- Safe to run against a database created before that feature existed;
--- databases bootstrapped from database/schema.sql already have this
--- shape and skip this file (see the schema_migrations seed at the
+-- Safe to run against a database created before that feature existed,
+-- since databases bootstrapped from database/schema.sql already have
+-- this shape and skip this file (see the schema_migrations seed at the
 -- bottom of schema.sql).
 
 CREATE TABLE IF NOT EXISTS folders (

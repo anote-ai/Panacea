@@ -34,6 +34,8 @@ export interface UserProfile {
   name: string;
   email: string;
   hasAvatar: boolean;
+  plan: string;
+  credits: number;
 }
 
 export const AuthContext = createContext<{
@@ -127,6 +129,8 @@ export default function App() {
         name: res.data.name || "",
         email: res.data.email || "",
         hasAvatar: !!res.data.hasAvatar,
+        plan: res.data.plan || "free",
+        credits: res.data.credits ?? 0,
       });
     } catch {
       setUser(null);

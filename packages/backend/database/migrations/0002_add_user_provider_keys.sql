@@ -1,8 +1,8 @@
 -- Adds user_provider_keys, which lets users bring their own Anthropic/
 -- OpenAI/Gemini API keys (encrypted at rest) instead of relying on the
 -- server's env-configured keys. Safe to run against a database created
--- before this feature existed; fresh installs already have this shape
--- (see the schema_migrations seed at the bottom of schema.sql).
+-- before this feature existed, since fresh installs already have this
+-- shape (see the schema_migrations seed at the bottom of schema.sql).
 
 CREATE TABLE IF NOT EXISTS user_provider_keys (
     id             INT AUTO_INCREMENT PRIMARY KEY,

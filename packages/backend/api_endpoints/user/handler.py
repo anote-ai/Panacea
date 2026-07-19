@@ -7,10 +7,14 @@ from typing import Any
 from flask import Blueprint, jsonify, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
+from constants import PLAN_SEARCHES
 from database.db import (
+    count_monthly_requests,
     delete_provider_key,
     get_connection,
     get_provider_keys,
+    get_usage_rows,
+    get_usage_summary,
     get_user_by_id,
     update_user_name,
     upsert_provider_key,
@@ -40,6 +44,8 @@ def get_profile() -> tuple:
         "name": user.get("name") or "",
         "email": user.get("email") or "",
         "hasAvatar": avatar_path(user_id).exists(),
+        "plan": user.get("plan") or "free",
+        "credits": user.get("credits") if user.get("credits") is not None else 0,
     }), 200
 
 
@@ -106,6 +112,41 @@ def remove_avatar() -> tuple:
     user_id = int(get_jwt_identity())
     delete_avatar(user_id)
     return jsonify({"deleted": True}), 200
+
+
+@user_bp.get("/usage")
+@jwt_required()
+def get_usage() -> tuple:
+    """Recent per-request usage history plus aggregate totals."""
+    user_id = int(get_jwt_identity())
+    cnx = get_connection()
+    try:
+        user = get_user_by_id(cnx, user_id)
+        plan = (user or {}).get("plan") or "free"
+        rows = get_usage_rows(cnx, user_id)
+        summary = get_usage_summary(cnx, user_id)
+        monthly_limit = PLAN_SEARCHES.get(plan, 0)
+        monthly_used = count_monthly_requests(cnx, user_id) if monthly_limit > 0 else 0
+    finally:
+        cnx.close()
+    return jsonify({
+        "summary": summary,
+        "monthlyLimit": monthly_limit,
+        "monthlyUsed": monthly_used,
+        "rows": [
+            {
+                "id": r["id"],
+                "endpoint": r["endpoint"],
+                "model": r["model"],
+                "promptTokens": r["prompt_tokens"],
+                "completionTokens": r["completion_tokens"],
+                "totalTokens": r["total_tokens"],
+                "creditsUsed": r["credits_used"],
+                "createdAt": r["created_at"].isoformat(),
+            }
+            for r in rows
+        ],
+    }), 200
 
 
 @user_bp.get("/provider-keys")
