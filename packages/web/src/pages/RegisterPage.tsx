@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
-import RocketLogo from "../components/RocketLogo";
+import AnoteWordmark from "../components/AnoteWordmark";
 
 export default function RegisterPage() {
   const { setToken } = useAuth();
@@ -40,7 +40,7 @@ export default function RegisterPage() {
       </button>
       <div className="w-full max-w-sm px-8">
         <div className="flex flex-col items-center mb-8">
-          <RocketLogo className="w-12 h-12 mb-4" />
+          <AnoteWordmark className="mb-4" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Create account</h1>
         </div>
         <form onSubmit={submit} className="space-y-4">
