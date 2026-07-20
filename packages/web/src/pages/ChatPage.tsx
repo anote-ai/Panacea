@@ -684,7 +684,9 @@ export default function ChatPage() {
             onClick={() => cancelUpload(u.id)}
             className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 text-white text-[10px] flex items-center justify-center hover:bg-red-500 transition-colors"
             title={
-              u.step === 'done' || u.step === 'error' ? 'Dismiss' : 'Cancel upload'
+              u.step === 'done' || u.step === 'error'
+                ? 'Dismiss'
+                : 'Cancel upload'
             }
           >
             ✕
@@ -771,11 +773,15 @@ export default function ChatPage() {
             className="p-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
             aria-label={streaming ? 'Stop' : 'Send'}
             title={
-              isUploading && !streaming ? 'Waiting for uploads to finish...' : undefined
+              isUploading && !streaming
+                ? 'Waiting for uploads to finish...'
+                : undefined
             }
           >
             {streaming ? (
-              <span className="w-4 h-4 flex items-center justify-center">■</span>
+              <span className="w-4 h-4 flex items-center justify-center">
+                ■
+              </span>
             ) : (
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
@@ -1002,7 +1008,7 @@ export default function ChatPage() {
             <span className="font-semibold text-sm truncate">Anote AI</span>
           )}
         </div>
-        <div className="px-2 pb-2 space-y-0.5">
+        <div className="px-2 pb-6 space-y-0.5">
           <button
             onClick={newChat}
             title="New Chat"
@@ -1071,7 +1077,7 @@ export default function ChatPage() {
           </button>
         </div>
         {sidebarOpen && (
-          <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+          <div className="flex-1 overflow-y-auto px-2 space-y-0.5 flex flex-col justify-end">
             {sessions.map((s) => (
               <div
                 key={s.id}
