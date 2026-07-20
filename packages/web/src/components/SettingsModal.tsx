@@ -440,6 +440,27 @@ export default function SettingsModal({ open, onClose }: Props) {
                   )}
                 </div>
 
+              </div>
+            )}
+
+            {section === 'account' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    Email
+                  </h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {user?.email || '—'}
+                  </p>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  More account settings coming soon.
+                </p>
+              </div>
+            )}
+
+            {section === 'display' && (
+              <div className="space-y-8">
                 <div>
                   <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                     Appearance
@@ -463,28 +484,6 @@ export default function SettingsModal({ open, onClose }: Props) {
                   </div>
                 </div>
               </div>
-            )}
-
-            {section === 'account' && (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                    Email
-                  </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {user?.email || '—'}
-                  </p>
-                </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  More account settings coming soon.
-                </p>
-              </div>
-            )}
-
-            {section === 'display' && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                More display settings coming soon.
-              </p>
             )}
 
             {section === 'api' && (

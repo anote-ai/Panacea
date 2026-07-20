@@ -1078,6 +1078,9 @@ export default function ChatPage() {
         </div>
         {sidebarOpen && (
           <div className="flex-1 overflow-y-auto px-2 space-y-0.5 flex flex-col justify-end">
+            <p className="px-1 pb-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              Chat History
+            </p>
             {sessions.map((s) => (
               <div
                 key={s.id}
@@ -1116,7 +1119,19 @@ export default function ChatPage() {
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
             aria-label="Toggle sidebar"
           >
-            ☰
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
           </button>
         </header>
 
@@ -1125,7 +1140,7 @@ export default function ChatPage() {
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
               <RocketLogo className="w-16 h-16 opacity-30" />
-              <p className="text-gray-400 dark:text-gray-500 text-lg">
+              <p className="text-gray-600 dark:text-gray-300 text-lg">
                 How can I help you today?
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500">

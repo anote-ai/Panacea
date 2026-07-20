@@ -317,7 +317,20 @@ export default function DocumentsPage() {
               sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
             }`}
           >
-            <span>💬</span> {sidebarOpen && 'Chat'}
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            {sidebarOpen && 'Chat'}
           </button>
           <button
             onClick={() => nav('/documents')}
@@ -326,7 +339,20 @@ export default function DocumentsPage() {
               sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
             }`}
           >
-            <span>📁</span> {sidebarOpen && 'Library'}
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+              />
+            </svg>
+            {sidebarOpen && 'Library'}
           </button>
         </div>
         {!sidebarOpen && <div className="flex-1" />}
@@ -345,7 +371,19 @@ export default function DocumentsPage() {
             className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${selectedFolder === null ? 'bg-gray-200 dark:bg-[#2F2F2F]' : 'hover:bg-gray-200 dark:hover:bg-[#2F2F2F]'} ${draggingOver === 'root' ? 'ring-2 ring-gray-400' : ''}`}
           >
             <span className="flex items-center gap-2">
-              <span>📄</span>
+              <svg
+                className="w-4 h-4 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
               <span>All documents</span>
             </span>
             <span className="text-xs text-gray-400">{documents.length}</span>
@@ -375,7 +413,19 @@ export default function DocumentsPage() {
                 />
               ) : (
                 <span className="flex items-center gap-2 truncate">
-                  <span>📁</span>
+                  <svg
+                    className="w-4 h-4 flex-shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                    />
+                  </svg>
                   <span className="truncate">{folder.name}</span>
                 </span>
               )}
@@ -386,20 +436,44 @@ export default function DocumentsPage() {
                     setRenamingId(folder.id);
                     setRenameValue(folder.name);
                   }}
-                  className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs p-0.5"
+                  className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-0.5"
                   title="Rename"
                 >
-                  ✏️
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteFolder(folder.id);
                   }}
-                  className="text-gray-400 hover:text-red-500 text-xs p-0.5"
+                  className="text-gray-400 hover:text-red-500 p-0.5"
                   title="Delete"
                 >
-                  ✕
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -427,7 +501,20 @@ export default function DocumentsPage() {
               onClick={() => setCreatingFolder(true)}
               className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-[#2F2F2F] transition-colors flex items-center gap-2"
             >
-              <span>+</span> New folder
+              <svg
+                className="w-4 h-4 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              New folder
             </button>
           )}
         </div>
@@ -444,7 +531,19 @@ export default function DocumentsPage() {
               onClick={() => setSidebarOpen((o) => !o)}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
             >
-              ☰
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
             </button>
             <nav className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
               <button
@@ -467,7 +566,7 @@ export default function DocumentsPage() {
 
         {/* Bulk action toolbar */}
         {selectedDocs.size > 0 && (
-          <div className="flex items-center gap-3 px-6 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-3 px-6 py-2 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
               {selectedDocs.size} selected
             </span>
@@ -632,10 +731,22 @@ export default function DocumentsPage() {
                           e.stopPropagation();
                           deleteDocument(doc.id);
                         }}
-                        className="w-6 h-6 rounded-full bg-white/90 dark:bg-black/50 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-red-500 text-xs"
+                        className="w-6 h-6 rounded-full bg-white/90 dark:bg-black/50 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-red-500"
                         title="Delete"
                       >
-                        ✕
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
                       </button>
                     </div>
                     <div className="aspect-[3/4] w-full rounded-lg overflow-hidden">
@@ -655,7 +766,20 @@ export default function DocumentsPage() {
                         className="mt-1 mx-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 truncate text-[10px]"
                         title={`Attached to chat: ${doc.chat_name || 'Untitled chat'}`}
                       >
-                        💬 <span className="truncate">{doc.chat_name || 'Untitled chat'}</span>
+                        <svg
+                          className="w-3 h-3 flex-shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                          />
+                        </svg>
+                        <span className="truncate">{doc.chat_name || 'Untitled chat'}</span>
                       </span>
                     )}
                     <select
