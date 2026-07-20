@@ -4,6 +4,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from mysql.connector.errors import Error as MySQLError
+
+_DUPLICATE_ENTRY_ERRNO = 1062
+
 try:
     import mysql.connector
     MYSQL_AVAILABLE = True
@@ -512,3 +516,28 @@ def get_stripe_customer(cnx: Any, user_id: int) -> dict | None:
     row = cursor.fetchone()
     cursor.close()
     return row  # type: ignore[return-value]
+
+
+def claim_stripe_event(cnx: Any, event_id: str, event_type: str) -> bool:
+    """Atomically record that a Stripe webhook event is being processed.
+
+    Returns False if it was already recorded — Stripe can and does
+    redeliver the same event more than once, and the caller should treat
+    that as a no-op rather than reprocessing it (e.g. double-crediting a
+    purchase). The INSERT's primary key collision is the atomicity
+    guarantee here, so this is race-safe even if two deliveries of the
+    same event arrive concurrently.
+    """
+    cursor = cnx.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO stripe_events (event_id, event_type) VALUES (%s, %s)",
+            (event_id, event_type),
+        )
+    except MySQLError as exc:
+        if exc.errno != _DUPLICATE_ENTRY_ERRNO:
+            raise
+        return False
+    finally:
+        cursor.close()
+    return True

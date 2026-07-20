@@ -684,6 +684,34 @@ def test_payments_webhook_handler_error_still_acks(client):
             assert resp.status_code == 200
 
 
+def test_payments_webhook_redelivered_event_is_not_reprocessed(client):
+    """Stripe can redeliver the same event more than once — a second
+    delivery of an already-processed event must not double-credit."""
+    with patch.dict(os.environ, {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+        mock_stripe = MagicMock()
+        event = {
+            "id": "evt_dedupe_test",
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "mode": "payment",
+                "metadata": {"kind": "credit_pack", "user_id": "1", "credits": "1000"},
+            }},
+        }
+        mock_stripe.Webhook.construct_event.return_value = event
+        # First delivery: claim succeeds (True). Second: already claimed (False).
+        cnx = _mock_cnx()
+        with patch.dict("sys.modules", {"stripe": mock_stripe}):
+            with patch("api_endpoints.payments.handler.get_connection", return_value=cnx), \
+                 patch("api_endpoints.payments.handler.claim_stripe_event", side_effect=[True, False]), \
+                 patch("api_endpoints.payments.handler.add_purchased_credits") as mock_add:
+                for _ in range(2):
+                    resp = client.post("/api/payments/webhook", data=b"{}",
+                                        headers={"Stripe-Signature": "sig",
+                                                 "Content-Type": "application/json"})
+                    assert resp.status_code == 200
+                mock_add.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # database/db.py
 # ---------------------------------------------------------------------------
@@ -969,3 +997,29 @@ def test_count_monthly_requests_no_row():
     from database import db
     cnx = _mock_cnx(fetchone=None)
     assert db.count_monthly_requests(cnx, 1) == 0
+
+
+def test_claim_stripe_event_first_delivery():
+    from database import db
+    cnx = _mock_cnx()
+    assert db.claim_stripe_event(cnx, "evt_1", "checkout.session.completed") is True
+    cnx.cursor.return_value.close.assert_called_once()
+
+
+def test_claim_stripe_event_duplicate_delivery():
+    from mysql.connector.errors import Error as MySQLError
+
+    from database import db
+    cnx = _mock_cnx()
+    cnx.cursor.return_value.execute.side_effect = MySQLError(msg="Duplicate entry", errno=1062)
+    assert db.claim_stripe_event(cnx, "evt_1", "checkout.session.completed") is False
+
+
+def test_claim_stripe_event_reraises_unrelated_error():
+    from mysql.connector.errors import Error as MySQLError
+
+    from database import db
+    cnx = _mock_cnx()
+    cnx.cursor.return_value.execute.side_effect = MySQLError(msg="Connection lost", errno=2013)
+    with pytest.raises(MySQLError):
+        db.claim_stripe_event(cnx, "evt_1", "checkout.session.completed")

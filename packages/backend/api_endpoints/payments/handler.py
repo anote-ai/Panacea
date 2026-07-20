@@ -10,6 +10,7 @@ from flask_jwt_extended import get_jwt_identity
 from constants import CREDIT_PACKS, PLAN_CREDITS, PLAN_SEARCHES
 from database.db import (
     add_purchased_credits,
+    claim_stripe_event,
     downgrade_to_free,
     get_connection,
     get_stripe_customer,
@@ -171,6 +172,19 @@ def stripe_webhook() -> tuple:
     except Exception as exc:
         print(f"Webhook signature error: {exc}")
         return jsonify({"error": "Invalid webhook signature"}), 400
+
+    # Stripe can and does redeliver the same event more than once (retries,
+    # at-least-once delivery) — claim it first so a redelivery is a no-op
+    # instead of double-crediting a purchase or reprocessing a subscription.
+    event_id = event.get("id", "")
+    if event_id:
+        cnx = get_connection()
+        try:
+            claimed = claim_stripe_event(cnx, event_id, event.get("type", ""))
+        finally:
+            cnx.close()
+        if not claimed:
+            return jsonify({"received": True}), 200
 
     try:
         _handle_webhook_event(event)

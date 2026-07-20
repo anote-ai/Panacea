@@ -98,6 +98,15 @@ CREATE TABLE IF NOT EXISTS stripe_customers (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Tracks processed Stripe webhook event IDs so a redelivered event (Stripe
+-- retries and can send the same event more than once) is a no-op instead
+-- of double-crediting a purchase or reprocessing a subscription change.
+CREATE TABLE IF NOT EXISTS stripe_events (
+    event_id      VARCHAR(255) PRIMARY KEY,
+    event_type    VARCHAR(100) NOT NULL,
+    processed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tracks which database/migrations/*.sql files have been applied (see
 -- database/migrate.py). Fresh installs get the final schema directly from
 -- the CREATE TABLE statements above, so migrations that are already
@@ -109,3 +118,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 INSERT IGNORE INTO schema_migrations (version) VALUES ('0001_add_folders_and_document_columns.sql');
 INSERT IGNORE INTO schema_migrations (version) VALUES ('0002_add_user_provider_keys.sql');
 INSERT IGNORE INTO schema_migrations (version) VALUES ('0003_add_api_usage.sql');
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0004_add_stripe_events.sql');
