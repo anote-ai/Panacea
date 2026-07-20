@@ -1010,7 +1010,20 @@ export default function ChatPage() {
               sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
             }`}
           >
-            <span className="text-lg">+</span> {sidebarOpen && 'New Chat'}
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+            {sidebarOpen && 'New Chat'}
           </button>
           <button
             onClick={() => nav('/documents')}
@@ -1019,7 +1032,20 @@ export default function ChatPage() {
               sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
             }`}
           >
-            <span>📁</span> {sidebarOpen && 'Library'}
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+              />
+            </svg>
+            {sidebarOpen && 'Library'}
           </button>
           <button
             onClick={() => setSearchOpen(true)}
@@ -1028,7 +1054,20 @@ export default function ChatPage() {
               sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
             }`}
           >
-            <span>🔍</span> {sidebarOpen && 'Search Chats'}
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.5 5.5a7.5 7.5 0 0011.15 11.15z"
+              />
+            </svg>
+            {sidebarOpen && 'Search Chats'}
           </button>
         </div>
         {sidebarOpen && (
