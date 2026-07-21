@@ -19,9 +19,8 @@ def test_register_short_password(client):
 
 def test_register_success(client):
     resp = client.post("/auth/register", json={"email": "new@example.com", "password": "password123"})
-    # 201 with DB, or 201 with fallback token in test env
-    assert resp.status_code == 201
-    assert "token" in resp.get_json()
+    # No DB in the test client, so this surfaces as a clean 503 rather than a fake token.
+    assert resp.status_code == 503
 
 
 def test_login_missing_credentials(client):
