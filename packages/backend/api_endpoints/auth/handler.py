@@ -40,8 +40,7 @@ def register() -> tuple:
         token = create_access_token(identity=str(user_id))
         return jsonify({"token": token, "userId": user_id}), 201
     except Exception:
-        token = create_access_token(identity="test-user")
-        return jsonify({"token": token, "userId": 1}), 201
+        return jsonify({"error": "Authentication service unavailable"}), 503
 
 
 @auth_bp.post("/login")

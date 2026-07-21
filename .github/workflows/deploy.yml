@@ -66,13 +66,11 @@ jobs:
         with:
           node-version: "20.19.0"
           cache: npm
-          cache-dependency-path: packages/web/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install dependencies
-        working-directory: packages/web
         run: npm ci
       - name: Build
-        working-directory: packages/web
-        run: npm run build
+        run: npm run build --workspace=packages/web
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
