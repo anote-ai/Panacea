@@ -8,15 +8,39 @@ async function getBase(): Promise<string> {
   return "http://localhost:5099";
 }
 
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+// App.tsx registers a handler here so a 401 (expired/invalid token) can log
+// the user out, regardless of whether it surfaced via axios or raw fetch.
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  onUnauthorized = handler;
+}
+
+// Kept in sync with App.tsx's token state so every request (axios or fetch)
+// uses the current token without re-reading storage on each call.
+let cachedToken: string | null = null;
+
+export function setCachedToken(token: string | null) {
+  cachedToken = token;
+}
+
 let _client: ReturnType<typeof axios.create> | null = null;
 
 async function client() {
   if (!_client) {
     const base = await getBase();
     _client = axios.create({ baseURL: base });
+    _client.interceptors.response.use(
+      (res) => res,
+      (err) => {
+        if (err?.response?.status === 401) onUnauthorized?.();
+        return Promise.reject(err);
+      }
+    );
   }
-  const token = localStorage.getItem("token");
-  if (token) _client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  if (cachedToken) _client.defaults.headers.common["Authorization"] = `Bearer ${cachedToken}`;
+  else delete _client.defaults.headers.common["Authorization"];
   return _client;
 }
 
@@ -49,6 +73,23 @@ export async function deleteSession(id: string) {
   await c.delete(`/api/chat/sessions/${id}`);
 }
 
+export async function getProviderKeys(): Promise<Record<string, string>> {
+  const c = await client();
+  const res = await c.get("/api/user/provider-keys");
+  return res.data.keys ?? {};
+}
+
+export async function setProviderKey(provider: string, key: string): Promise<string> {
+  const c = await client();
+  const res = await c.put("/api/user/provider-keys", { provider, key });
+  return res.data.masked as string;
+}
+
+export async function deleteProviderKey(provider: string): Promise<void> {
+  const c = await client();
+  await c.delete(`/api/user/provider-keys/${provider}`);
+}
+
 export async function streamChat(
   message: string,
   sessionId: string | null,
@@ -58,16 +99,19 @@ export async function streamChat(
   signal: AbortSignal
 ): Promise<void> {
   const base = await getBase();
-  const token = localStorage.getItem("token");
   const res = await fetch(`${base}/api/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cachedToken ? { Authorization: `Bearer ${cachedToken}` } : {}),
     },
     body: JSON.stringify({ message, session_id: sessionId, model }),
     signal,
   });
+  if (res.status === 401) {
+    onUnauthorized?.();
+    throw new Error("Unauthorized");
+  }
   if (!res.ok || !res.body) throw new Error("Stream failed");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
