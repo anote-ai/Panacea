@@ -37,7 +37,9 @@ jobs:
           ECR_REPOSITORY: autonomous-intelligence-backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build \
+            --build-arg BUILD_SHA=$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
                      $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -70,6 +72,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: npm run build --workspace=packages/web
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -94,6 +98,22 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id $CF_DISTRIBUTION --paths "/*"
+      - name: Verify production release
+        if: ${{ github.event.inputs.environment == 'production' }}
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          for attempt in {1..6}; do
+            python3 scripts/release_smoke.py \
+              --frontend-url https://chat.anote.ai \
+              --api-url https://chat.anote.ai \
+              --expected-sha "$EXPECTED_SHA" \
+              --require-payments && exit 0
+            if [[ "$attempt" -lt 6 ]]; then
+              sleep 10
+            fi
+          done
+          exit 1
 
   notify:
     name: Notify on Failure
