@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
@@ -14,9 +14,10 @@ from api_endpoints.payments.handler import payments_bp
 from api_endpoints.search.handler import search_bp
 from api_endpoints.user.handler import user_bp
 from api_endpoints.workspaces.handler import workspaces_bp
+from build_metadata import get_build_metadata
 
 
-def create_app(config: dict | None = None) -> Flask:
+def create_app(config: dict[str, object] | None = None) -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__)
 
@@ -51,12 +52,17 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(workspaces_bp)
 
     @app.get("/health")
-    def health() -> tuple:
-        return jsonify({"status": "ok", "service": "anote-backend"}), 200
+    def health() -> tuple[Response, int]:
+        return jsonify({"status": "ok", **get_build_metadata()}), 200
+
+    @app.get("/version")
+    @app.get("/api/version")
+    def version() -> tuple[Response, int]:
+        return jsonify(get_build_metadata()), 200
 
     @app.get("/")
-    def root() -> tuple:
-        return jsonify({"name": "Anote AI Backend", "version": "1.0.0"}), 200
+    def root() -> tuple[Response, int]:
+        return jsonify({"name": "Anote AI Backend", **get_build_metadata()}), 200
 
     return app
 
