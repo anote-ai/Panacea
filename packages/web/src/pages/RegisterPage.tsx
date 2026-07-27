@@ -1,14 +1,15 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
-import RocketLogo from "../components/RocketLogo";
+import AnoteWordmark from "../components/AnoteWordmark";
 
 export default function RegisterPage() {
   const { setToken } = useAuth();
   const { dark, toggle } = useTheme();
   const nav = useNavigate();
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get("email") || "");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -21,7 +22,7 @@ export default function RegisterPage() {
     try {
       const res = await axios.post("/auth/register", { email, password, name });
       setToken(res.data.token);
-      nav("/");
+      nav("/app");
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed");
     } finally {
@@ -40,7 +41,7 @@ export default function RegisterPage() {
       </button>
       <div className="w-full max-w-sm px-8">
         <div className="flex flex-col items-center mb-8">
-          <RocketLogo className="w-12 h-12 mb-4" />
+          <AnoteWordmark className="mb-4" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Create account</h1>
         </div>
         <form onSubmit={submit} className="space-y-4">

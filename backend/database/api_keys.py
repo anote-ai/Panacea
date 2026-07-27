@@ -94,7 +94,6 @@ def create_api_key(
     finally:
         conn.close()
 
-
 def list_api_keys(email: str) -> dict[str, list[dict[str, Any]]]:
     conn, cursor = get_db_connection()
     try:
@@ -181,4 +180,3 @@ def find_api_key_record(api_key: str) -> dict[str, Any] | None:
         return None
     finally:
         conn.close()
-

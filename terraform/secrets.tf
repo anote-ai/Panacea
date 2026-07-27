@@ -5,10 +5,12 @@ resource "aws_secretsmanager_secret" "backend" {
 resource "aws_secretsmanager_secret_version" "backend" {
   secret_id = aws_secretsmanager_secret.backend.id
   secret_string = jsonencode({
-    JWT_SECRET_KEY    = var.jwt_secret_key
-    DB_PASSWORD       = var.db_password
-    ANTHROPIC_API_KEY = var.anthropic_api_key
-    OPENAI_API_KEY    = var.openai_api_key
-    STRIPE_SECRET_KEY = var.stripe_secret_key
+    JWT_SECRET_KEY              = var.jwt_secret_key
+    DB_PASSWORD                 = var.db_password
+    ANTHROPIC_API_KEY           = var.anthropic_api_key
+    OPENAI_API_KEY              = var.openai_api_key
+    STRIPE_SECRET_KEY           = var.stripe_secret_key
+    STRIPE_WEBHOOK_SECRET       = var.stripe_webhook_secret
+    PROVIDER_KEY_ENCRYPTION_KEY = var.provider_key_encryption_key
   })
 }
