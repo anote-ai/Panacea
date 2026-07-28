@@ -96,7 +96,6 @@ jobs:
         run: |
           aws s3 sync packages/web/dist/ s3://$S3_BUCKET --delete \
             --cache-control "public, max-age=31536000, immutable" \
-            --exclude "index.html" --exclude "*.json"
           aws s3 cp packages/web/dist/index.html s3://$S3_BUCKET/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
           aws s3 sync packages/web/dist/ s3://$S3_BUCKET \
