@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
+import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import { useAuth, useTheme } from "../App";
 import AnoteWordmark from "../components/AnoteWordmark";
 
@@ -28,6 +29,24 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    setError("");
+    if (!credentialResponse.credential) {
+      setError("Google sign-in failed");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await axios.post("/auth/google", { credential: credentialResponse.credential });
+      setToken(res.data.token);
+      nav("/app");
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Google sign-in failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#212121]">
       <button
@@ -41,6 +60,19 @@ export default function LoginPage() {
         <div className="flex flex-col items-center mb-8">
           <AnoteWordmark className="mb-4" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Welcome back</h1>
+        </div>
+        <div className="flex justify-center mb-6">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError("Google sign-in failed")}
+            theme={dark ? "filled_black" : "outline"}
+            width="320"
+          />
+        </div>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+          <span className="text-xs text-gray-400 dark:text-gray-500">OR</span>
+          <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>

@@ -1,9 +1,14 @@
-"""Authentication endpoints — register, login, refresh."""
+"""Authentication endpoints — register, login, refresh, Google OAuth."""
 from __future__ import annotations
+
+import os
+import secrets
 
 import bcrypt
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -62,6 +67,46 @@ def login() -> tuple:
             return jsonify({"error": "Invalid credentials"}), 401
         token = create_access_token(identity=str(user["id"]))
         return jsonify({"token": token, "userId": user["id"]}), 200
+    except Exception:
+        return jsonify({"error": "Authentication service unavailable"}), 503
+
+
+@auth_bp.post("/google")
+def google_login() -> tuple:
+    """Authenticate a user via a Google Identity Services ID token."""
+    data = request.get_json(silent=True) or {}
+    credential = data.get("credential") or ""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+
+    if not credential:
+        return jsonify({"error": "Missing Google credential"}), 400
+    if not client_id:
+        return jsonify({"error": "Google sign-in is not configured"}), 503
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            credential, google_requests.Request(), client_id
+        )
+    except ValueError:
+        return jsonify({"error": "Invalid Google credential"}), 401
+
+    email = (claims.get("email") or "").strip().lower()
+    if not email or not claims.get("email_verified"):
+        return jsonify({"error": "Google account has no verified email"}), 401
+    name = claims.get("name") or ""
+
+    try:
+        from database.db import create_user, get_connection, get_user_by_email
+        cnx = get_connection()
+        user = get_user_by_email(cnx, email)
+        if not user:
+            random_password = _hash_password(secrets.token_urlsafe(32))
+            user_id = create_user(cnx, email, random_password, name)
+        else:
+            user_id = user["id"]
+        cnx.close()
+        token = create_access_token(identity=str(user_id))
+        return jsonify({"token": token, "userId": user_id}), 200
     except Exception:
         return jsonify({"error": "Authentication service unavailable"}), 503
 

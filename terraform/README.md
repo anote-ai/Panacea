@@ -103,6 +103,28 @@ local dev) and AWS credentials for this account.
      Dashboard shows the webhook delivered successfully and the DB's
      `users.plan`/`credits` updated.
 
+## Google Sign-In
+
+`ecs.tf` passes `GOOGLE_CLIENT_ID` to the backend as a plain (non-secret) env var —
+it's a public identifier, safe to expose in the frontend bundle. The backend uses
+it to verify the audience of Google ID tokens; the frontend needs the *same* value
+baked in at build time as `VITE_GOOGLE_CLIENT_ID` (Vite env vars are compile-time,
+not runtime, so this can't just live in Secrets Manager next to the backend's copy).
+
+1. Create an OAuth client ID in Google Cloud Console (APIs & Services → Credentials →
+   Create Credentials → OAuth client ID → Web application). Add both the CloudFront/
+   custom domain and `http://localhost:3000` as Authorized JavaScript origins. No
+   redirect URI is needed — the frontend uses the Identity Services popup flow, not
+   an auth-code redirect.
+2. Apply with `-var google_client_id=<id>.apps.googleusercontent.com` (or
+   `TF_VAR_google_client_id`) so the backend gets it — same "new revision doesn't
+   affect the running service" caveat as Stripe above; force a new ECS deployment
+   after applying.
+3. Add the same value as the `VITE_GOOGLE_CLIENT_ID` GitHub Actions secret so
+   `deploy.yml`'s frontend build step picks it up — the login/register pages will
+   otherwise render a broken "missing client_id" Google button in production even
+   though the backend is configured correctly.
+
 ## What this does NOT cover yet
 
 - Redis / Tika sidecars (used by docker-compose locally) — add `aws_elasticache_cluster`

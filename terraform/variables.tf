@@ -130,6 +130,12 @@ variable "ollama_base_url" {
   default     = "http://localhost:11434"
 }
 
+variable "google_client_id" {
+  description = "Google OAuth client ID for 'Sign in with Google' (not secret — it's embedded in the frontend bundle and sent to the backend for ID-token audience verification)."
+  type        = string
+  default     = ""
+}
+
 variable "domain_name" {
   description = "Optional custom domain for the CloudFront distribution (requires an ACM cert in us-east-1). Leave empty to use the default CloudFront domain."
   type        = string

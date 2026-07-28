@@ -27,6 +27,7 @@ mysql-connector-python==8.4.0
 # Auth
 bcrypt==4.2.0
 cryptography==43.0.3
+google-auth==2.35.0
 
 # Payments
 stripe==10.12.0

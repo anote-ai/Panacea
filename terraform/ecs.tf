@@ -80,6 +80,7 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "STRIPE_PRICE_BASIC", value = var.stripe_price_basic },
       { name = "STRIPE_PRICE_PRO", value = var.stripe_price_pro },
       { name = "STRIPE_PRICE_ENTERPRISE", value = var.stripe_price_enterprise },
+      { name = "GOOGLE_CLIENT_ID", value = var.google_client_id },
     ]
 
     secrets = [
