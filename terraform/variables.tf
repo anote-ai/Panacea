@@ -131,7 +131,26 @@ variable "ollama_base_url" {
 }
 
 variable "google_client_id" {
-  description = "Google OAuth client ID for 'Sign in with Google' (not secret — it's embedded in the frontend bundle and sent to the backend for ID-token audience verification)."
+  description = "Google OAuth client ID for 'Sign in with Google' (not secret — Google itself sends this back in the browser redirect)."
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret, used server-side to exchange the auth code for tokens."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "google_oauth_redirect_uri" {
+  description = "Must exactly match an 'Authorized redirect URI' on the Google OAuth client, e.g. https://<domain>/callback."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_url" {
+  description = "Public URL of the web frontend (e.g. https://<cloudfront-domain> or the custom domain) — where the backend redirects the browser after Google login completes."
   type        = string
   default     = ""
 }

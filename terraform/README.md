@@ -105,25 +105,32 @@ local dev) and AWS credentials for this account.
 
 ## Google Sign-In
 
-`ecs.tf` passes `GOOGLE_CLIENT_ID` to the backend as a plain (non-secret) env var —
-it's a public identifier, safe to expose in the frontend bundle. The backend uses
-it to verify the audience of Google ID tokens; the frontend needs the *same* value
-baked in at build time as `VITE_GOOGLE_CLIENT_ID` (Vite env vars are compile-time,
-not runtime, so this can't just live in Secrets Manager next to the backend's copy).
+This uses the server-side OAuth redirect flow, entirely on the backend — the
+frontend just links to `/auth/google/login`; there's no Google JS SDK and no
+frontend build-time env var. The backend redirects the browser to Google,
+Google redirects back to `/callback` (a bare path outside `/auth/*`, matching
+the exact "Authorized redirect URI" registered on the OAuth client — see the
+routing rule `cloudfront.tf` adds for it), the backend exchanges the code
+server-side (needs the client *secret*, unlike the old popup approach), then
+redirects the browser to `${FRONTEND_URL}/oauth/callback?token=...` where the
+SPA picks up the JWT.
 
 1. Create an OAuth client ID in Google Cloud Console (APIs & Services → Credentials →
-   Create Credentials → OAuth client ID → Web application). Add both the CloudFront/
-   custom domain and `http://localhost:3000` as Authorized JavaScript origins. No
-   redirect URI is needed — the frontend uses the Identity Services popup flow, not
-   an auth-code redirect.
-2. Apply with `-var google_client_id=<id>.apps.googleusercontent.com` (or
-   `TF_VAR_google_client_id`) so the backend gets it — same "new revision doesn't
-   affect the running service" caveat as Stripe above; force a new ECS deployment
-   after applying.
-3. Add the same value as the `VITE_GOOGLE_CLIENT_ID` GitHub Actions secret so
-   `deploy.yml`'s frontend build step picks it up — the login/register pages will
-   otherwise render a broken "missing client_id" Google button in production even
-   though the backend is configured correctly.
+   Create Credentials → OAuth client ID → Web application). Add the production
+   redirect URI — `https://<cloudfront-or-custom-domain>/callback` — under
+   **Authorized redirect URIs** (not "JavaScript origins", a different field).
+   For local dev this is `http://127.0.0.1:5000/callback`.
+2. Apply with these vars (or `TF_VAR_*`):
+   ```
+   -var google_client_id=<id>.apps.googleusercontent.com
+   -var google_client_secret=GOCSPX-...
+   -var google_oauth_redirect_uri=https://<domain>/callback
+   -var frontend_url=https://<domain>
+   ```
+   Same "new revision doesn't affect the running service" caveat as Stripe
+   above — force a new ECS deployment after applying.
+3. No GitHub Actions secret or frontend build step change needed — the client
+   ID/secret never reach the frontend bundle in this flow.
 
 ## What this does NOT cover yet
 
