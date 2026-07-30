@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import CookbookPage from "./pages/CookbookPage";
 import LandingPage from "./landing_page/LandingPage.js";
 import ContactPage from "./landing_page/ContactPage.js";
 import PrivacyPolicyPage from "./landing_page/PrivacyPolicyPage.js";
@@ -67,6 +68,8 @@ export default function App() {
             <Route path="/case-studies" element={<CaseStudiesPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/cookbook" element={<Navigate to="/cookbook/03-panacea-document-qa-rag" replace />} />
+            <Route path="/cookbook/:slug" element={<CookbookPage />} />
             <Route path="/app" element={<RequireAuth><ChatPage /></RequireAuth>} />
             <Route path="/app/chat/:id" element={<RequireAuth><ChatPage /></RequireAuth>} />
           </Routes>

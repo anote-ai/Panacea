@@ -30,6 +30,9 @@ function Navbar() {
               {link.label}
             </a>
           ))}
+          <Link to="/cookbook" className="hover:text-gray-900 dark:hover:text-white">
+            Cookbook
+          </Link>
         </div>
 
         <div className="hidden md:flex items-center gap-3">
@@ -80,6 +83,13 @@ function Navbar() {
               {link.label}
             </a>
           ))}
+          <Link
+            to="/cookbook"
+            onClick={() => setOpen(false)}
+            className="py-1 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+          >
+            Cookbook
+          </Link>
           <div className="flex items-center gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={toggle}
