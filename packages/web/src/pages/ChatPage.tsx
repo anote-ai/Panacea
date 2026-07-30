@@ -8,6 +8,7 @@ import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
 import UserMenu from '../components/UserMenu';
+import { getEmptyStateSuggestions } from '../lib/productReadiness';
 
 interface Message {
   id?: string;
@@ -269,7 +270,20 @@ export default function ChatPage() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
   };
 
+  const focusComposer = () => {
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      autoResize();
+    });
+  };
+
   const newChat = () => nav('/app');
+  const emptyStateSuggestions = getEmptyStateSuggestions(chatDocs.length > 0);
+
+  const applySuggestedPrompt = (prompt: string) => {
+    setInput(prompt);
+    focusComposer();
+  };
 
   const uploadFile = async (file: File, existingId?: string) => {
     const id = existingId ?? crypto.randomUUID();
@@ -1143,9 +1157,39 @@ export default function ChatPage() {
               <p className="text-gray-600 dark:text-gray-300 text-lg">
                 How can I help you today?
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Drop a file anywhere to upload — {ACCEPTED_LABEL}
+              <p className="max-w-xl text-center text-sm text-gray-500 dark:text-gray-400">
+                {chatDocs.length > 0
+                  ? `Your documents are attached and ready. Ask for a summary, a risk review, or next steps.`
+                  : `Start with a question, or upload a file and ask for a summary, action items, or a draft response.`}
               </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 max-w-2xl">
+                {emptyStateSuggestions.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => applySuggestedPrompt(prompt)}
+                    className="rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2F2F2F] transition-colors"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-[#2F2F2F] transition-colors"
+                >
+                  Upload a document
+                </button>
+                {chatDocs.length > 0 && (
+                  <button
+                    onClick={() => setDocsModalOpen(true)}
+                    className="rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-[#2F2F2F] transition-colors"
+                  >
+                    View attached documents ({chatDocs.length})
+                  </button>
+                )}
+                <span>Drop files anywhere to upload — {ACCEPTED_LABEL}</span>
+              </div>
               <div className="w-full mt-2">
                 {uploadsRow}
                 {composerBox}
