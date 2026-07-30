@@ -18,7 +18,8 @@ export default function LoginPage() {
     setLoading(true); setError("");
     try {
       const token = await login(email, password);
-      setToken(token); nav("/");
+      setToken(token);
+      nav("/", { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed");
     } finally { setLoading(false); }
