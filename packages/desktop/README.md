@@ -6,12 +6,21 @@ A private desktop AI assistant. All data stays on your machine.
 
 ```bash
 # Install dependencies
+cd packages/desktop
 npm install
 cd frontend && npm install
+cd ..
 
-# Start (dev mode - requires Python backend running separately)
-cd packages/backend && python app.py --port 5099 &
+# Start Electron + Vite frontend.
+# The Electron main process will launch packages/backend/app.py on port 5099.
 npm run dev
+```
+
+If you want to debug the backend separately, start it like this instead:
+
+```bash
+cd packages/backend
+PORT=5099 python app.py
 ```
 
 ## Building
