@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
 import AnoteWordmark from "../components/AnoteWordmark";
+import { API_BASE_URL } from "../constants/constants";
 
 export default function RegisterPage() {
   const { setToken } = useAuth();
@@ -20,7 +21,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("/auth/register", { email, password, name });
+      const res = await axios.post(`${API_BASE_URL}/auth/register`, { email, password, name });
       setToken(res.data.token);
       nav("/app");
     } catch (err: any) {

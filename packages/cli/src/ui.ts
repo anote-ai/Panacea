@@ -87,13 +87,13 @@ export function renderCliBanner(options: {
 
   return [
     "",
-    chalk.bold.hex("#4ec9b0")("┌──────────────────────────────────────────────┐"),
-    chalk.bold.hex("#4ec9b0")("│") +
+    chalk.bold.hex("#c586c0")("┌──────────────────────────────────────────────┐"),
+    chalk.bold.hex("#c586c0")("│") +
       chalk.bold.white(" Anote") +
       chalk.gray("  AI-assisted coding tool") +
       " ".repeat(15) +
-      chalk.bold.hex("#4ec9b0")("│"),
-    chalk.bold.hex("#4ec9b0")("└──────────────────────────────────────────────┘"),
+      chalk.bold.hex("#c586c0")("│"),
+    chalk.bold.hex("#c586c0")("└──────────────────────────────────────────────┘"),
     chalk.gray(`  Workspace   ${options.cwd}`),
     chalk.gray(`  Model       ${options.model}`),
     chalk.gray(`  Tools       ${options.toolsEnabled ? "enabled" : "chat-only"}`),
