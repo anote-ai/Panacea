@@ -89,13 +89,7 @@ def _state_serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(current_app.config["JWT_SECRET_KEY"], salt="google-oauth-state")
 
 
-@auth_bp.get("/google/login")
-def google_login_start():
-    """Redirect the browser to Google's OAuth consent screen."""
-    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
-    if not client_id:
-        return jsonify({"error": "Google sign-in is not configured"}), 503
-
+def _build_google_auth_url(client_id: str) -> str:
     state = _state_serializer().dumps(secrets.token_urlsafe(16))
     params = {
         "client_id": client_id,
@@ -110,7 +104,27 @@ def google_login_start():
         # documented way to force re-authentication.
         "max_auth_age": "0",
     }
-    return redirect(f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}")
+    return f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
+
+
+@auth_bp.get("/google/login")
+def google_login_start():
+    """Redirect the browser to Google's OAuth consent screen."""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    if not client_id:
+        return jsonify({"error": "Google sign-in is not configured"}), 503
+
+    return redirect(_build_google_auth_url(client_id))
+
+
+@auth_bp.get("/google/url")
+def google_login_url():
+    """Return Google's OAuth consent screen URL as JSON, for client-driven redirects."""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    if not client_id:
+        return jsonify({"error": "Google sign-in is not configured"}), 503
+
+    return jsonify({"url": _build_google_auth_url(client_id)}), 200
 
 
 def google_oauth_callback():
