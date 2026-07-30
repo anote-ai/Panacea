@@ -130,6 +130,31 @@ variable "ollama_base_url" {
   default     = "http://localhost:11434"
 }
 
+variable "google_client_id" {
+  description = "Google OAuth client ID for 'Sign in with Google' (not secret — Google itself sends this back in the browser redirect)."
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret, used server-side to exchange the auth code for tokens."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "google_oauth_redirect_uri" {
+  description = "Must exactly match an 'Authorized redirect URI' on the Google OAuth client, e.g. https://<domain>/callback."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_url" {
+  description = "Public URL of the web frontend (e.g. https://<cloudfront-domain> or the custom domain) — where the backend redirects the browser after Google login completes."
+  type        = string
+  default     = ""
+}
+
 variable "domain_name" {
   description = "Optional custom domain for the CloudFront distribution (requires an ACM cert in us-east-1). Leave empty to use the default CloudFront domain."
   type        = string
