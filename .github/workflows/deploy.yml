@@ -117,12 +117,17 @@ jobs:
             exit 1
           fi
 
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "ERROR: INSTANCE_ID is empty — check that the INSTANCE_ID secret is set."
+            exit 1
+          fi
+
           echo "Deploying image: $IMAGE_URI"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy $IMAGE_URI via GitHub Actions" \
+            --comment "Deploy ${GITHUB_SHA::12} via GitHub Actions" \
             --parameters commands="[
               'cd $APP_DIR',
               'aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY',

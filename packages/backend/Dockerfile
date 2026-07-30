@@ -20,14 +20,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN chmod +x entrypoint.sh
 
 EXPOSE 5000
 
-# Invoked via `sh` rather than relying on the executable bit: docker-compose's
-# local-dev bind mount (`./packages/backend:/app`) overwrites this image's
-# files — and their permissions — with the host copy, so a non-executable
-# host-side entrypoint.sh (e.g. checked out on a filesystem/git config that
-# doesn't preserve +x) would otherwise fail with "permission denied" even
-# though this RUN chmod succeeded at build time.
-ENTRYPOINT ["sh", "entrypoint.sh"]
+# Migrations + gunicorn are inlined here (rather than a separate entrypoint.sh)
+# so the startup command lives in the image's own metadata — immune to a
+# docker-compose bind mount shadowing /app with an incomplete host directory.
+ENTRYPOINT ["sh", "-c", "if [ \"${SKIP_DB_MIGRATIONS:-}\" != \"1\" ]; then python -m database.migrate; fi && exec gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 \"app:create_app()\""]
