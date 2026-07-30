@@ -46,7 +46,7 @@ For a full example of this working end to end for this use case, please see [Ano
 The preferred local startup path is now:
 
 ```bash
-cp backend/.env.example backend/.env
+cp packages/backend/.env.example packages/backend/.env
 docker compose up --build
 ```
 
@@ -54,6 +54,6 @@ That starts the frontend, backend, MySQL, Redis, and Tika together.
 
 If Docker is installed but not running, start Docker Desktop first or `docker compose up` will fail before the app boots.
 
-For native local development and testing instructions, see [`CODEBASE_SETUP.md`](/Users/natanvidra/Workspace/Autonomous-Intelligence/CODEBASE_SETUP.md).
+For native local development and testing instructions, see [`CODEBASE_SETUP.md`](CODEBASE_SETUP.md).
 
 For any questions or issues, please [join our slack community](https://join.slack.com/t/anote-ai/shared_invite/zt-2vdh1p5xt-KWvtBZEprhrCzU6wrRPwNA) or [contact us](mailto:nvidra@anote.ai).

@@ -21,8 +21,14 @@ function startBackend() {
   if (isDev) {
     // In dev, start Python directly
     backendPath = path.join(__dirname, "..", "backend", "app.py");
-    backendProcess = spawn("python", [backendPath], {
-      env: { ...process.env, FLASK_PORT: String(BACKEND_PORT), APP_ENV: "local" },
+    const pythonBin = process.platform === "win32" ? "python" : (process.env.PYTHON_BIN || "python3");
+    backendProcess = spawn(pythonBin, [backendPath], {
+      env: {
+        ...process.env,
+        PORT: String(BACKEND_PORT),
+        FLASK_PORT: String(BACKEND_PORT),
+        APP_ENV: "local",
+      },
       stdio: "pipe",
     });
   } else {
@@ -30,7 +36,7 @@ function startBackend() {
     const exeName = process.platform === "win32" ? "anote-backend.exe" : "anote-backend";
     backendPath = path.join(process.resourcesPath, "backend-dist", exeName);
     backendProcess = spawn(backendPath, [], {
-      env: { ...process.env, FLASK_PORT: String(BACKEND_PORT) },
+      env: { ...process.env, PORT: String(BACKEND_PORT), FLASK_PORT: String(BACKEND_PORT) },
       stdio: "pipe",
     });
   }
