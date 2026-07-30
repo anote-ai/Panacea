@@ -19,7 +19,8 @@ export default function RegisterPage() {
     setLoading(true); setError("");
     try {
       const token = await register(email, password, name);
-      setToken(token); nav("/");
+      setToken(token);
+      nav("/", { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed");
     } finally { setLoading(false); }

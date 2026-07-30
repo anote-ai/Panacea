@@ -12,8 +12,9 @@ if (app.isPackaged) {
 let mainWindow = null;
 let backendProcess = null;
 const BACKEND_PORT = 5099;
-const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
+const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+const shouldOpenDevTools = process.env.DESKTOP_OPEN_DEVTOOLS === "1";
 
 // Spawn bundled backend executable
 function startBackend() {
@@ -84,7 +85,9 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL("http://localhost:3001");
-    mainWindow.webContents.openDevTools();
+    if (shouldOpenDevTools) {
+      mainWindow.webContents.openDevTools({ mode: "detach" });
+    }
   } else {
     mainWindow.loadFile(path.join(__dirname, "frontend", "dist", "index.html"));
   }
