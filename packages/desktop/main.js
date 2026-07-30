@@ -17,20 +17,29 @@ const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
 // Spawn bundled backend executable
 function startBackend() {
+  // The backend reads PORT (not FLASK_PORT) and binds HOST; keep it loopback-only
+  // so the desktop backend is never reachable from the local network.
+  const backendEnv = {
+    ...process.env,
+    PORT: String(BACKEND_PORT),
+    HOST: "127.0.0.1",
+  };
   let backendPath;
   if (isDev) {
-    // In dev, start Python directly
+    // In dev, start Python directly ("python" does not exist on modern macOS/Linux)
+    const pythonBin = process.platform === "win32" ? "python" : "python3";
     backendPath = path.join(__dirname, "..", "backend", "app.py");
-    backendProcess = spawn("python", [backendPath], {
-      env: { ...process.env, FLASK_PORT: String(BACKEND_PORT), APP_ENV: "local" },
+    backendProcess = spawn(pythonBin, [backendPath], {
+      env: { ...backendEnv, APP_ENV: "local" },
       stdio: "pipe",
     });
   } else {
-    // In production, use the bundled executable
+    // In production, use the bundled executable; APP_ENV=production keeps Flask
+    // debug mode (and its interactive debugger + reloader fork) off.
     const exeName = process.platform === "win32" ? "anote-backend.exe" : "anote-backend";
     backendPath = path.join(process.resourcesPath, "backend-dist", exeName);
     backendProcess = spawn(backendPath, [], {
-      env: { ...process.env, FLASK_PORT: String(BACKEND_PORT) },
+      env: { ...backendEnv, APP_ENV: "production" },
       stdio: "pipe",
     });
   }
