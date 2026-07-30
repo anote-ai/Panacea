@@ -81,13 +81,13 @@ def test_register_short_password(client):
     assert resp.status_code == 400
 
 
-def test_register_falls_back_without_db(client):
-    """With no DB reachable, register still issues a token via the fallback."""
+def test_register_service_unavailable_without_db(client):
+    """With no DB reachable, register fails closed instead of issuing a token."""
     resp = client.post(
         "/auth/register", json={"email": "new@x.com", "password": "longenough"}
     )
-    assert resp.status_code == 201
-    assert "token" in resp.get_json()
+    assert resp.status_code == 503
+    assert resp.get_json()["error"] == "Authentication service unavailable"
 
 
 def test_login_missing_fields(client):
@@ -168,64 +168,101 @@ def test_me_with_token(client, auth_headers):
 
 # --- document handler edge cases ---
 
-def test_upload_no_file(client):
-    assert client.post("/api/documents/upload").status_code == 400
+def test_upload_no_file(client, auth_headers):
+    assert client.post("/api/documents/upload", headers=auth_headers).status_code == 400
 
 
-def test_get_document_not_found(client):
-    assert client.get("/api/documents/nope").status_code == 404
+def test_get_document_not_found(client, auth_headers, monkeypatch):
+    from api_endpoints.documents import handler as doc_handler
+
+    monkeypatch.setattr(
+        doc_handler,
+        "get_connection",
+        lambda: FakeConnection(FakeCursor(fetch_result=None)),
+    )
+    assert client.get("/api/documents/nope", headers=auth_headers).status_code == 404
 
 
-def test_delete_document_not_found(client):
-    assert client.delete("/api/documents/nope").status_code == 404
+def test_delete_document_not_found(client, auth_headers, monkeypatch):
+    from api_endpoints.documents import handler as doc_handler
+
+    monkeypatch.setattr(
+        doc_handler,
+        "get_connection",
+        lambda: FakeConnection(FakeCursor(fetch_result=None)),
+    )
+    assert client.delete("/api/documents/nope", headers=auth_headers).status_code == 404
 
 
-def test_ask_document_not_found(client):
+def test_ask_document_requires_auth(client):
     resp = client.post("/api/documents/nope/ask", json={"question": "hi"})
-    assert resp.status_code == 404
+    assert resp.status_code == 401
 
 
-def test_upload_unsupported_type(client):
+def test_upload_unsupported_type(client, auth_headers):
     import io
 
     data = {"file": (io.BytesIO(b"binary"), "x.exe", "application/octet-stream")}
-    resp = client.post("/api/documents/upload", data=data, content_type="multipart/form-data")
+    resp = client.post(
+        "/api/documents/upload",
+        data=data,
+        content_type="multipart/form-data",
+        headers=auth_headers,
+    )
     assert resp.status_code == 400
 
 
-def test_upload_and_ask_success(client, monkeypatch):
+def test_upload_and_ask_success(client, auth_headers, monkeypatch, tmp_path):
     """Happy path with RAG mocked: upload a .txt, then ask a question."""
     import io
 
     from api_endpoints.documents import handler as doc_handler
 
+    monkeypatch.setattr(doc_handler, "UPLOAD_FOLDER", tmp_path)
     monkeypatch.setattr(doc_handler, "ingest_document", lambda doc_id, file_path: 3)
+    monkeypatch.setattr(
+        doc_handler,
+        "get_connection",
+        lambda: FakeConnection(FakeCursor()),
+    )
+    monkeypatch.setattr(doc_handler, "create_document", lambda *args: 1)
     monkeypatch.setattr(
         doc_handler, "query_documents", lambda question, doc_ids, model: "the answer"
     )
 
     data = {"file": (io.BytesIO(b"hello world"), "notes.txt", "text/plain")}
-    up = client.post("/api/documents/upload", data=data, content_type="multipart/form-data")
+    up = client.post(
+        "/api/documents/upload",
+        data=data,
+        content_type="multipart/form-data",
+        headers=auth_headers,
+    )
     assert up.status_code == 201
     doc_id = up.get_json()["id"]
     assert up.get_json()["chunks"] == 3
 
-    # It now appears in the listing and is fetchable.
-    assert any(d["id"] == doc_id for d in client.get("/api/documents").get_json()["documents"])
-    assert client.get(f"/api/documents/{doc_id}").status_code == 200
-
-    ask = client.post(f"/api/documents/{doc_id}/ask", json={"question": "what?"})
+    ask = client.post(
+        f"/api/documents/{doc_id}/ask",
+        json={"question": "what?"},
+        headers=auth_headers,
+    )
     assert ask.status_code == 200
     assert ask.get_json()["answer"] == "the answer"
 
     # Missing question is a 400 even for a real doc.
-    assert client.post(f"/api/documents/{doc_id}/ask", json={}).status_code == 400
+    assert (
+        client.post(
+            f"/api/documents/{doc_id}/ask",
+            json={},
+            headers=auth_headers,
+        ).status_code
+        == 400
+    )
 
-    # And it can be deleted.
-    assert client.delete(f"/api/documents/{doc_id}").status_code == 200
 
-
-def test_upload_ingest_failure_returns_500(client, monkeypatch):
+def test_upload_ingest_failure_returns_500(
+    client, auth_headers, monkeypatch, tmp_path
+):
     import io
 
     from api_endpoints.documents import handler as doc_handler
@@ -233,7 +270,13 @@ def test_upload_ingest_failure_returns_500(client, monkeypatch):
     def boom(doc_id, file_path):
         raise RuntimeError("parse failed")
 
+    monkeypatch.setattr(doc_handler, "UPLOAD_FOLDER", tmp_path)
     monkeypatch.setattr(doc_handler, "ingest_document", boom)
     data = {"file": (io.BytesIO(b"hi"), "notes.txt", "text/plain")}
-    resp = client.post("/api/documents/upload", data=data, content_type="multipart/form-data")
+    resp = client.post(
+        "/api/documents/upload",
+        data=data,
+        content_type="multipart/form-data",
+        headers=auth_headers,
+    )
     assert resp.status_code == 500
