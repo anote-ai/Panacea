@@ -6,7 +6,7 @@ import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
 import UserMenu from '../components/UserMenu';
-
+import { API_BASE_URL } from '../constants/constants';
 interface Folder {
   id: number;
   name: string;
@@ -58,14 +58,14 @@ export default function DocumentsPage() {
 
   const loadFolders = useCallback(async () => {
     try {
-      const res = await axios.get('/api/folders', { headers });
+      const res = await axios.get(`${API_BASE_URL}/api/folders`, { headers });
       setFolders(res.data.folders || []);
     } catch {}
   }, [token]);
 
   const loadDocuments = useCallback(async () => {
     try {
-      const res = await axios.get('/api/documents', { headers });
+      const res = await axios.get(`${API_BASE_URL}/api/documents`, { headers });
       setDocuments(res.data.documents || []);
     } catch {}
   }, [token]);
@@ -176,7 +176,7 @@ export default function DocumentsPage() {
     const name = newFolderName.trim();
     if (!name) return;
     try {
-      const res = await axios.post('/api/folders', { name }, { headers });
+      const res = await axios.post(`${API_BASE_URL}/api/folders`, { name }, { headers });
       setFolders((prev) => [...prev, res.data]);
       setNewFolderName('');
       setCreatingFolder(false);
@@ -190,7 +190,7 @@ export default function DocumentsPage() {
       return;
     }
     try {
-      await axios.patch(`/api/folders/${id}`, { name }, { headers });
+      await axios.patch(`${API_BASE_URL}/api/folders/${id}`, { name }, { headers });
       setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)));
       if (selectedFolder?.id === id)
         setSelectedFolder((f) => (f ? { ...f, name } : f));
@@ -202,7 +202,7 @@ export default function DocumentsPage() {
     if (!confirm('Delete this folder? Documents inside will become unfiled.'))
       return;
     try {
-      await axios.delete(`/api/folders/${id}`, { headers });
+      await axios.delete(`${API_BASE_URL}/api/folders/${id}`, { headers });
       setFolders((prev) => prev.filter((f) => f.id !== id));
       if (selectedFolder?.id === id) setSelectedFolder(null);
       loadDocuments();

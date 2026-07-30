@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
 import AnoteWordmark from "../components/AnoteWordmark";
+import { API_BASE_URL } from "../constants/constants";
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   google_denied: "Google sign-in was cancelled",
@@ -32,7 +33,7 @@ export default function LoginPage() {
     setGoogleLoading(true);
     setError("");
     try {
-      const res = await axios.get("/auth/google/url");
+      const res = await axios.get(`${API_BASE_URL}/auth/google/url`);
       window.location.href = res.data.url;
     } catch (err: any) {
       setError(err.response?.data?.error || "Google sign-in failed");
@@ -45,7 +46,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("/auth/login", { email, password });
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
       setToken(res.data.token);
       nav("/app");
     } catch (err: any) {
