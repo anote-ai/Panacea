@@ -17,7 +17,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./packages/backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./packages/backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-anote}"]
       interval: 5s
@@ -75,7 +75,6 @@ services:
       tika:
         condition: service_started
     volumes:
-      - ./packages/backend:/app
       - backend_uploads:/app/uploads
 
   web:
