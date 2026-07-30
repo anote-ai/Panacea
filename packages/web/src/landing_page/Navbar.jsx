@@ -41,6 +41,12 @@ function Navbar() {
             {dark ? "☀️" : "🌙"}
           </button>
           <Link
+            to="/demo"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-[#2F2F2F]"
+          >
+            Live demo
+          </Link>
+          <Link
             to="/login"
             className="px-4 py-2 rounded-lg text-sm font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-[#2F2F2F]"
           >

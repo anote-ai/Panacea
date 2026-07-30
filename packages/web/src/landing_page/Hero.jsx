@@ -23,10 +23,16 @@ function Hero() {
 
       <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <Link
-          to="/register"
+          to="/demo"
           className="px-6 py-3 rounded-lg font-medium bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
         >
-          Try Panacea free
+          Try the live demo
+        </Link>
+        <Link
+          to="/register"
+          className="px-6 py-3 rounded-lg font-medium border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#2F2F2F] transition-colors"
+        >
+          Sign up free
         </Link>
         <a
           href="#versions"
