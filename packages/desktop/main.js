@@ -12,8 +12,9 @@ if (app.isPackaged) {
 let mainWindow = null;
 let backendProcess = null;
 const BACKEND_PORT = 5099;
-const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
+const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+const shouldOpenDevTools = process.env.DESKTOP_OPEN_DEVTOOLS === "1";
 
 // Spawn bundled backend executable
 function startBackend() {
@@ -21,8 +22,14 @@ function startBackend() {
   if (isDev) {
     // In dev, start Python directly
     backendPath = path.join(__dirname, "..", "backend", "app.py");
-    backendProcess = spawn("python", [backendPath], {
-      env: { ...process.env, FLASK_PORT: String(BACKEND_PORT), APP_ENV: "local" },
+    const pythonBin = process.platform === "win32" ? "python" : (process.env.PYTHON_BIN || "python3");
+    backendProcess = spawn(pythonBin, [backendPath], {
+      env: {
+        ...process.env,
+        PORT: String(BACKEND_PORT),
+        FLASK_PORT: String(BACKEND_PORT),
+        APP_ENV: "local",
+      },
       stdio: "pipe",
     });
   } else {
@@ -30,7 +37,7 @@ function startBackend() {
     const exeName = process.platform === "win32" ? "anote-backend.exe" : "anote-backend";
     backendPath = path.join(process.resourcesPath, "backend-dist", exeName);
     backendProcess = spawn(backendPath, [], {
-      env: { ...process.env, FLASK_PORT: String(BACKEND_PORT) },
+      env: { ...process.env, PORT: String(BACKEND_PORT), FLASK_PORT: String(BACKEND_PORT) },
       stdio: "pipe",
     });
   }
@@ -78,7 +85,9 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL("http://localhost:3001");
-    mainWindow.webContents.openDevTools();
+    if (shouldOpenDevTools) {
+      mainWindow.webContents.openDevTools({ mode: "detach" });
+    }
   } else {
     mainWindow.loadFile(path.join(__dirname, "frontend", "dist", "index.html"));
   }

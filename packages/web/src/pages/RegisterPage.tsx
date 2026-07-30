@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
 import AnoteWordmark from "../components/AnoteWordmark";
+import AuthStatusNotice from "../components/AuthStatusNotice";
+import { useServiceHealth } from "../hooks/useServiceHealth";
 
 export default function RegisterPage() {
   const { setToken } = useAuth();
@@ -14,6 +16,20 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { health, healthState, googleAuthConfigured } = useServiceHealth();
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const res = await axios.get("/auth/google/url");
+      window.location.href = res.data.url;
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Google sign-in failed");
+      setGoogleLoading(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,8 +60,11 @@ export default function RegisterPage() {
           <AnoteWordmark className="mb-4" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Create account</h1>
         </div>
-        <a
-          href="/auth/google/login"
+        <AuthStatusNotice health={health} healthState={healthState} />
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={googleLoading || healthState === "offline" || !googleAuthConfigured}
           className="flex items-center justify-center gap-3 w-full py-3 mb-6 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-[#3A3A3A] transition-colors"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -54,8 +73,8 @@ export default function RegisterPage() {
             <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.16.27-1.7V4.97H.96A9 9 0 000 9c0 1.45.35 2.83.96 4.03l2.99-2.33z" />
             <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z" />
           </svg>
-          Continue with Google
-        </a>
+          {googleLoading ? "Redirecting..." : googleAuthConfigured ? "Continue with Google" : "Google sign-in unavailable"}
+        </button>
         <div className="flex items-center gap-3 mb-6">
           <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
           <span className="text-xs text-gray-400 dark:text-gray-500">OR</span>
@@ -89,7 +108,7 @@ export default function RegisterPage() {
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || healthState === "offline"}
             className="w-full py-3 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors"
           >
             {loading ? "Creating account..." : "Create account"}

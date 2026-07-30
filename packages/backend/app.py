@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -15,6 +16,71 @@ from api_endpoints.payments.handler import payments_bp
 from api_endpoints.search.handler import search_bp
 from api_endpoints.user.handler import user_bp
 from api_endpoints.workspaces.handler import workspaces_bp
+
+
+def _config_string(app: Flask, key: str, default: str = "") -> str:
+    value = os.environ.get(key)
+    if value is None:
+        value = app.config.get(key, default)
+    return str(value or default)
+
+
+def _build_health_report(app: Flask) -> dict[str, Any]:
+    app_env = os.environ.get("APP_ENV", "local")
+    jwt_secret = _config_string(app, "JWT_SECRET_KEY", "dev-secret-change-me")
+    provider_key_encryption_key = _config_string(app, "PROVIDER_KEY_ENCRYPTION_KEY")
+    google_client_id = _config_string(app, "GOOGLE_CLIENT_ID")
+    google_client_secret = _config_string(app, "GOOGLE_CLIENT_SECRET")
+    stripe_secret_key = _config_string(app, "STRIPE_SECRET_KEY")
+    stripe_webhook_secret = _config_string(app, "STRIPE_WEBHOOK_SECRET")
+    stripe_prices = [
+        _config_string(app, "STRIPE_PRICE_BASIC"),
+        _config_string(app, "STRIPE_PRICE_PRO"),
+        _config_string(app, "STRIPE_PRICE_ENTERPRISE"),
+    ]
+    ai_provider_configured = any(
+        [
+            _config_string(app, "ANTHROPIC_API_KEY"),
+            _config_string(app, "OPENAI_API_KEY"),
+            _config_string(app, "GEMINI_API_KEY"),
+            _config_string(app, "OLLAMA_BASE_URL"),
+        ]
+    )
+    google_auth_configured = bool(google_client_id and google_client_secret)
+    billing_configured = bool(
+        stripe_secret_key and stripe_webhook_secret and any(price for price in stripe_prices)
+    )
+    has_partial_google_config = bool(google_client_id) != bool(google_client_secret)
+    has_partial_billing_config = bool(
+        stripe_secret_key or stripe_webhook_secret or any(price for price in stripe_prices)
+    ) and not billing_configured
+
+    warnings: list[str] = []
+    if len(jwt_secret) < 32:
+        warnings.append("jwt_secret_too_short")
+    if app_env != "local" and not provider_key_encryption_key:
+        warnings.append("provider_key_encryption_key_missing")
+    if has_partial_google_config:
+        warnings.append("google_auth_partial_config")
+    if has_partial_billing_config:
+        warnings.append("billing_partial_config")
+    if not ai_provider_configured:
+        warnings.append("no_llm_provider_configured")
+
+    return {
+        "status": "ok",
+        "service": "anote-backend",
+        "environment": app_env,
+        "readiness": "degraded" if warnings else "ready",
+        "checks": {
+            "googleAuthConfigured": google_auth_configured,
+            "billingConfigured": billing_configured,
+            "aiProviderConfigured": ai_provider_configured,
+            "providerKeyEncryptionConfigured": bool(provider_key_encryption_key),
+            "jwtSecretStrong": len(jwt_secret) >= 32,
+        },
+        "warnings": warnings,
+    }
 
 
 def create_app(config: dict | None = None) -> Flask:
@@ -34,7 +100,15 @@ def create_app(config: dict | None = None) -> Flask:
         ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY", ""),
         OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY", ""),
         GEMINI_API_KEY=os.environ.get("GEMINI_API_KEY", ""),
+        OLLAMA_BASE_URL=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
         STRIPE_SECRET_KEY=os.environ.get("STRIPE_SECRET_KEY", ""),
+        STRIPE_WEBHOOK_SECRET=os.environ.get("STRIPE_WEBHOOK_SECRET", ""),
+        STRIPE_PRICE_BASIC=os.environ.get("STRIPE_PRICE_BASIC", ""),
+        STRIPE_PRICE_PRO=os.environ.get("STRIPE_PRICE_PRO", ""),
+        STRIPE_PRICE_ENTERPRISE=os.environ.get("STRIPE_PRICE_ENTERPRISE", ""),
+        PROVIDER_KEY_ENCRYPTION_KEY=os.environ.get("PROVIDER_KEY_ENCRYPTION_KEY", ""),
+        GOOGLE_CLIENT_ID=os.environ.get("GOOGLE_CLIENT_ID", ""),
+        GOOGLE_CLIENT_SECRET=os.environ.get("GOOGLE_CLIENT_SECRET", ""),
         UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER", "/tmp/anote_uploads"),
     )
     if config:
@@ -54,9 +128,13 @@ def create_app(config: dict | None = None) -> Flask:
 
     app.add_url_rule("/callback", "google_oauth_callback", google_oauth_callback, methods=["GET"])
 
+    if not app.config.get("TESTING"):
+        for warning in _build_health_report(app)["warnings"]:
+            app.logger.warning("Startup readiness warning: %s", warning)
+
     @app.get("/health")
     def health() -> tuple:
-        return jsonify({"status": "ok", "service": "anote-backend"}), 200
+        return jsonify(_build_health_report(app)), 200
 
     @app.get("/")
     def root() -> tuple:

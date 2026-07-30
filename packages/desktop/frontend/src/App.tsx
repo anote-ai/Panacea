@@ -15,6 +15,11 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+function PublicOnly({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
+  return token ? <Navigate to="/" replace /> : <>{children}</>;
+}
+
 export default function App() {
   const [dark, setDark] = useState(() => {
     const s = localStorage.getItem("theme");
@@ -38,8 +43,8 @@ export default function App() {
       <AuthContext.Provider value={{ token, setToken }}>
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
+            <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
             <Route path="/*" element={<RequireAuth><ChatPage /></RequireAuth>} />
           </Routes>
         </BrowserRouter>
