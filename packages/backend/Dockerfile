@@ -26,4 +26,4 @@ EXPOSE 5000
 # Migrations + gunicorn are inlined here (rather than a separate entrypoint.sh)
 # so the startup command lives in the image's own metadata — immune to a
 # docker-compose bind mount shadowing /app with an incomplete host directory.
-ENTRYPOINT ["sh", "-c", "if [ \"${SKIP_DB_MIGRATIONS:-}\" != \"1\" ]; then python -m database.migrate; fi && exec gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 \"app:create_app()\""]
+ENTRYPOINT ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 \"app:create_app()\""]
