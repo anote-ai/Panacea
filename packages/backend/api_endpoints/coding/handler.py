@@ -29,21 +29,21 @@ _repos: dict[str, dict] = {}  # repoId -> {"path": str, "repoUrl": str}
 def _build_tree(root: Path, current: Path) -> dict:
     """Recursively build a JSON-serializable file tree, excluding .git."""
     rel = current.relative_to(root)
-    node = {
-        "name": current.name if rel != Path(".") else root.name,
-        "path": "" if rel == Path(".") else str(rel),
-        "type": "dir",
-        "children": [],
-    }
+    children: list[dict] = []
     for child in sorted(current.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
         if child.name == ".git":
             continue
         if child.is_dir():
-            node["children"].append(_build_tree(root, child))
+            children.append(_build_tree(root, child))
         else:
             child_rel = child.relative_to(root)
-            node["children"].append({"name": child.name, "path": str(child_rel), "type": "file"})
-    return node
+            children.append({"name": child.name, "path": str(child_rel), "type": "file"})
+    return {
+        "name": current.name if rel != Path(".") else root.name,
+        "path": "" if rel == Path(".") else str(rel),
+        "type": "dir",
+        "children": children,
+    }
 
 
 @coding_bp.post("/connect-repo")
