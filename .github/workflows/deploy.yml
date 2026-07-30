@@ -30,19 +30,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-backend:
-    name: Deploy Backend to ECS
+  build-and-push-backend:
+    name: Build and Push Backend Image
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
+    outputs:
+      image_uri: ${{ steps.image.outputs.image_uri }}
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
     steps:
       - uses: actions/checkout@v4
-      - name: Validate backend deployment configuration
-        env:
-          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-          ECS_SERVICE: ${{ secrets.ECS_SERVICE_BACKEND }}
+      - name: Validate backend build configuration
         run: |
           missing=()
-          for name in AWS_REGION AWS_ROLE_ARN ECS_CLUSTER ECS_SERVICE; do
+          for name in AWS_REGION AWS_ROLE_ARN ECR_REPOSITORY; do
             [[ -n "${!name}" ]] || missing+=("$name")
           done
           if (( ${#missing[@]} )); then
@@ -58,10 +57,11 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
       - name: Build and push backend image
+        id: image
         working-directory: packages/backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: autonomous-intelligence-backend
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
@@ -72,24 +72,79 @@ jobs:
                      $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-      - name: Deploy to ECS
+          echo "image_uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy-to-ec2:
+    needs: build-and-push-backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate EC2 deployment configuration
         env:
-          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-          ECS_SERVICE: ${{ secrets.ECS_SERVICE_BACKEND }}
+          IMAGE_URI: ${{ needs.build-and-push-backend.outputs.image_uri }}
+          ECR_REGISTRY: ${{ needs.build-and-push-backend.outputs.ecr_registry }}
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
         run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --force-new-deployment
-          aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_SERVICE
+          missing=()
+          for name in AWS_REGION AWS_ROLE_ARN IMAGE_URI ECR_REGISTRY INSTANCE_ID APP_DIR; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing required deployment configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to EC2 via SSM Session Manager
+        env:
+          IMAGE_URI: ${{ needs.build-and-push-backend.outputs.image_uri }}
+          ECR_REGISTRY: ${{ needs.build-and-push-backend.outputs.ecr_registry }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+          APP_DIR: ${{ env.APP_DIR }}
+        run: |
+          if [ -z "$IMAGE_URI" ]; then
+            echo "ERROR: IMAGE_URI is empty — the build-and-push-backend job did not produce an output."
+            echo "Check the Quality Gate and build-and-push-backend job logs above."
+            exit 1
+          fi
+
+          if [ -z "$ECR_REGISTRY" ]; then
+            echo "ERROR: ECR_REGISTRY is empty — the build-and-push-backend job did not produce an output."
+            exit 1
+          fi
+
+          echo "Deploying image: $IMAGE_URI"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy $IMAGE_URI via GitHub Actions" \
+            --parameters commands="[
+              'cd $APP_DIR',
+              'aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY',
+              'docker pull $IMAGE_URI',
+              'docker compose down',
+              'docker compose up -d',
+              'docker system prune -a'
+            ]" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" || true
 
   deploy-frontend:
     name: Deploy Frontend to S3/CloudFront
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'production' }}
-    needs: deploy-backend
+    needs: deploy-to-ec2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -113,7 +168,7 @@ jobs:
             printf 'Missing required deployment configuration: %s\n' "${missing[*]}"
             exit 1
           fi
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
@@ -151,7 +206,7 @@ jobs:
   notify:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [deploy-backend, deploy-frontend]
+    needs: [deploy-to-ec2, deploy-frontend]
     if: failure()
     steps:
       - uses: slackapi/slack-github-action@v1
