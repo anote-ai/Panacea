@@ -7,9 +7,10 @@ from flask import Flask, Response, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
-from api_endpoints.auth.handler import auth_bp
+from api_endpoints.auth.handler import auth_bp, google_oauth_callback
 from api_endpoints.chat.handler import chat_bp
 from api_endpoints.documents.handler import documents_bp
+from api_endpoints.folders.handler import folders_bp
 from api_endpoints.payments.handler import payments_bp
 from api_endpoints.search.handler import search_bp
 from api_endpoints.user.handler import user_bp
@@ -46,10 +47,13 @@ def create_app(config: dict[str, object] | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(documents_bp)
+    app.register_blueprint(folders_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(payments_bp)
     app.register_blueprint(workspaces_bp)
+
+    app.add_url_rule("/callback", "google_oauth_callback", google_oauth_callback, methods=["GET"])
 
     @app.get("/health")
     def health() -> tuple[Response, int]:

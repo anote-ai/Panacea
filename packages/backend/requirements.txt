@@ -6,7 +6,8 @@ gunicorn==22.0.0
 
 # AI / LLM
 anthropic==0.40.0
-openai==1.50.0
+openai==1.58.1
+google-generativeai==0.8.3
 langchain==0.3.30
 langchain-anthropic==0.3.0
 langchain-openai==0.2.1
@@ -17,9 +18,16 @@ chromadb==0.5.3
 
 # Document processing
 PyPDF2==3.0.1
+PyMuPDF==1.24.11
+Pillow==10.4.0
+
+# Database
+mysql-connector-python==8.4.0
 
 # Auth
 bcrypt==4.2.0
+cryptography==43.0.3
+google-auth==2.35.0
 
 # Payments
 stripe==10.12.0
@@ -39,3 +47,4 @@ pytest-mock==3.14.0
 # Lint / type check
 ruff==0.7.1
 mypy==1.12.1
+types-requests==2.32.0.20241016

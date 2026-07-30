@@ -1,9 +1,13 @@
+# Local dev stack only — production deploys packages/backend and packages/web
+# directly via ECS/CloudFront (see terraform/ and .github/workflows/deploy.yml),
+# not this file. restart: "no" everywhere is intentional so a crashed
+# container surfaces immediately in the terminal instead of restart-looping.
 version: "3.9"
 
 services:
   db:
     image: mysql:8.0
-    restart: always
+    restart: "no"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-anote}
       MYSQL_DATABASE: ${DB_NAME:-anote}
@@ -14,16 +18,21 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./packages/backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-anote}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   redis:
     image: redis:7-alpine
-    restart: always
+    restart: "no"
     ports:
       - "6379:6379"
 
   tika:
     image: apache/tika:latest
-    restart: always
+    restart: "no"
     ports:
       - "9998:9998"
 
@@ -31,7 +40,7 @@ services:
     build:
       context: ./packages/backend
       dockerfile: Dockerfile
-    restart: always
+    restart: "no"
     ports:
       - "5000:5000"
     environment:
@@ -44,23 +53,36 @@ services:
       REDIS_URL: redis://redis:6379
       TIKA_URL: http://tika:9998
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-change-me}
+      PROVIDER_KEY_ENCRYPTION_KEY: ${PROVIDER_KEY_ENCRYPTION_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://localhost:11434}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_BASIC: ${STRIPE_PRICE_BASIC:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-http://127.0.0.1:5000/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
-      - db
-      - redis
-      - tika
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      tika:
+        condition: service_started
     volumes:
       - ./packages/backend:/app
       - backend_uploads:/app/uploads
 
   web:
     build:
-      context: ./packages/web
-      dockerfile: Dockerfile
-    restart: always
+      context: .
+      dockerfile: packages/web/Dockerfile
+    restart: "no"
     ports:
       - "3000:3000"
     environment:

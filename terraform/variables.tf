@@ -92,6 +92,69 @@ variable "stripe_secret_key" {
   default   = ""
 }
 
+variable "stripe_webhook_secret" {
+  description = "Signing secret for the Stripe webhook endpoint (whsec_...)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_basic" {
+  description = "Stripe Price ID for the basic subscription tier."
+  type        = string
+  default     = ""
+}
+
+variable "stripe_price_pro" {
+  description = "Stripe Price ID for the pro subscription tier."
+  type        = string
+  default     = ""
+}
+
+variable "stripe_price_enterprise" {
+  description = "Stripe Price ID for the enterprise subscription tier."
+  type        = string
+  default     = ""
+}
+
+variable "provider_key_encryption_key" {
+  description = "Fernet key encrypting user-supplied LLM provider API keys at rest. Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "ollama_base_url" {
+  description = "Base URL for an Ollama server, if the deployment supports local/self-hosted models."
+  type        = string
+  default     = "http://localhost:11434"
+}
+
+variable "google_client_id" {
+  description = "Google OAuth client ID for 'Sign in with Google' (not secret — Google itself sends this back in the browser redirect)."
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret, used server-side to exchange the auth code for tokens."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "google_oauth_redirect_uri" {
+  description = "Must exactly match an 'Authorized redirect URI' on the Google OAuth client, e.g. https://<domain>/callback."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_url" {
+  description = "Public URL of the web frontend (e.g. https://<cloudfront-domain> or the custom domain) — where the backend redirects the browser after Google login completes."
+  type        = string
+  default     = ""
+}
+
 variable "domain_name" {
   description = "Optional custom domain for the CloudFront distribution (requires an ACM cert in us-east-1). Leave empty to use the default CloudFront domain."
   type        = string
