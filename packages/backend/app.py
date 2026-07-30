@@ -69,6 +69,7 @@ def create_app(config: dict | None = None) -> Flask:
 
 if __name__ == "__main__":
     app = create_app()
+    host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("APP_ENV", "local") == "local"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug)
