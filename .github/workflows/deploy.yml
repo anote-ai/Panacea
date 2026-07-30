@@ -132,6 +132,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
+        env:
+          REACT_APP_API_BASE_URL: ${{ vars.REACT_APP_API_BASE_URL }}
         run: npm run build --workspace=packages/web
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
