@@ -96,7 +96,7 @@ AI document Q&A attacks this directly: instead of opening, scrolling, and skimmi
 
 ## Cost side of the ledger
 
-Plan pricing is per-seat with monthly question allowances (see the in-app billing page). At the default scenario's ~$7,500/person/year recovered, a plan costing a few hundred dollars per person per year pays back **>10×**; self-hosted deployments trade the subscription for infrastructure plus LLM API usage you meter yourself.
+Plan pricing is per-seat with monthly question allowances (see the [FAQ](faq.md) and in-app billing page). At the default scenario's ~$7,500/person/year recovered, a plan costing a few hundred dollars per person per year pays back **>10×**; self-hosted deployments trade the subscription for infrastructure plus LLM API usage you meter yourself.
 
 [^1]: McKinsey Global Institute, *The social economy: Unlocking value and productivity through social technologies* (2012) — reports 19% of the knowledge worker's week spent searching and gathering information. [mckinsey.com](https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-social-economy)
 [^2]: IDC, *The Knowledge Quotient: Unlocking the Hidden Value of Information* (2014) and related IDC knowledge-worker studies — commonly cited at ~2.5 hours/day searching for information.
