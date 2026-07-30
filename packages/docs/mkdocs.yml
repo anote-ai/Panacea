@@ -38,6 +38,7 @@ plugins:
 
 markdown_extensions:
   - admonition
+  - footnotes
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.highlight:
@@ -56,6 +57,7 @@ nav:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
     - Configuration: getting-started/configuration.md
+  - FAQ: faq.md
   - CLI:
     - Overview: cli/overview.md
     - Commands: cli/commands.md
@@ -86,3 +88,4 @@ nav:
     - Contributing: development/contributing.md
     - Architecture: development/architecture.md
     - Testing: development/testing.md
+  - ROI Calculator: roi.md

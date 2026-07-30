@@ -20,7 +20,7 @@ from database.db import (
     delete_document as db_delete_document,
 )
 from middleware.auth import require_auth
-from services.rag import UPLOAD_FOLDER, ingest_document, query_documents
+from services.rag import UPLOAD_FOLDER, delete_document_vectors, ingest_document, query_documents
 from services.thumbnails import generate_thumbnail, thumbnail_path
 
 documents_bp = Blueprint("documents", __name__, url_prefix="/api/documents")
@@ -190,6 +190,7 @@ def remove_document(doc_id: str) -> tuple:  # type: ignore[type-arg]
         for ext in (".pdf", ".txt", ".md", ".csv", ".docx"):
             Path(UPLOAD_FOLDER / f"{doc_id}{ext}").unlink(missing_ok=True)
         thumbnail_path(UPLOAD_FOLDER, doc_id).unlink(missing_ok=True)
+        delete_document_vectors(doc_id)
         return jsonify({"deleted": True}), 200
     except Exception:
         return jsonify({"error": "Internal server error"}), 500

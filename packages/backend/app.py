@@ -9,6 +9,7 @@ from flask_jwt_extended import JWTManager
 
 from api_endpoints.auth.handler import auth_bp, google_oauth_callback
 from api_endpoints.chat.handler import chat_bp
+from api_endpoints.demo.handler import demo_bp
 from api_endpoints.documents.handler import documents_bp
 from api_endpoints.folders.handler import folders_bp
 from api_endpoints.payments.handler import payments_bp
@@ -45,6 +46,7 @@ def create_app(config: dict | None = None) -> Flask:
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(demo_bp)
     app.register_blueprint(documents_bp)
     app.register_blueprint(folders_bp)
     app.register_blueprint(search_bp)
@@ -67,6 +69,7 @@ def create_app(config: dict | None = None) -> Flask:
 
 if __name__ == "__main__":
     app = create_app()
+    host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("APP_ENV", "local") == "local"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug)
