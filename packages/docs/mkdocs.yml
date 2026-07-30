@@ -82,6 +82,16 @@ nav:
     - Chat: api/chat.md
     - Documents: api/documents.md
     - Search: api/search.md
+  - Cookbook:
+    - Overview: cookbook/index.md
+    - Document Q&A + RAG: cookbook/03-panacea-document-qa-rag.md
+    - Multi-Agent Orchestration: cookbook/04-panacea-multi-agent-orchestration.md
+    - AI Coding Toolchain: cookbook/05-panacea-ai-coding-toolchain.md
+    - Multi-Modal Ingestion: cookbook/06-panacea-multimodal-ingestion.md
+    - OpenAI-Compatible Gateway: cookbook/07-panacea-openai-compatible-gateway.md
+    - Billing & API Keys: cookbook/08-panacea-billing-and-api-keys.md
+    - MCP Tool Server: cookbook/09-panacea-mcp-tool-server.md
+    - Multi-Channel Messaging Bots: cookbook/10-panacea-messaging-bots.md
   - Development:
     - Contributing: development/contributing.md
     - Architecture: development/architecture.md
