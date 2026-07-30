@@ -104,7 +104,11 @@ def google_login_start():
         "scope": "openid email profile",
         "state": state,
         "access_type": "online",
-        "prompt": "select_account",
+        # Forces Google to show its credential entry screen instead of
+        # silently reusing an existing browser session or the account
+        # picker — Google has no "prompt=login"; max_auth_age=0 is the
+        # documented way to force re-authentication.
+        "max_auth_age": "0",
     }
     return redirect(f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}")
 
