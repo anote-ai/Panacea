@@ -2,6 +2,7 @@ import axios from "axios";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
+import CodingPage from "./pages/CodingPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -164,6 +165,7 @@ export default function App() {
             <Route path="/app" element={<RequireAuth><ChatPage /></RequireAuth>} />
             <Route path="/app/chat/:id" element={<RequireAuth><ChatPage /></RequireAuth>} />
             <Route path="/documents" element={<RequireAuth><DocumentsPage /></RequireAuth>} />
+            <Route path="/coding" element={<RequireAuth><CodingPage /></RequireAuth>} />
           </Routes>
         </BrowserRouter>
       </AuthContext.Provider>
