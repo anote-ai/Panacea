@@ -13,17 +13,17 @@ on:
         options: [production, staging]
 
 permissions:
-  id-token: write   # required for OIDC
-  contents: read    # required to check out the repo
+  id-token: write
+  contents: read
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   IMAGE_TAG: "production"
-  AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }} 
+  AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
   S3_BUCKET: ${{ vars.S3_BUCKET_FRONTEND_PROD }}
   CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
-  APP_DIR: ${{ vars.APP_DIR }}  # <-- path to docker-compose.yml on EC2
+  APP_DIR: ${{ vars.APP_DIR }}
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -38,10 +38,20 @@ jobs:
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
     steps:
       - uses: actions/checkout@v4
+      - name: Validate backend build configuration
+        run: |
+          missing=()
+          for name in AWS_REGION AWS_ROLE_ARN ECR_REPOSITORY; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing required deployment configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}  # <-- your role ARN
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Login to ECR
         id: login-ecr
@@ -54,7 +64,10 @@ jobs:
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build \
+            --platform linux/amd64 \
+            --build-arg BUILD_SHA=$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
                      $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -65,10 +78,24 @@ jobs:
     needs: build-and-push-backend
     runs-on: ubuntu-latest
     steps:
+      - name: Validate EC2 deployment configuration
+        env:
+          IMAGE_URI: ${{ needs.build-and-push-backend.outputs.image_uri }}
+          ECR_REGISTRY: ${{ needs.build-and-push-backend.outputs.ecr_registry }}
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+        run: |
+          missing=()
+          for name in AWS_REGION AWS_ROLE_ARN IMAGE_URI ECR_REGISTRY INSTANCE_ID APP_DIR; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing required deployment configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}  # <-- your role ARN
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to EC2 via SSM Session Manager
@@ -76,8 +103,8 @@ jobs:
           IMAGE_URI: ${{ needs.build-and-push-backend.outputs.image_uri }}
           ECR_REGISTRY: ${{ needs.build-and-push-backend.outputs.ecr_registry }}
           AWS_REGION: ${{ env.AWS_REGION }}
-          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}             # <-- your EC2 instance ID
-          APP_DIR: ${{ env.APP_DIR }}                   # <-- path to docker-compose.yml on EC2
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+          APP_DIR: ${{ env.APP_DIR }}
         run: |
           if [ -z "$IMAGE_URI" ]; then
             echo "ERROR: IMAGE_URI is empty — the build-and-push-backend job did not produce an output."
@@ -122,6 +149,7 @@ jobs:
     name: Deploy Frontend to S3/CloudFront
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'production' }}
+    needs: deploy-to-ec2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -132,28 +160,53 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: npm run build --workspace=packages/web
+      - name: Validate frontend deployment configuration
+        run: |
+          missing=()
+          for name in AWS_REGION AWS_ROLE_ARN S3_BUCKET CLOUDFRONT_DISTRIBUTION_ID; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing required deployment configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}  # <-- your role ARN
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Deploy to S3
-        env:
-          S3_BUCKET: ${{ secrets.S3_BUCKET_FRONTEND }}
         run: |
           aws s3 sync packages/web/dist/ s3://$S3_BUCKET --delete \
-            --cache-control "public, max-age=31536000, immutable"
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" --exclude "*.json"
           aws s3 cp packages/web/dist/index.html s3://$S3_BUCKET/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
           aws s3 sync packages/web/dist/ s3://$S3_BUCKET \
             --exclude "*" --include "*.json" --cache-control "no-cache"
       - name: Invalidate CloudFront
-        env:
-          CF_DISTRIBUTION: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id $CF_DISTRIBUTION --paths "/*"
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+      - name: Verify production release
+        if: ${{ github.event_name == 'push' || github.event.inputs.environment == 'production' }}
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          for attempt in {1..6}; do
+            python3 scripts/release_smoke.py \
+              --frontend-url https://chat.anote.ai \
+              --api-url https://chat.anote.ai \
+              --expected-sha "$EXPECTED_SHA" \
+              --require-payments && exit 0
+            if [[ "$attempt" -lt 6 ]]; then
+              sleep 10
+            fi
+          done
+          exit 1
 
   notify:
     name: Notify on Failure
