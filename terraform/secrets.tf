@@ -12,5 +12,6 @@ resource "aws_secretsmanager_secret_version" "backend" {
     STRIPE_SECRET_KEY           = var.stripe_secret_key
     STRIPE_WEBHOOK_SECRET       = var.stripe_webhook_secret
     PROVIDER_KEY_ENCRYPTION_KEY = var.provider_key_encryption_key
+    GOOGLE_CLIENT_SECRET        = var.google_client_secret
   })
 }

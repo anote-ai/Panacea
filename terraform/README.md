@@ -103,6 +103,35 @@ local dev) and AWS credentials for this account.
      Dashboard shows the webhook delivered successfully and the DB's
      `users.plan`/`credits` updated.
 
+## Google Sign-In
+
+This uses the server-side OAuth redirect flow, entirely on the backend — the
+frontend just links to `/auth/google/login`; there's no Google JS SDK and no
+frontend build-time env var. The backend redirects the browser to Google,
+Google redirects back to `/callback` (a bare path outside `/auth/*`, matching
+the exact "Authorized redirect URI" registered on the OAuth client — see the
+routing rule `cloudfront.tf` adds for it), the backend exchanges the code
+server-side (needs the client *secret*, unlike the old popup approach), then
+redirects the browser to `${FRONTEND_URL}/oauth/callback?token=...` where the
+SPA picks up the JWT.
+
+1. Create an OAuth client ID in Google Cloud Console (APIs & Services → Credentials →
+   Create Credentials → OAuth client ID → Web application). Add the production
+   redirect URI — `https://<cloudfront-or-custom-domain>/callback` — under
+   **Authorized redirect URIs** (not "JavaScript origins", a different field).
+   For local dev this is `http://127.0.0.1:5000/callback`.
+2. Apply with these vars (or `TF_VAR_*`):
+   ```
+   -var google_client_id=<id>.apps.googleusercontent.com
+   -var google_client_secret=GOCSPX-...
+   -var google_oauth_redirect_uri=https://<domain>/callback
+   -var frontend_url=https://<domain>
+   ```
+   Same "new revision doesn't affect the running service" caveat as Stripe
+   above — force a new ECS deployment after applying.
+3. No GitHub Actions secret or frontend build step change needed — the client
+   ID/secret never reach the frontend bundle in this flow.
+
 ## What this does NOT cover yet
 
 - Redis / Tika sidecars (used by docker-compose locally) — add `aws_elasticache_cluster`
