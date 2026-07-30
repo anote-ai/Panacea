@@ -56,6 +56,7 @@ nav:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
     - Configuration: getting-started/configuration.md
+  - FAQ: faq.md
   - CLI:
     - Overview: cli/overview.md
     - Commands: cli/commands.md

@@ -36,6 +36,21 @@ def ingest_document(doc_id: str, file_path: Path) -> int:
     return len(chunks)
 
 
+def delete_document_vectors(doc_id: str) -> None:
+    """Remove all of a document's chunks from the vector store."""
+    try:
+        import chromadb
+        from chromadb.utils import embedding_functions
+        client = chromadb.PersistentClient(path=os.environ.get("CHROMA_PERSIST_DIR", "./chroma_db"))
+        ef = embedding_functions.DefaultEmbeddingFunction()
+        collection = client.get_or_create_collection(
+            "documents", embedding_function=ef  # type: ignore[arg-type]
+        )
+        collection.delete(where={"doc_id": doc_id})
+    except Exception:
+        pass
+
+
 def retrieve_context(
     question: str,
     doc_ids: list[str] | None = None,
@@ -100,6 +115,13 @@ def _extract_text(file_path: Path) -> str:
             with open(file_path, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
                 return "\n".join(page.extract_text() or "" for page in reader.pages)
+        except Exception:
+            return ""
+    if ext == ".docx":
+        try:
+            import docx
+            document = docx.Document(str(file_path))
+            return "\n".join(p.text for p in document.paragraphs)
         except Exception:
             return ""
     return ""

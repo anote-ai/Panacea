@@ -237,7 +237,8 @@ def test_delete_document_not_found(client, auth_headers):
 
 def test_delete_document_found(client, auth_headers):
     doc = {"id": "abc", "filename": "test.txt", "chunk_count": 5, "folder_id": None, "created_at": None}
-    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)), \
+         patch("api_endpoints.documents.handler.delete_document_vectors"):
         resp = client.delete("/api/documents/abc", headers=auth_headers)
     assert resp.status_code == 200
 
@@ -247,10 +248,20 @@ def test_delete_document_removes_thumbnail(client, auth_headers, tmp_path):
     thumb = tmp_path / "abc_thumb.png"
     thumb.write_bytes(b"fake")
     with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
-         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)), \
+         patch("api_endpoints.documents.handler.delete_document_vectors"):
         resp = client.delete("/api/documents/abc", headers=auth_headers)
     assert resp.status_code == 200
     assert not thumb.exists()
+
+
+def test_delete_document_removes_vectors(client, auth_headers):
+    doc = {"id": "abc", "filename": "test.txt", "chunk_count": 5, "folder_id": None, "created_at": None}
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)), \
+         patch("api_endpoints.documents.handler.delete_document_vectors") as mock_delete_vectors:
+        resp = client.delete("/api/documents/abc", headers=auth_headers)
+    assert resp.status_code == 200
+    mock_delete_vectors.assert_called_once_with("abc")
 
 
 # ---------------------------------------------------------------------------
@@ -301,3 +312,21 @@ def test_ask_document_with_folder(client, auth_headers):
             headers=auth_headers,
         )
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# services.rag text extraction
+# ---------------------------------------------------------------------------
+
+def test_extract_text_docx(tmp_path, monkeypatch):
+    import pytest
+
+    docx = pytest.importorskip("docx")
+    import services.rag as rag
+
+    monkeypatch.setattr(rag, "_UPLOAD_DIR", tmp_path)
+    document = docx.Document()
+    document.add_paragraph("Hello from a Word document.")
+    path = tmp_path / "sample.docx"
+    document.save(str(path))
+    assert "Hello from a Word document." in rag._extract_text(path)
