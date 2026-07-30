@@ -10,6 +10,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
+from agents.coding_agent import run_coding_agent
+
 coding_bp = Blueprint("coding", __name__, url_prefix="/api/coding")
 
 CODING_WORKSPACES_DIR = Path(os.environ.get("CODING_WORKSPACES_DIR", "/tmp/anote_coding_workspaces"))
@@ -107,3 +109,18 @@ def get_file(repo_id: str) -> tuple:  # type: ignore[type-arg]
     content = raw[:_MAX_FILE_BYTES].decode("utf-8", errors="replace")
     truncated = len(raw) > _MAX_FILE_BYTES
     return jsonify({"path": rel_path, "content": content, "truncated": truncated}), 200
+
+
+@coding_bp.post("/repos/<repo_id>/run")
+def run_agent(repo_id: str) -> tuple:  # type: ignore[type-arg]
+    repo = _repos.get(repo_id)
+    if not repo:
+        return jsonify({"error": "Repo not found. Connect it again."}), 404
+
+    data = request.get_json(silent=True) or {}
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt is required"}), 400
+
+    output = run_coding_agent(prompt, cwd=repo["path"])
+    return jsonify({"output": output}), 200

@@ -79,6 +79,11 @@ export default function CodingPage() {
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
+  const [prompt, setPrompt] = useState("");
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runOutput, setRunOutput] = useState<string | null>(null);
+
   const connectRepo = async () => {
     if (!repoUrl.trim()) return;
     setConnecting(true);
@@ -99,6 +104,25 @@ export default function CodingPage() {
       setConnectError(err.response?.data?.error || "Failed to connect to repo.");
     } finally {
       setConnecting(false);
+    }
+  };
+
+  const runAgent = async () => {
+    if (!repoId || !prompt.trim()) return;
+    setRunning(true);
+    setRunError(null);
+    setRunOutput(null);
+    try {
+      const res = await axios.post(
+        `/api/coding/repos/${repoId}/run`,
+        { prompt: prompt.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setRunOutput(res.data.output);
+    } catch (err: any) {
+      setRunError(err.response?.data?.error || "Failed to run the agent.");
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -179,6 +203,35 @@ export default function CodingPage() {
                 <pre className="whitespace-pre-wrap text-sm">{fileContent}</pre>
               )}
             </div>
+          </div>
+        )}
+
+        {repoId && (
+          <div className="mt-6 rounded-xl border border-warm-border dark:border-warm-border-dark bg-warm-card dark:bg-warm-card-dark p-4">
+            <p className="text-sm font-medium mb-2">Ask the coding agent</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && runAgent()}
+                placeholder="e.g. Summarize what this repo does"
+                className="flex-1 px-4 py-3 rounded-lg border border-warm-border dark:border-warm-border-dark bg-warm-bg dark:bg-warm-bg-dark text-warm-text dark:text-warm-text-dark placeholder-warm-muted dark:placeholder-warm-muted-dark focus:outline-none focus:ring-2 focus:ring-warm-border dark:focus:ring-warm-border-dark"
+              />
+              <button
+                onClick={runAgent}
+                disabled={running || !prompt.trim()}
+                className="px-6 py-3 rounded-lg font-medium bg-brand-blue-600 dark:bg-brand-blue-400 text-white dark:text-brand-blue-900 hover:bg-brand-blue-800 dark:hover:bg-brand-blue-200 disabled:opacity-50 transition-colors"
+              >
+                {running ? "Running..." : "Run"}
+              </button>
+            </div>
+            {runError && <p className="mt-2 text-sm text-red-500">{runError}</p>}
+            {runOutput !== null && (
+              <pre className="mt-3 whitespace-pre-wrap text-sm max-h-[40vh] overflow-auto rounded-lg bg-warm-bg dark:bg-warm-bg-dark p-3">
+                {runOutput}
+              </pre>
+            )}
           </div>
         )}
       </div>
