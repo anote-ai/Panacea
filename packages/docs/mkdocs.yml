@@ -8,15 +8,18 @@ repo_url: https://github.com/anote-ai/Autonomous-Intelligence
 
 theme:
   name: material
+  logo: assets/anote-icon.png
+  favicon: assets/anote-icon.png
+  font: false
   palette:
     - scheme: slate
-      primary: indigo
+      primary: black
       accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
     - scheme: default
-      primary: indigo
+      primary: white
       accent: indigo
       toggle:
         icon: material/brightness-7
@@ -32,6 +35,9 @@ theme:
     - content.code.annotate
   icon:
     repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
 
 plugins:
   - search

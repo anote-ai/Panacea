@@ -1,0 +1,88 @@
+/*
+  Re-skin Material for MkDocs to match the Panacea web app's monochrome
+  ChatGPT-style palette (packages/web/src/index.css, App.tsx, ChatPage.tsx)
+  instead of Material's default indigo theme. No color accent — buttons,
+  links, and highlights are all black/white, same as the app.
+
+  !important is required here: Material's compiled palette CSS keys several
+  of these variables off compound attribute selectors (e.g.
+  [data-md-color-scheme][data-md-color-accent]) that outrank a plain
+  [data-md-color-scheme="slate"] selector on specificity alone.
+*/
+
+:root, [data-md-color-scheme="default"] {
+  --md-primary-fg-color: #ffffff !important;
+  --md-primary-fg-color--light: #ffffff !important;
+  --md-primary-fg-color--dark: #ffffff !important;
+  --md-primary-bg-color: #111111 !important;
+  --md-primary-bg-color--light: #4b5563 !important;
+
+  --md-accent-fg-color: #111111 !important;
+  --md-accent-fg-color--transparent: rgba(17, 17, 17, 0.1) !important;
+  --md-accent-bg-color: #ffffff !important;
+
+  --md-default-bg-color: #ffffff !important;
+  --md-default-fg-color: #111111 !important;
+  --md-default-fg-color--light: #4b5563 !important;
+  --md-default-fg-color--lighter: #9ca3af !important;
+  --md-default-fg-color--lightest: #e5e7eb !important;
+
+  --md-typeset-a-color: #111111 !important;
+
+  --md-code-bg-color: #f7f7f8 !important;
+  --md-code-fg-color: #111111 !important;
+
+  --md-footer-bg-color: #f7f7f8 !important;
+  --md-footer-bg-color--dark: #f7f7f8 !important;
+  --md-footer-fg-color: #111111 !important;
+  --md-footer-fg-color--light: #4b5563 !important;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #171717 !important;
+  --md-primary-fg-color--light: #171717 !important;
+  --md-primary-fg-color--dark: #171717 !important;
+  --md-primary-bg-color: #ffffff !important;
+  --md-primary-bg-color--light: #d1d5db !important;
+
+  --md-accent-fg-color: #ffffff !important;
+  --md-accent-fg-color--transparent: rgba(255, 255, 255, 0.1) !important;
+  --md-accent-bg-color: #111111 !important;
+
+  --md-default-bg-color: #212121 !important;
+  --md-default-fg-color: #ffffff !important;
+  --md-default-fg-color--light: #d1d5db !important;
+  --md-default-fg-color--lighter: #9ca3af !important;
+  --md-default-fg-color--lightest: #4b5563 !important;
+
+  --md-typeset-a-color: #ffffff !important;
+
+  --md-code-bg-color: #2f2f2f !important;
+  --md-code-fg-color: #e5e7eb !important;
+
+  --md-footer-bg-color: #171717 !important;
+  --md-footer-bg-color--dark: #171717 !important;
+  --md-footer-fg-color: #ffffff !important;
+  --md-footer-fg-color--light: #d1d5db !important;
+}
+
+/* Same system font stack as packages/web/src/index.css, so text renders
+   identically whether you're on the app or the docs. */
+:root {
+  --md-text-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  --md-code-font: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace !important;
+}
+
+/* Nav sidebar active/hover items: Material dims these via accent opacity,
+   which reads fine already once --md-accent-fg-color is monochrome. */
+.md-nav__link--active,
+.md-nav__link:focus,
+.md-nav__link:hover {
+  color: var(--md-accent-fg-color);
+}
+
+/* Rounded, borderless code blocks matching the app's chat/card corners. */
+.md-typeset pre > code,
+.md-typeset code {
+  border-radius: 6px;
+}
