@@ -12,7 +12,7 @@ export interface AgentRunOptions {
   prompt: string;
   cwd?: string;
   allowedTools?: string[];
-  permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
+  permissionMode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
   systemPrompt?: string;
   maxTurns?: number;
   model?: string;
@@ -65,7 +65,7 @@ export async function runAgentStream(opts: AgentRunOptions): Promise<string> {
     }
   }
 
-  const allowedTools = opts.allowedTools ?? ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
+  const allowedTools = opts.allowedTools ?? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebSearch", "WebFetch"];
   const maxTurns = opts.maxTurns ?? config.maxTurns ?? 30;
   const model = opts.model ?? config.model ?? "";
 
@@ -86,12 +86,20 @@ export async function runAgentStream(opts: AgentRunOptions): Promise<string> {
   }
 
   // ── Anthropic path — claude-agent-sdk ────────────────────────────────────
+  // Wire configured MCP servers. Their tools remain subject to the SDK's
+  // normal permission flow because tool names are only known after discovery.
+  const mcpServers = config.mcpServers;
+  if (mcpServers && Object.keys(mcpServers).length) {
+    console.log(chalk.gray(`  (MCP: ${Object.keys(mcpServers).join(", ")})\n`));
+  }
+
   const options: Options = {
     cwd,
     allowedTools,
     permissionMode: opts.permissionMode ?? config.permissionMode ?? "default",
     systemPrompt,
     maxTurns,
+    ...(mcpServers ? { mcpServers: mcpServers as Options["mcpServers"] } : {}),
   };
 
   let result = "";

@@ -7,6 +7,7 @@ import type { Options, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
   directRuntimeSupportMessage,
   getConfiguredApiKey,
+  getMcpServers,
   getModel,
   getProvider,
   getServerUrl,
@@ -102,6 +103,10 @@ export class AnoteAgent {
     return vscode.workspace.getConfiguration("anote").get<boolean>("autoEdit") ?? false;
   }
 
+  private isPlanMode(): boolean {
+    return vscode.workspace.getConfiguration("anote").get<boolean>("planMode") ?? false;
+  }
+
   getCwdForWorkspace(): string {
     const folders = vscode.workspace.workspaceFolders;
     return folders && folders.length > 0 ? folders[0].uri.fsPath : process.cwd();
@@ -160,13 +165,31 @@ export class AnoteAgent {
       prompt = `Previous conversation:\n${history}\n\nUser: ${prompt}`;
     }
 
+    // Wire configured MCP servers. Their tools remain subject to the SDK's
+    // normal permission flow because tool names are only known after discovery.
+    const mcpServers = getMcpServers();
+
     const options: Options = {
       cwd,
-      allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-      permissionMode: this.isAutoEdit() ? "acceptEdits" : "default",
+      allowedTools: [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "WebSearch",
+        "WebFetch",
+      ],
+      permissionMode: this.isPlanMode()
+        ? "plan"
+        : this.isAutoEdit()
+          ? "acceptEdits"
+          : "default",
       systemPrompt,
       maxTurns: this.getMaxTurns(),
       model: getModel(),
+      ...(mcpServers ? { mcpServers: mcpServers as Options["mcpServers"] } : {}),
     };
 
     try {
