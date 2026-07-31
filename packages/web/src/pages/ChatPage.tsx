@@ -632,7 +632,7 @@ export default function ChatPage() {
 
   const deleteSession = async (id: string) => {
     try {
-      await axios.delete(`/api/chat/sessions/${id}`, { headers });
+      await axios.delete(`${API_BASE_URL}/api/chat/sessions/${id}`, { headers });
       if (sessionId === id) nav('/app');
       loadSessions();
     } catch {}
