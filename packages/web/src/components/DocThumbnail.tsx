@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../constants/constants';
 
 interface Props {
   docId: string;
@@ -26,7 +27,7 @@ export default function DocThumbnail({ docId, token, size = 'md' }: Props) {
 
     (async () => {
       try {
-        const res = await axios.get(`/api/documents/${docId}/thumbnail`, {
+        const res = await axios.get(`${API_BASE_URL}/api/documents/${docId}/thumbnail`, {
           headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob',
         });
