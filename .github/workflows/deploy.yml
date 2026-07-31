@@ -160,12 +160,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
-        run: |
-          export REACT_APP_API_BASE_URL="$REACT_APP_API_BASE_URL" >> "$GITHUB_ENV"
-          echo "Building with REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL}"
-          npm run build --workspace=packages/web
         env:
           REACT_APP_API_BASE_URL: ${{ vars.REACT_APP_API_BASE_URL }}
+        run: |
+          echo "REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL" >> "$GITHUB_ENV"
+          echo "Building with REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL"
+          npm run build --workspace=packages/web
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
