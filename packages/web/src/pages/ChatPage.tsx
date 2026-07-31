@@ -8,6 +8,7 @@ import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import RocketLogo from '../components/RocketLogo';
 import UserMenu from '../components/UserMenu';
+import { API_BASE_URL } from '../constants/constants';
 
 interface Message {
   id?: string;
@@ -166,7 +167,7 @@ export default function ChatPage() {
 
   const loadSessions = useCallback(async () => {
     try {
-      const res = await axios.get('/api/chat/sessions', { headers });
+      const res = await axios.get(`${API_BASE_URL}/api/chat/sessions`, { headers });
       setSessions(res.data.sessions || []);
     } catch {}
   }, [token]);
@@ -174,7 +175,7 @@ export default function ChatPage() {
   const loadMessages = useCallback(
     async (id: string) => {
       try {
-        const res = await axios.get(`/api/chat/sessions/${id}`, { headers });
+        const res = await axios.get(`${API_BASE_URL}/api/chat/sessions/${id}`, { headers });
         setMessages(res.data.messages || []);
       } catch {}
     },
@@ -184,7 +185,7 @@ export default function ChatPage() {
   const loadChatDocs = useCallback(
     async (id: string) => {
       try {
-        const res = await axios.get('/api/documents', {
+        const res = await axios.get(`${API_BASE_URL}/api/documents`, {
           headers,
           params: { chat_id: id },
         });
@@ -226,7 +227,7 @@ export default function ChatPage() {
     }
     const handle = setTimeout(async () => {
       try {
-        const res = await axios.get('/api/chat/search', {
+        const res = await axios.get(`${API_BASE_URL}/api/chat/search`, {
           headers: { Authorization: `Bearer ${token}` },
           params: { q },
         });
@@ -446,7 +447,7 @@ export default function ChatPage() {
     onChunk: (accumulated: string) => void,
   ): Promise<void> => {
     abortRef.current = new AbortController();
-    const res = await fetch('/api/chat/stream', {
+    const res = await fetch(`${API_BASE_URL}/api/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
