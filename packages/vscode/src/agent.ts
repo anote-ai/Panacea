@@ -165,9 +165,9 @@ export class AnoteAgent {
       prompt = `Previous conversation:\n${history}\n\nUser: ${prompt}`;
     }
 
-    // Wire configured MCP servers and auto-allow their tools (mcp__<server>).
+    // Wire configured MCP servers. Their tools remain subject to the SDK's
+    // normal permission flow because tool names are only known after discovery.
     const mcpServers = getMcpServers();
-    const mcpAllow = mcpServers ? Object.keys(mcpServers).map((s) => `mcp__${s}`) : [];
 
     const options: Options = {
       cwd,
@@ -180,7 +180,6 @@ export class AnoteAgent {
         "Grep",
         "WebSearch",
         "WebFetch",
-        ...mcpAllow,
       ],
       permissionMode: this.isPlanMode()
         ? "plan"

@@ -86,16 +86,16 @@ export async function runAgentStream(opts: AgentRunOptions): Promise<string> {
   }
 
   // ── Anthropic path — claude-agent-sdk ────────────────────────────────────
-  // Wire configured MCP servers and auto-allow their tools (mcp__<server>).
+  // Wire configured MCP servers. Their tools remain subject to the SDK's
+  // normal permission flow because tool names are only known after discovery.
   const mcpServers = config.mcpServers;
-  const mcpAllow = mcpServers ? Object.keys(mcpServers).map((s) => `mcp__${s}`) : [];
-  if (mcpAllow.length) {
-    console.log(chalk.gray(`  (MCP: ${Object.keys(mcpServers!).join(", ")})\n`));
+  if (mcpServers && Object.keys(mcpServers).length) {
+    console.log(chalk.gray(`  (MCP: ${Object.keys(mcpServers).join(", ")})\n`));
   }
 
   const options: Options = {
     cwd,
-    allowedTools: [...allowedTools, ...mcpAllow],
+    allowedTools,
     permissionMode: opts.permissionMode ?? config.permissionMode ?? "default",
     systemPrompt,
     maxTurns,
