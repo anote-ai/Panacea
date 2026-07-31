@@ -211,7 +211,7 @@ export default function DocumentsPage() {
 
   const deleteDocument = async (docId: string) => {
     try {
-      await axios.delete(`/api/documents/${docId}`, { headers });
+      await axios.delete(`${API_BASE_URL}/api/documents/${docId}`, { headers });
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
       setSelectedDocs((prev) => {
         const n = new Set(prev);
@@ -235,7 +235,7 @@ export default function DocumentsPage() {
   const moveDocument = async (docId: string, folderId: number | null) => {
     try {
       await axios.patch(
-        `/api/documents/${docId}/move`,
+        `${API_BASE_URL}/api/documents/${docId}/move`,
         { folder_id: folderId },
         { headers },
       );

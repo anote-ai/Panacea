@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { API_BASE_URL } from '../constants/constants';
 
 interface ViewableDoc {
   id: string;
@@ -36,7 +37,7 @@ export default function FileViewerModal({ doc, token, onClose }: Props) {
 
     (async () => {
       try {
-        const res = await axios.get(`/api/documents/${doc.id}/file`, {
+        const res = await axios.get(`${API_BASE_URL}/api/documents/${doc.id}/file`, {
           headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob',
         });
