@@ -1,5 +1,11 @@
 FROM node:20.19.0-slim AS build
 
+ARG BUILD_SHA=unknown
+ARG APP_VERSION=1.0.0
+
+ENV VITE_BUILD_SHA=${BUILD_SHA} \
+    VITE_APP_VERSION=${APP_VERSION}
+
 WORKDIR /app
 
 # Copy root workspace files first so npm can resolve hoisted dependencies
