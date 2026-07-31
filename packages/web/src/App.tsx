@@ -13,6 +13,7 @@ import BlogPage from "./landing_page/BlogPage";
 import CareersPage from "./landing_page/CareersPage";
 import CaseStudiesPage from "./landing_page/CaseStudiesPage";
 import { DEFAULT_MODEL, MODELS } from "./constants/models";
+import { API_BASE_URL } from "./constants/constants";
 
 // Theme
 export type ThemeMode = "light" | "dark" | "system";
@@ -123,7 +124,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await axios.get("/api/user/profile", {
+      const res = await axios.get(`${API_BASE_URL}/api/user/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser({

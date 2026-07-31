@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../constants/constants';
 
 interface Props {
   name?: string;
@@ -46,7 +47,7 @@ export default function UserAvatar({
 
     (async () => {
       try {
-        const res = await axios.get('/api/user/avatar', {
+        const res = await axios.get(`${API_BASE_URL}/api/user/avatar`, {
           headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob',
         });

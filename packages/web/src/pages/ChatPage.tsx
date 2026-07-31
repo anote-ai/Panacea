@@ -247,7 +247,7 @@ export default function ChatPage() {
     if (activeChatIdRef.current) return activeChatIdRef.current;
     if (!ensureChatIdPromiseRef.current) {
       ensureChatIdPromiseRef.current = (async () => {
-        const res = await axios.post('/api/chat/sessions', {}, { headers });
+        const res = await axios.post(`${API_BASE_URL}/api/chat/sessions`, {}, { headers });
         const newId = String(res.data.sessionId);
         activeChatIdRef.current = newId;
         skipNextLoadRef.current = true;
@@ -351,7 +351,7 @@ export default function ChatPage() {
     };
 
     try {
-      await axios.post('/api/documents/upload', form, {
+      await axios.post(`${API_BASE_URL}/api/documents/upload`, form, {
         headers: { ...headers, 'Content-Type': 'multipart/form-data' },
         signal: controller.signal,
         onUploadProgress: (e) => {
@@ -413,7 +413,7 @@ export default function ChatPage() {
   const removeAttachedDoc = async (docId: string) => {
     setChatDocs((prev) => prev.filter((d) => d.id !== docId));
     try {
-      await axios.delete(`/api/documents/${docId}`, { headers });
+      await axios.delete(`${API_BASE_URL}/api/documents/${docId}`, { headers });
     } catch {}
   };
 
