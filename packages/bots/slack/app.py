@@ -16,6 +16,7 @@ import re
 import threading
 from typing import Optional
 
+import requests
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from flask import Flask, request
@@ -38,6 +39,7 @@ MODEL = os.environ.get("ANOTE_MODEL", "claude-sonnet-4-6")
 MAX_TOKENS = int(os.environ.get("ANOTE_MAX_TOKENS", "4096"))
 PORT = int(os.environ.get("PORT", "3000"))
 SLACK_MAX_CHARS = 2900
+ANOTE_BACKEND_URL = os.environ.get("ANOTE_BACKEND_URL", "http://localhost:5000")
 
 ANOTE_SYSTEM_PROMPT = """\
 You are Anote, an expert AI coding assistant built by Anote AI.
@@ -156,6 +158,121 @@ def handle_message_events(event, logger):
     if subtype in ("bot_message", "message_changed", "message_deleted"):
         return
     logger.debug("Unhandled message event subtype=%r", subtype)
+
+
+# ── Remote approvals: resolve a paused CLI session from Slack ──────────────
+# The counterpart to packages/cli/src/remoteApproval.ts — a CLI session pauses on
+# a risky tool call and posts it to the backend; this surfaces it here so it can
+# be resolved without anyone being at the terminal.
+
+
+def fetch_pending_approvals() -> list:
+    resp = requests.get(f"{ANOTE_BACKEND_URL}/api/approvals", params={"status": "pending"}, timeout=5)
+    resp.raise_for_status()
+    return resp.json().get("approvals", [])
+
+
+def resolve_approval(approval_id: str, approved: bool, responder: str) -> dict:
+    resp = requests.post(
+        f"{ANOTE_BACKEND_URL}/api/approvals/{approval_id}/respond",
+        json={"approved": approved, "responder": responder},
+        timeout=5,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def build_approval_blocks(approval: dict) -> list:
+    return [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"*Session* `{approval['session_id']}` wants to run "
+                    f"*{approval['action']}*\n```{approval.get('detail', '')[:500]}```"
+                ),
+            },
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Approve"},
+                    "style": "primary",
+                    "action_id": "approval_approve",
+                    "value": approval["id"],
+                },
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Deny"},
+                    "style": "danger",
+                    "action_id": "approval_deny",
+                    "value": approval["id"],
+                },
+            ],
+        },
+    ]
+
+
+@slack_app.command("/anote-approvals")
+def handle_approvals_command(ack, respond, logger):
+    ack()
+    try:
+        approvals = fetch_pending_approvals()
+    except Exception as exc:
+        logger.error("Failed to fetch approvals: %s", exc, exc_info=True)
+        respond(text=f":warning: Could not reach the approvals backend: {exc}")
+        return
+
+    if not approvals:
+        respond(text="No pending approvals. :white_check_mark:")
+        return
+
+    for approval in approvals:
+        respond(blocks=build_approval_blocks(approval), text=f"Approval needed: {approval['action']}")
+
+
+def _handle_approval_action(ack, body, client, logger, approved: bool):
+    ack()
+    approval_id = body["actions"][0]["value"]
+    responder = f"slack:{body['user']['username']}"
+    try:
+        approval = resolve_approval(approval_id, approved, responder)
+    except Exception as exc:
+        logger.error("Failed to resolve approval %s: %s", approval_id, exc, exc_info=True)
+        client.chat_postMessage(
+            channel=body["channel"]["id"],
+            text=f":warning: Could not resolve approval `{approval_id}`: {exc}",
+        )
+        return
+
+    verb = "approved" if approved else "denied"
+    client.chat_update(
+        channel=body["channel"]["id"],
+        ts=body["message"]["ts"],
+        text=f"Approval {verb} by @{body['user']['username']}",
+        blocks=[
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*{approval['action']}* was *{verb}* by <@{body['user']['id']}>",
+                },
+            }
+        ],
+    )
+
+
+@slack_app.action("approval_approve")
+def handle_approval_approve(ack, body, client, logger):
+    _handle_approval_action(ack, body, client, logger, approved=True)
+
+
+@slack_app.action("approval_deny")
+def handle_approval_deny(ack, body, client, logger):
+    _handle_approval_action(ack, body, client, logger, approved=False)
 
 
 flask_app = Flask(__name__)

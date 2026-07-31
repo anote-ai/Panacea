@@ -6,6 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import type { RemoteApprovalConfig } from "./remoteApproval.js";
 
 export interface HookConfig {
   preToolUse?: string[];
@@ -22,6 +23,8 @@ export interface AnoteConfig {
   provider?: string;
   /** Base URL for OpenAI-compatible endpoints (e.g. http://localhost:11434/v1 for Ollama). */
   baseUrl?: string;
+  /** Pause risky tool calls for approval from another surface (Slack/mobile/web) via the backend. */
+  remoteApproval?: RemoteApprovalConfig;
 }
 
 const CONFIG_FILENAMES = [".anote.json", ".claw.json", "anote.config.json"];

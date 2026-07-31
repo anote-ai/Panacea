@@ -2,8 +2,10 @@ import { query, type Options, type SDKMessage } from "@anthropic-ai/claude-agent
 import chalk from "chalk";
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import { loadConfig } from "./config.js";
 import { HookRunner } from "./hooks.js";
+import { RemoteApprovalClient } from "./remoteApproval.js";
 import { describeToolProgress } from "./ui.js";
 import { ANOTE_SYSTEM_PROMPT, buildSystemPrompt } from "./prompts.js";
 import { resolveProvider, getAdapter } from "./providers/index.js";
@@ -24,6 +26,8 @@ export interface AgentRunOptions {
   onTool?: (toolName: string, input: unknown) => void;
   /** If true, suppress streaming text to stdout (useful when output is captured). */
   suppressTextOutput?: boolean;
+  /** Identifies this run to the remote-approvals backend; defaults to a random id. */
+  sessionId?: string;
 }
 
 /** Re-export so existing callers continue to work. */
@@ -54,6 +58,8 @@ export async function runAgentStream(opts: AgentRunOptions): Promise<string> {
   const cwd = opts.cwd ?? process.cwd();
   const config = loadConfig(cwd);
   const hooks = new HookRunner(config.hooks ?? {});
+  const sessionId = opts.sessionId ?? crypto.randomUUID();
+  const remoteApproval = new RemoteApprovalClient(config.remoteApproval ?? {}, sessionId);
 
   // Build system prompt — append project memory if found
   let systemPrompt = opts.systemPrompt;
@@ -80,7 +86,7 @@ export async function runAgentStream(opts: AgentRunOptions): Promise<string> {
       systemPrompt,
       maxTurns,
       model,
-    }, opts, hooks);
+    }, opts, hooks, remoteApproval);
     console.log(chalk.bold.cyan("\n────────────────────────────────────\n"));
     return result;
   }
@@ -119,6 +125,8 @@ export async function runAgentStream(opts: AgentRunOptions): Promise<string> {
             process.stdout.write(
               chalk.red(`\n  ✗ Hook denied ${block.name}: ${hookResult.messages[0] ?? ""}\n`)
             );
+          } else if (remoteApproval.requiresApproval(block.name) && !(await awaitRemoteApproval(remoteApproval, block.name, block.input))) {
+            // denial already reported by awaitRemoteApproval
           } else if (opts.onTool) {
             opts.onTool(block.name, block.input);
           } else {
@@ -143,7 +151,8 @@ async function runViaAdapter(
   prompt: string,
   streamOpts: { cwd: string; allowedTools: string[]; systemPrompt: string; maxTurns: number; model: string },
   runOpts: AgentRunOptions,
-  hooks: HookRunner
+  hooks: HookRunner,
+  remoteApproval: RemoteApprovalClient
 ): Promise<string> {
   const { adapter, error } = getAdapter(model);
 
@@ -176,6 +185,8 @@ async function runViaAdapter(
           process.stdout.write(
             chalk.red(`\n  ✗ Hook denied ${toolName}: ${hookResult.messages[0] ?? ""}\n`)
           );
+        } else if (remoteApproval.requiresApproval(toolName) && !(await awaitRemoteApproval(remoteApproval, toolName, input))) {
+          // denial already reported by awaitRemoteApproval
         } else if (runOpts.onTool) {
           runOpts.onTool(toolName, input);
         } else if (runOpts.showToolUse !== false) {
@@ -197,6 +208,28 @@ async function runViaAdapter(
   }
 
   return result;
+}
+
+/**
+ * Pauses on a tool configured for remote approval, prints where things stand, and
+ * waits for another surface (Slack/mobile/web) to resolve it. Returns whether the
+ * tool call may proceed.
+ */
+async function awaitRemoteApproval(
+  remoteApproval: RemoteApprovalClient,
+  toolName: string,
+  input: unknown
+): Promise<boolean> {
+  process.stdout.write(
+    chalk.yellow(`\n  ⏸ ${toolName} needs remote approval — waiting for Slack/mobile/web…\n`)
+  );
+  const decision = await remoteApproval.requestApproval(toolName, input);
+  if (decision.approved) {
+    process.stdout.write(chalk.green(`  ✓ ${decision.reason}\n`));
+  } else {
+    process.stdout.write(chalk.red(`  ✗ ${toolName} denied: ${decision.reason}\n`));
+  }
+  return decision.approved;
 }
 
 function providerKeyEnvVar(provider: string): string {
