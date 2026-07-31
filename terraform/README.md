@@ -41,6 +41,16 @@ VPC module with private subnets + NAT for ECS/RDS.
 - Point your domain's DNS at the `cloudfront_domain_name` output (or set
   `domain_name` + `acm_certificate_arn` to use a custom domain with HTTPS).
 
+## GitHub Actions authentication
+
+The deploy workflow uses GitHub's OpenID Connect token to assume an AWS IAM
+role. Configure the role ARN as a repository secret named
+`AWS_ROLE_ARN`. The role's trust policy must allow this repository and the
+selected GitHub environment to call `sts:AssumeRoleWithWebIdentity`.
+
+The workflow intentionally does not use long-lived
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` credentials.
+
 ## Stripe billing + BYOK provider keys
 
 `ecs.tf` wires 5 env vars beyond the original set — `PROVIDER_KEY_ENCRYPTION_KEY`,

@@ -1,0 +1,53 @@
+name: Production Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: "Public Panacea frontend URL"
+        required: true
+        default: "https://chat.anote.ai"
+        type: string
+      api_url:
+        description: "Public origin that routes Panacea API paths"
+        required: true
+        default: "https://chat.anote.ai"
+        type: string
+      expected_sha:
+        description: "Expected frontend and backend commit SHA (optional)"
+        required: false
+        type: string
+      require_payments:
+        description: "Require at least one configured Stripe paid plan"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  smoke:
+    name: Verify public release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run read-only smoke checks
+        env:
+          FRONTEND_URL: ${{ inputs.frontend_url }}
+          API_URL: ${{ inputs.api_url }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          REQUIRE_PAYMENTS: ${{ inputs.require_payments }}
+        run: |
+          args=(
+            --frontend-url "$FRONTEND_URL"
+            --api-url "$API_URL"
+          )
+          if [[ -n "$EXPECTED_SHA" ]]; then
+            args+=(--expected-sha "$EXPECTED_SHA")
+          fi
+          if [[ "$REQUIRE_PAYMENTS" == "true" ]]; then
+            args+=(--require-payments)
+          fi
+          python scripts/release_smoke.py "${args[@]}"

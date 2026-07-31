@@ -42,6 +42,10 @@ jobs:
           DB_HOST: localhost
           JWT_SECRET_KEY: test-secret
 
+      - name: Test release smoke tooling
+        working-directory: .
+        run: python -m unittest discover -s scripts/tests
+
   # ── TypeScript packages ───────────────────────────────────────────────────────
   typescript:
     name: TypeScript (build + test)
