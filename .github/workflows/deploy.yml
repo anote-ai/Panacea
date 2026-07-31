@@ -161,10 +161,10 @@ jobs:
         run: npm ci
       - name: Build
         env:
-          REACT_APP_API_BASE_URL: ${{ vars.REACT_APP_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
         run: |
-          echo "REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL" >> "$GITHUB_ENV"
-          echo "Building with REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL"
+          echo "VITE_API_BASE_URL=$VITE_API_BASE_URL" >> "$GITHUB_ENV"
+          echo "Building with VITE_API_BASE_URL=$VITE_API_BASE_URL"
           npm run build --workspace=packages/web
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
