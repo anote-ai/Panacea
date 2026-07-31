@@ -171,6 +171,7 @@ CREATE TABLE documents (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     chat_id INTEGER,
+    user_id INTEGER NOT NULL,
     storage_key TEXT NOT NULL,
     document_name VARCHAR(255) NOT NULL,
     -- NULL for binary-only media (image / video / audio) where text is derived separately

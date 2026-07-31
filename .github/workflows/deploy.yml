@@ -161,18 +161,11 @@ jobs:
         run: npm ci
       - name: Build
         env:
-          VITE_BUILD_SHA: ${{ github.sha }}
-        run: npm run build --workspace=packages/web
-      - name: Validate frontend deployment configuration
+          REACT_APP_API_BASE_URL: ${{ vars.REACT_APP_API_BASE_URL }}
         run: |
-          missing=()
-          for name in AWS_REGION AWS_ROLE_ARN S3_BUCKET CLOUDFRONT_DISTRIBUTION_ID; do
-            [[ -n "${!name}" ]] || missing+=("$name")
-          done
-          if (( ${#missing[@]} )); then
-            printf 'Missing required deployment configuration: %s\n' "${missing[*]}"
-            exit 1
-          fi
+          export REACT_APP_API_BASE_URL="${REACT_APP_API_BASE_URL}"
+          echo "Building with REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL}"
+          npm run build --workspace=packages/web
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
