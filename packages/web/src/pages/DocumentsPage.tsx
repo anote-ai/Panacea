@@ -235,7 +235,7 @@ export default function DocumentsPage() {
   const moveDocument = async (docId: string, folderId: number | null) => {
     try {
       await axios.patch(
-        `/api/documents/${docId}/move`,
+        `${API_BASE_URL}/api/documents/${docId}/move`,
         { folder_id: folderId },
         { headers },
       );

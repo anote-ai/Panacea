@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type ThemeMode, useAuth, useModel, useTheme } from '../App';
 import { MODELS } from '../constants/models';
 import UserAvatar from './UserAvatar';
+import { API_BASE_URL } from '../constants/constants';
 
 interface Props {
   open: boolean;
@@ -113,7 +114,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     if (open && section === 'api') {
       setProviderKeysLoading(true);
       axios
-        .get('/api/user/provider-keys', {
+        .get(`${API_BASE_URL}/api/user/provider-keys`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         .then((res) => setProviderKeys(res.data.keys || {}))
@@ -125,7 +126,7 @@ export default function SettingsModal({ open, onClose }: Props) {
   useEffect(() => {
     if (open && (section === 'usage' || section === 'billing') && !plans) {
       axios
-        .get('/api/payments/plans')
+        .get(`${API_BASE_URL}/api/payments/plans`)
         .then((res) => setPlans(res.data))
         .catch(() => {});
     }
@@ -137,7 +138,7 @@ export default function SettingsModal({ open, onClose }: Props) {
       setUsageError(null);
       refreshUser();
       axios
-        .get('/api/user/usage', { headers: { Authorization: `Bearer ${token}` } })
+        .get(`${API_BASE_URL}/api/user/usage`, { headers: { Authorization: `Bearer ${token}` } })
         .then((res) => setUsage(res.data))
         .catch((err) =>
           setUsageError(err?.response?.data?.error || err?.message || 'Failed to load usage.'),
@@ -154,7 +155,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setKeyErrors((e) => ({ ...e, [provider]: '' }));
     try {
       const res = await axios.put(
-        '/api/user/provider-keys',
+        `${API_BASE_URL}/api/user/provider-keys`,
         { provider, key },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -175,7 +176,7 @@ export default function SettingsModal({ open, onClose }: Props) {
   const removeProviderKey = async (provider: string) => {
     setKeyErrors((e) => ({ ...e, [provider]: '' }));
     try {
-      await axios.delete(`/api/user/provider-keys/${provider}`, {
+      await axios.delete(`${API_BASE_URL}/api/user/provider-keys/${provider}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setProviderKeys((keys) => {
@@ -198,7 +199,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setBillingError(null);
     try {
       const res = await axios.post(
-        '/api/payments/portal',
+        `${API_BASE_URL}/api/payments/portal`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -219,7 +220,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setCreditsError(null);
     try {
       const res = await axios.post(
-        '/api/payments/credits/checkout',
+        `${API_BASE_URL}/api/payments/credits/checkout`,
         { credits },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -239,7 +240,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setBillingError(null);
     try {
       const res = await axios.post(
-        '/api/payments/checkout',
+        `${API_BASE_URL}/api/payments/checkout`,
         {
           plan: plan.plan,
         },
@@ -262,7 +263,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     const form = new FormData();
     form.append('file', file);
     try {
-      await axios.post('/api/user/avatar', form, {
+      await axios.post(`${API_BASE_URL}/api/user/avatar`, form, {
         headers: { Authorization: `Bearer ${token}` },
       });
       bumpAvatarVersion();
@@ -279,7 +280,7 @@ export default function SettingsModal({ open, onClose }: Props) {
   const removeAvatar = async () => {
     setAvatarError(null);
     try {
-      await axios.delete('/api/user/avatar', {
+      await axios.delete(`${API_BASE_URL}/api/user/avatar`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       bumpAvatarVersion();
@@ -298,7 +299,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setNameError(null);
     try {
       await axios.put(
-        '/api/user/profile',
+        `${API_BASE_URL}/api/user/profile`,
         { name: trimmed },
         { headers: { Authorization: `Bearer ${token}` } },
       );
