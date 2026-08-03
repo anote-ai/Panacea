@@ -20,6 +20,16 @@ jobs:
         with:
           node-version: 20.19.0
           registry-url: "https://registry.npmjs.org"
+      - name: Verify tag matches package.json version
+        working-directory: packages/cli
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match packages/cli/package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "Tag $GITHUB_REF_NAME matches packages/cli/package.json version $PKG_VERSION"
       - working-directory: packages/cli
         run: npm install
       - working-directory: packages/cli
@@ -37,6 +47,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20.19.0
+      - name: Verify tag matches package.json version
+        working-directory: packages/vscode
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match packages/vscode/package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "Tag $GITHUB_REF_NAME matches packages/vscode/package.json version $PKG_VERSION"
       - working-directory: packages/vscode
         run: npm install
       - run: npm install -g @vscode/vsce
