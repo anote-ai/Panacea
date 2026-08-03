@@ -30,4 +30,4 @@ npm install -g @anote-ai/anote
 | `anote init` | Set up Anote |
 | `anote config` | Manage configuration |
 
-See [Commands](commands.md) for full usage.
+See [Commands](commands.md) for full usage, or follow the [Quick Start](../getting-started/quickstart.md) for a step-by-step walkthrough of `init` → ask a question → auto-fix a bug → index and search → review a PR.
