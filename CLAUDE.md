@@ -15,7 +15,7 @@
 ## Repository Structure
 
 ```
-Autonomous-Intelligence/
+Panacea/
 ├── packages/
 │   ├── backend/        # Python Flask API (shared by all frontends)
 │   ├── cli/            # TypeScript CLI tool (anote command)

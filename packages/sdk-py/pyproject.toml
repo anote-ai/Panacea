@@ -23,8 +23,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/anote-ai/Autonomous-Intelligence"
-Repository = "https://github.com/anote-ai/Autonomous-Intelligence"
+Homepage = "https://github.com/anote-ai/Panacea"
+Repository = "https://github.com/anote-ai/Panacea"
 
 [tool.hatch.build.targets.wheel]
 packages = ["anote_sdk"]
