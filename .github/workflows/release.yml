@@ -68,7 +68,42 @@ jobs:
         run: npm install && npm run build
       - working-directory: packages/desktop
         run: npm install
+
+      # --- Code signing (see issue #295 and packages/desktop/README.md) ---
+      # Both steps are no-ops until the relevant repo secrets are added, so
+      # today's unsigned build/publish is unaffected.
+      - name: Import Apple signing certificate
+        if: matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_P12 != ''
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/apple-cert.p12"
+          security import "$RUNNER_TEMP/apple-cert.p12" -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm "$RUNNER_TEMP/apple-cert.p12"
+
+      - name: Decode Windows signing certificate
+        if: matrix.os == 'windows-latest' && secrets.CSC_LINK != ''
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+        run: |
+          $bytes = [Convert]::FromBase64String($env:CSC_LINK)
+          $certPath = Join-Path $env:RUNNER_TEMP "windows-cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, $bytes)
+          echo "WINDOWS_CERTIFICATE_FILE=$certPath" >> $env:GITHUB_ENV
+
       - working-directory: packages/desktop
         run: npx electron-forge publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
