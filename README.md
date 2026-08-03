@@ -37,7 +37,7 @@ Within the [Agent Registry](https://anote.ai/community/agents), we have added ma
 5. **Automation**: Emails are automatically sent to the generated list of leads. The system tracks progress, showing the number of emails sent and responses received daily.
 6. **Feedback Loop**: User feedback is incorporated to improve the lead generation process, refine email drafts, or adjust selection criteria for future tasks.
 
-![alt text](https://github.com/nv78/Autonomous-Intelligence/blob/main/materials/assets/ExampleNew.png?raw=true)
+![alt text](materials/assets/ExampleNew.png)
 
 For a full example of this working end to end for this use case, please see [Anote's Upreach Product](https://anote.ai/upreach).
 
@@ -54,6 +54,6 @@ That starts the frontend, backend, MySQL, Redis, and Tika together.
 
 If Docker is installed but not running, start Docker Desktop first or `docker compose up` will fail before the app boots.
 
-For native local development and testing instructions, see [`CODEBASE_SETUP.md`](/Users/natanvidra/Workspace/Autonomous-Intelligence/CODEBASE_SETUP.md).
+For native local development and testing instructions, see [`CODEBASE_SETUP.md`](CODEBASE_SETUP.md).
 
 For any questions or issues, please [join our slack community](https://join.slack.com/t/anote-ai/shared_invite/zt-2vdh1p5xt-KWvtBZEprhrCzU6wrRPwNA) or [contact us](mailto:nvidra@anote.ai).

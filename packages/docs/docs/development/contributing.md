@@ -3,8 +3,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/anote-ai/Autonomous-Intelligence
-cd Autonomous-Intelligence
+git clone https://github.com/anote-ai/Panacea
+cd Panacea
 
 # Install Node.js packages
 npm install
