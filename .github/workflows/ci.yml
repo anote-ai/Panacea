@@ -115,6 +115,35 @@ jobs:
         working-directory: packages/vscode
         run: npm run build
 
+  # ── Desktop app ────────────────────────────────────────────────────────────────
+  desktop:
+    name: Desktop (build + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - name: Install desktop dependencies
+        working-directory: packages/desktop
+        run: npm install
+
+      - name: Install desktop frontend dependencies
+        working-directory: packages/desktop/frontend
+        run: npm install
+
+      - name: Type-check + build frontend
+        working-directory: packages/desktop/frontend
+        run: npm run build
+
+      - name: Run frontend tests
+        working-directory: packages/desktop/frontend
+        run: npm test --if-present
+
   # ── Docs ──────────────────────────────────────────────────────────────────────
   docs:
     name: Docs (build)
@@ -140,7 +169,7 @@ jobs:
   # ── All checks gate ───────────────────────────────────────────────────────────
   all-checks-passed:
     name: All checks passed
-    needs: [backend, typescript, vscode, docs]
+    needs: [backend, typescript, vscode, desktop, docs]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -149,6 +178,7 @@ jobs:
           if [[ "${{ needs.backend.result }}" == "success" && \
                 "${{ needs.typescript.result }}" == "success" && \
                 "${{ needs.vscode.result }}" == "success" && \
+                "${{ needs.desktop.result }}" == "success" && \
                 "${{ needs.docs.result }}" == "success" ]]; then
             echo "All checks passed!"
           else

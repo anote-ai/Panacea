@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth, useTheme } from "../App";
 import RocketLogo from "../components/RocketLogo";
+import SettingsModal from "../components/SettingsModal";
 import { getSessions, getSession, deleteSession, streamChat } from "../api";
 
 interface Message { role: "user" | "assistant"; content: string; }
@@ -21,6 +22,7 @@ export default function ChatPage() {
   const [model, setModel] = useState(MODELS[0]);
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -117,10 +119,12 @@ export default function ChatPage() {
             </div>
           ))}
         </div>
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
+          <button onClick={() => setSettingsOpen(true)} className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2F2F2F]">API keys</button>
           <button onClick={logout} className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2F2F2F]">Sign out</button>
         </div>
       </aside>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <button onClick={() => setSidebarOpen((o) => !o)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400">☰</button>

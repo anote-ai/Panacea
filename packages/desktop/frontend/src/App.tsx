@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import { setCachedToken, setUnauthorizedHandler } from "./api";
+import { loadToken, saveToken } from "./auth-storage";
 
 export const ThemeContext = createContext<{ dark: boolean; toggle: () => void }>({ dark: false, toggle: () => {} });
 export const AuthContext = createContext<{ token: string | null; setToken: (t: string | null) => void }>({ token: null, setToken: () => {} });
@@ -20,7 +22,8 @@ export default function App() {
     const s = localStorage.getItem("theme");
     return s ? s === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-  const [token, setTokenState] = useState<string | null>(() => localStorage.getItem("token"));
+  const [token, setTokenState] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -29,9 +32,29 @@ export default function App() {
 
   const setToken = (t: string | null) => {
     setTokenState(t);
-    if (t) localStorage.setItem("token", t);
-    else localStorage.removeItem("token");
+    setCachedToken(t);
+    saveToken(t);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    loadToken().then((t) => {
+      if (cancelled) return;
+      setCachedToken(t);
+      setTokenState(t);
+      setAuthReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => setToken(null));
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  if (!authReady) {
+    return <div className="min-h-screen bg-white dark:bg-[#212121]" />;
+  }
 
   return (
     <ThemeContext.Provider value={{ dark, toggle: () => setDark((d) => !d) }}>
