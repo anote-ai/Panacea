@@ -7,7 +7,12 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"  # Map container's 5000 to host's 8000
-      - "6379:6379"  # Ray
+      # NOTE: host port 6379 intentionally not published here -- this machine
+      # already has an unrelated redis container bound to host:6379 (a
+      # separate anote-product stack). Ray's GCS port only needs to be
+      # reachable from other containers on this stack's internal network
+      # (Flask talks to Ray in-process), not from the host, so dropping the
+      # host publish avoids the conflict without touching Ray's behavior.
     volumes:
       - ./:/app
       - ./db:/app/db
@@ -71,7 +76,7 @@ services:
     environment:
       - TIKA_SERVER_ENDPOINT=http://tika:9998
     ports:
-      - "9998:9998"
+      - "19998:9998"  # remapped: host:9998 already taken by an unrelated stack
     volumes:
       - tika-data:/data
     networks:
