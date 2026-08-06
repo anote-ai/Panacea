@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from dotenv import load_dotenv
 
 from api_endpoints.auth.handler import auth_bp, google_oauth_callback
 from api_endpoints.chat.handler import chat_bp
