@@ -9,6 +9,7 @@ def test_health(client):
     assert data["service"] == "anote-backend"
     assert data["readiness"] in ("ready", "degraded")
     assert "checks" in data
+    assert "providers" in data
     assert "warnings" in data
 
 

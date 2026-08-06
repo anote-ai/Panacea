@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from dotenv import load_dotenv
 
 from api_endpoints.auth.handler import auth_bp, google_oauth_callback
 from api_endpoints.chat.handler import chat_bp
@@ -16,6 +18,8 @@ from api_endpoints.payments.handler import payments_bp
 from api_endpoints.search.handler import search_bp
 from api_endpoints.user.handler import user_bp
 from api_endpoints.workspaces.handler import workspaces_bp
+
+load_dotenv(Path(__file__).resolve().with_name(".env"))
 
 
 def _config_string(app: Flask, key: str, default: str = "") -> str:
@@ -38,13 +42,14 @@ def _build_health_report(app: Flask) -> dict[str, Any]:
         _config_string(app, "STRIPE_PRICE_PRO"),
         _config_string(app, "STRIPE_PRICE_ENTERPRISE"),
     ]
+    provider_statuses = {
+        "anthropic": bool(_config_string(app, "ANTHROPIC_API_KEY")),
+        "openai": bool(_config_string(app, "OPENAI_API_KEY")),
+        "google": bool(_config_string(app, "GEMINI_API_KEY")),
+        "ollama": bool(_config_string(app, "OLLAMA_BASE_URL")),
+    }
     ai_provider_configured = any(
-        [
-            _config_string(app, "ANTHROPIC_API_KEY"),
-            _config_string(app, "OPENAI_API_KEY"),
-            _config_string(app, "GEMINI_API_KEY"),
-            _config_string(app, "OLLAMA_BASE_URL"),
-        ]
+        provider_statuses.values()
     )
     google_auth_configured = bool(google_client_id and google_client_secret)
     billing_configured = bool(
@@ -79,6 +84,7 @@ def _build_health_report(app: Flask) -> dict[str, Any]:
             "providerKeyEncryptionConfigured": bool(provider_key_encryption_key),
             "jwtSecretStrong": len(jwt_secret) >= 32,
         },
+        "providers": provider_statuses,
         "warnings": warnings,
     }
 
@@ -92,10 +98,10 @@ def create_app(config: dict | None = None) -> Flask:
         JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me"),
         JWT_ACCESS_TOKEN_EXPIRES=False,
         TESTING=False,
-        DB_HOST=os.environ.get("DB_HOST", "localhost"),
+        DB_HOST=os.environ.get("DB_HOST", "127.0.0.1"),
         DB_NAME=os.environ.get("DB_NAME", "anote"),
-        DB_USER=os.environ.get("DB_USER", "root"),
-        DB_PASSWORD=os.environ.get("DB_PASSWORD", ""),
+        DB_USER=os.environ.get("DB_USER", "anote"),
+        DB_PASSWORD=os.environ.get("DB_PASSWORD", "anote"),
         REDIS_URL=os.environ.get("REDIS_URL", "redis://localhost:6379"),
         ANTHROPIC_API_KEY=os.environ.get("ANTHROPIC_API_KEY", ""),
         OPENAI_API_KEY=os.environ.get("OPENAI_API_KEY", ""),

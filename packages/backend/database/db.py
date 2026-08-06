@@ -19,10 +19,10 @@ def get_connection() -> Any:
     if not MYSQL_AVAILABLE:
         raise RuntimeError("mysql-connector-python not installed")
     return mysql.connector.connect(
-        host=os.environ.get("DB_HOST", "localhost"),
+        host=os.environ.get("DB_HOST", "127.0.0.1"),
         database=os.environ.get("DB_NAME", "anote"),
-        user=os.environ.get("DB_USER", "root"),
-        password=os.environ.get("DB_PASSWORD", ""),
+        user=os.environ.get("DB_USER", "anote"),
+        password=os.environ.get("DB_PASSWORD", "anote"),
         autocommit=True,
     )
 

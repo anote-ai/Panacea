@@ -1,7 +1,15 @@
 import axios from "axios";
 
+function normalizeStreamError(message: string, model: string): string {
+  if (!message) return "Sorry, something went wrong.";
+  if (/not configured/i.test(message)) {
+    return `The selected model (${model}) is not configured on this device yet. Add the matching provider key or switch to a configured model and try again.`;
+  }
+  return message;
+}
+
 // In Electron, resolve backend URL via preload
-async function getBase(): Promise<string> {
+export async function getBackendBaseUrl(): Promise<string> {
   if (window.electronAPI) {
     return window.electronAPI.getBackendUrl();
   }
@@ -12,11 +20,12 @@ let _client: ReturnType<typeof axios.create> | null = null;
 
 async function client() {
   if (!_client) {
-    const base = await getBase();
+    const base = await getBackendBaseUrl();
     _client = axios.create({ baseURL: base });
   }
   const token = localStorage.getItem("token");
   if (token) _client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  else delete _client.defaults.headers.common["Authorization"];
   return _client;
 }
 
@@ -57,7 +66,7 @@ export async function streamChat(
   onSessionId: (id: string) => void,
   signal: AbortSignal
 ): Promise<void> {
-  const base = await getBase();
+  const base = await getBackendBaseUrl();
   const token = localStorage.getItem("token");
   const res = await fetch(`${base}/api/chat/stream`, {
     method: "POST",
@@ -68,7 +77,15 @@ export async function streamChat(
     body: JSON.stringify({ message, session_id: sessionId, model }),
     signal,
   });
-  if (!res.ok || !res.body) throw new Error("Stream failed");
+  if (!res.ok) {
+    let errorMessage = "Stream failed";
+    try {
+      const payload = await res.json();
+      errorMessage = payload.error || payload.message || errorMessage;
+    } catch {}
+    throw new Error(normalizeStreamError(errorMessage, model));
+  }
+  if (!res.body) throw new Error("Stream failed");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -82,11 +99,17 @@ export async function streamChat(
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
       if (data === "[DONE]") return;
+      let parsed: { type?: string; text?: string; session_id?: string; message?: string } | null = null;
       try {
-        const parsed = JSON.parse(data);
-        if (parsed.type === "text" && parsed.text) onChunk(parsed.text);
-        if (parsed.type === "session_id") onSessionId(parsed.session_id);
-      } catch {}
+        parsed = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      if (parsed?.type === "text" && parsed.text) onChunk(parsed.text);
+      if (parsed?.type === "session_id" && parsed.session_id) onSessionId(parsed.session_id);
+      if (parsed?.type === "error") {
+        throw new Error(normalizeStreamError(parsed.message || "Stream failed", model));
+      }
     }
   }
 }
