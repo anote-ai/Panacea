@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+import requests
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -29,6 +30,17 @@ def _config_string(app: Flask, key: str, default: str = "") -> str:
     return str(value or default)
 
 
+def _ollama_is_available(app: Flask) -> bool:
+    base_url = _config_string(app, "OLLAMA_BASE_URL").rstrip("/")
+    if not base_url:
+        return False
+    try:
+        response = requests.get(f"{base_url}/api/tags", timeout=1.5)
+        return response.ok
+    except requests.RequestException:
+        return False
+
+
 def _build_health_report(app: Flask) -> dict[str, Any]:
     app_env = os.environ.get("APP_ENV", "local")
     jwt_secret = _config_string(app, "JWT_SECRET_KEY", "dev-secret-change-me")
@@ -46,7 +58,7 @@ def _build_health_report(app: Flask) -> dict[str, Any]:
         "anthropic": bool(_config_string(app, "ANTHROPIC_API_KEY")),
         "openai": bool(_config_string(app, "OPENAI_API_KEY")),
         "google": bool(_config_string(app, "GEMINI_API_KEY")),
-        "ollama": bool(_config_string(app, "OLLAMA_BASE_URL")),
+        "ollama": _ollama_is_available(app),
     }
     ai_provider_configured = any(
         provider_statuses.values()

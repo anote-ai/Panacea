@@ -27,7 +27,14 @@ interface Session {
   createdAt: string;
 }
 
-const MODELS = ["claude-sonnet-4-6", "claude-haiku-4-5-20251001", "gpt-4o", "gpt-4o-mini"];
+const MODEL_OPTIONS = [
+  { value: "llama3.2", label: "Llama 3.2 (local)" },
+  { value: "mistral", label: "Mistral (local)" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4o-mini", label: "GPT-4o mini" },
+] as const;
 
 const STATUS_ITEM_STYLES = {
   good: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200",
@@ -45,7 +52,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState(MODELS[0]);
+  const [model, setModel] = useState<string>(MODEL_OPTIONS[0].value);
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -59,11 +66,12 @@ export default function ChatPage() {
   const emptyStateSuggestions = getEmptyStateSuggestions();
   const workspaceStatusItems = getWorkspaceStatusItems(healthState, health, model);
   const selectedSession = sessions.find((session) => session.id === sessionId);
+  const selectedModelOption = MODEL_OPTIONS.find((entry) => entry.value === model);
   const composerPlaceholder =
     healthState === "offline"
       ? "Start the local backend to begin chatting..."
       : !providerReady
-        ? "Add a provider key or run Ollama locally, then ask for a summary or status update..."
+        ? "Start a local model or add a provider key, then ask for a summary or status update..."
         : "Ask for a summary, risk review, or work report draft...";
 
   const loadSessions = useCallback(async () => {
@@ -88,9 +96,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (healthState !== "online" || providerReady) return;
-    const fallback = MODELS.find((entry) => isModelConfigured(health, entry));
-    if (fallback && fallback !== model) {
-      setModel(fallback);
+    const fallback = MODEL_OPTIONS.find((entry) => isModelConfigured(health, entry.value));
+    if (fallback && fallback.value !== model) {
+      setModel(fallback.value);
     }
   }, [health, healthState, model, providerReady]);
 
@@ -331,9 +339,9 @@ export default function ChatPage() {
                 onChange={(e) => setModel(e.target.value)}
                 className="rounded-xl border border-gray-300 bg-transparent px-3 py-1.5 text-sm text-gray-700 focus:outline-none dark:border-gray-600 dark:text-gray-300"
               >
-                {MODELS.map((entry) => (
-                  <option key={entry} value={entry}>
-                    {entry}
+                {MODEL_OPTIONS.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
                   </option>
                 ))}
               </select>
@@ -423,7 +431,7 @@ export default function ChatPage() {
                         Start typing
                       </button>
                       <span className="rounded-full border border-gray-200 px-3 py-2 text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                        Selected model: {model}
+                        Selected model: {selectedModelOption?.label ?? model}
                       </span>
                     </div>
                   </section>

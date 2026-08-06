@@ -1,9 +1,16 @@
 import axios from "axios";
 
+function isLocalModel(model: string): boolean {
+  return !model.startsWith("claude") && !model.startsWith("gpt") && !model.startsWith("gemini");
+}
+
 function normalizeStreamError(message: string, model: string): string {
   if (!message) return "Sorry, something went wrong.";
   if (/not configured/i.test(message)) {
     return `The selected model (${model}) is not configured on this device yet. Add the matching provider key or switch to a configured model and try again.`;
+  }
+  if (isLocalModel(model) && /(11434|connection refused|failed to establish a new connection|ollama)/i.test(message)) {
+    return `Ollama is not responding on this device yet. Start Ollama, confirm the ${model} model is installed, and try again.`;
   }
   return message;
 }

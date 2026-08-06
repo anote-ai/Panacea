@@ -43,6 +43,14 @@ const REPORTING_SUGGESTIONS = [
   "Turn this work into stakeholder-ready talking points.",
 ] as const;
 
+function getModelSetupDetail(model: string): string {
+  const provider = getProviderForModel(model);
+  if (provider === "ollama") {
+    return `Start Ollama locally and make sure the ${model} model is installed, or switch to a cloud model with a configured provider key.`;
+  }
+  return "Switch to a configured model, add the matching provider key, or run Ollama locally before sending a message.";
+}
+
 export function getAuthStatusNotice(
   healthState: HealthFetchState,
   health: ServiceHealth | null,
@@ -87,8 +95,7 @@ export function getChatStatusNotice(
   if (!isModelConfigured(health, model)) {
     return {
       title: `${getProviderLabel(getProviderForModel(model))} setup needed for the selected model`,
-      detail:
-        "Switch to a configured model, add the matching provider key, or run Ollama locally before sending a message.",
+      detail: getModelSetupDetail(model),
       tone: "warning",
     };
   }
@@ -138,7 +145,7 @@ export function getWorkspaceStatusItems(
     : {
         label: "Selected model",
         value: "Setup needed",
-        detail: `${providerLabel} is not configured for the selected model yet. Add the matching key or switch models.`,
+        detail: getModelSetupDetail(model),
         tone: "warning",
       };
 
