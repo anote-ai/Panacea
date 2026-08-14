@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth, useModel } from '../App';
 import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
+import OnboardingTour from '../components/OnboardingTour';
 import RocketLogo from '../components/RocketLogo';
 import UserMenu from '../components/UserMenu';
 import { API_BASE_URL } from '../constants/constants';
@@ -140,6 +141,9 @@ export default function ChatPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ChatSearchResult[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => localStorage.getItem('anote_show_onboarding') === '1',
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1294,6 +1298,14 @@ export default function ChatPage() {
         token={token}
         onClose={() => setViewingDoc(null)}
       />
+      {showOnboarding && (
+        <OnboardingTour
+          onDone={() => {
+            localStorage.removeItem('anote_show_onboarding');
+            setShowOnboarding(false);
+          }}
+        />
+      )}
     </div>
   );
 }

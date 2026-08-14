@@ -11,6 +11,9 @@ export default function OAuthCallbackPage() {
     const token = searchParams.get("token");
     if (token) {
       setToken(token);
+      if (searchParams.get("isNewUser") === "1") {
+        localStorage.setItem("anote_show_onboarding", "1");
+      }
       nav("/app", { replace: true });
     } else {
       nav("/login?error=missing_code", { replace: true });
