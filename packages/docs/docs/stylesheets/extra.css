@@ -1,0 +1,452 @@
+/* Anote brand skin for Material for MkDocs.
+   Palette matches packages/web/tailwind.config.js (the actual Anote product UI) —
+   warm off-white / near-black, monochrome accent. Layout + header follow
+   code.claude.com/docs' structure (see overrides/partials/header.html for the
+   template that adds the language selector, search pill, Ask Assistant link,
+   and right-aligned product nav).
+
+   Ported from anote-ai/Documentation (docs.anote.ai) so this site follows the
+   same style guide. */
+
+:root {
+  --md-primary-fg-color: #26221f;
+  --md-primary-fg-color--light: #26221f;
+  --md-primary-fg-color--dark: #26221f;
+  --md-primary-bg-color: #faf7f0;
+  --md-primary-bg-color--light: #faf7f0;
+}
+
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #faf7f0;
+  --md-default-fg-color: #2c2c2a;
+  --md-default-fg-color--light: #888780;
+  --md-default-fg-color--lighter: #d3d1c7;
+  --md-accent-fg-color: #2c2c2a;
+  --md-accent-fg-color--transparent: rgba(44, 44, 42, 0.08);
+  --md-accent-bg-color: #ffffff;
+  --md-typeset-a-color: #2c2c2a;
+  --md-footer-bg-color: #26221f;
+  --md-footer-bg-color--dark: #1c1917;
+  --md-footer-fg-color: #faf7f0;
+  --md-footer-fg-color--light: #d3d1c7;
+  --md-code-bg-color: #f1efe8;
+  --md-code-fg-color: #2c2c2a;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #26221f;
+  --md-default-fg-color: #f1efe8;
+  --md-default-fg-color--light: #a6a59c;
+  --md-default-fg-color--lighter: #4a453e;
+  --md-accent-fg-color: #f1efe8;
+  --md-accent-fg-color--transparent: rgba(241, 239, 232, 0.1);
+  --md-accent-bg-color: #26221f;
+  --md-typeset-a-color: #f1efe8;
+  --md-footer-bg-color: #1c1917;
+  --md-footer-bg-color--dark: #131110;
+  --md-code-bg-color: #332f28;
+  --md-code-fg-color: #f1efe8;
+}
+
+body,
+.md-typeset {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Links: underline instead of a foreign accent color — matches the monochrome brand */
+.md-typeset a {
+  text-decoration: underline;
+  text-decoration-color: var(--md-default-fg-color--lighter);
+  text-underline-offset: 2px;
+}
+
+.md-typeset a:hover {
+  text-decoration-color: currentColor;
+}
+
+.md-typeset h1,
+.md-typeset h2 {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons — solid black (light) / solid white (dark), like the product's own CTAs */
+.md-typeset .md-button {
+  border-radius: 999px;
+  border-color: var(--md-default-fg-color);
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--md-default-fg-color);
+  border-color: var(--md-default-fg-color);
+  color: var(--md-default-bg-color);
+}
+
+/* Tabbed "Get started" surfaces */
+.md-typeset .tabbed-set {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lighter);
+}
+
+.md-typeset .tabbed-labels {
+  background-color: var(--md-code-bg-color);
+}
+
+.md-typeset .tabbed-labels > label {
+  font-weight: 600;
+}
+
+.md-typeset .tabbed-labels > label.tabbed-label--active,
+.md-typeset .tabbed-set > input:checked + label {
+  color: var(--md-default-fg-color);
+  opacity: 1;
+}
+
+.md-typeset .tabbed-content {
+  padding: 0.2rem 1.2rem 1rem;
+}
+
+/* Collapsible "What you can do" cards — force every admonition/detail type
+   (note, tip, bug, example, question, abstract, search, info, ...) to the
+   same neutral styling. Material's built-in per-type selectors are more
+   specific than a bare .admonition/.details rule, so !important is needed
+   here to actually win that battle and keep the look monochrome. */
+.md-typeset details,
+.md-typeset .admonition {
+  border-radius: 10px !important;
+  border: 1px solid var(--md-default-fg-color--lighter) !important;
+  border-left-width: 4px !important;
+}
+
+.md-typeset details > summary,
+.md-typeset .admonition-title {
+  font-weight: 600;
+  background-color: var(--md-code-bg-color) !important;
+}
+
+.md-typeset details > summary::before,
+.md-typeset .admonition-title::before {
+  background-color: var(--md-default-fg-color) !important;
+}
+
+.md-typeset details > summary::after,
+.md-typeset .admonition-title::after {
+  color: var(--md-default-fg-color) !important;
+}
+
+.md-typeset .admonition:focus-within,
+.md-typeset details:focus-within {
+  box-shadow: 0 0 0 0.2rem var(--md-accent-fg-color--transparent) !important;
+}
+
+/* Routing tables ("Use Panacea everywhere") */
+.md-typeset table:not([class]) {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lighter);
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-code-bg-color);
+}
+
+.md-typeset pre > code {
+  border-radius: 8px;
+}
+
+.md-nav__title {
+  font-weight: 700;
+}
+
+.md-nav__link--active,
+.md-nav__link:focus,
+.md-nav__link:hover {
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Header — Claude-Code-docs-style layout: logo, language selector, a pill
+ * search bar, an "Ask Assistant" link, then product nav pushed to the right.
+ * ---------------------------------------------------------------------- */
+
+.anote-header .md-header__inner {
+  gap: 0.9rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+/* Logo + site name, side by side, like "🌸 Claude Code Docs" */
+.anote-header__logo {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.25rem;
+}
+
+/* Always shown right next to the logo, at every screen size — unlike the
+   rest of the header chrome below, this one does not collapse. */
+.anote-header__site-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+/* The page-title breadcrumb is kept in the DOM (it drives the search-open
+   flex transition) but fully hidden — Claude's header doesn't show one, and
+   the logo + site name above now plays that role. */
+.anote-header .md-header__title {
+  visibility: hidden;
+}
+
+.anote-header__lang {
+  position: relative;
+  display: none;
+}
+
+.anote-header__lang summary {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+}
+
+.anote-header__lang summary::-webkit-details-marker,
+.anote-header__lang summary::marker {
+  display: none;
+  content: "";
+}
+
+.anote-header__lang summary:hover {
+  color: var(--md-default-fg-color);
+}
+
+.anote-header__lang svg {
+  fill: currentColor;
+  width: 0.8rem;
+  height: 0.8rem;
+  transition: transform 0.2s;
+}
+
+.anote-header__lang[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.anote-header__lang-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  z-index: 10;
+  min-width: 10rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.4rem;
+  list-style: none;
+  border-radius: 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-default-bg-color);
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.anote-header__lang-menu-item a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.4rem;
+  color: var(--md-default-fg-color) !important;
+  font-size: 0.85rem;
+  text-decoration: none !important;
+}
+
+.anote-header__lang-menu-item a:hover {
+  background-color: var(--md-code-bg-color);
+}
+
+.anote-header__lang-menu-item a svg {
+  fill: var(--md-default-fg-color);
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.anote-header__lang-menu-item--active a {
+  font-weight: 600;
+}
+
+.anote-header__search-pill {
+  align-items: center;
+  gap: 0.6rem;
+  height: 2.35rem;
+  min-width: 19rem;
+  margin: 0;
+  padding: 0 0.5rem 0 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-code-bg-color);
+  color: var(--md-default-fg-color--light);
+  white-space: nowrap;
+}
+
+.anote-header__search-pill svg {
+  fill: currentColor;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.anote-header__search-label {
+  flex: 1;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.anote-header__search-kbd {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.4rem;
+  background-color: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lighter);
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.anote-header__assistant {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-code-bg-color);
+  color: var(--md-default-fg-color--light) !important;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.anote-header__assistant:hover {
+  color: var(--md-default-fg-color) !important;
+  border-color: var(--md-default-fg-color--light);
+}
+
+.anote-header__assistant svg {
+  fill: currentColor;
+  width: 1rem;
+  height: 1rem;
+}
+
+.anote-header__links {
+  display: none;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.anote-header__links a {
+  color: var(--md-default-fg-color--light) !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.anote-header__links a:hover {
+  color: var(--md-default-fg-color) !important;
+}
+
+/* Solid CTA pill — the one high-contrast element in the header */
+.anote-header__cta {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background-color: var(--md-default-fg-color) !important;
+  color: var(--md-default-bg-color) !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.anote-header__cta svg {
+  fill: currentColor;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.anote-header__cta:hover {
+  opacity: 0.85;
+}
+
+.anote-header__desktop-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Claude's header doesn't show a GitHub star-count widget — hide it here too */
+.anote-header__source {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Secondary nav-tabs row — light background with a bold+underlined active
+ * tab, instead of Material's default dark colored bar.
+ * ---------------------------------------------------------------------- */
+
+.md-tabs {
+  background-color: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  border-bottom: 1px solid var(--md-default-fg-color--lighter);
+}
+
+.md-tabs__item {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.md-tabs__link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 1;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-tabs__link:focus,
+.md-tabs__link:hover {
+  color: var(--md-default-fg-color);
+  opacity: 1;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: var(--md-default-fg-color);
+  font-weight: 700;
+  box-shadow: 0 2px 0 0 var(--md-default-fg-color);
+}
+
+/* Only show the expanded header chrome once there's room — mirrors how
+   Claude's header collapses to just logo + search + drawer on small screens. */
+@media screen and (min-width: 76.25em) {
+  .anote-header__lang,
+  .anote-header__assistant,
+  .anote-header__links,
+  .anote-header__cta,
+  .anote-header__desktop-icon {
+    display: flex;
+  }
+}

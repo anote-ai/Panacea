@@ -3,26 +3,79 @@ site_url: https://docs.anote.ai
 site_description: Unified AI coding assistant and chatbot platform
 site_author: Anote AI
 
-repo_name: anote-ai/autonomous-intelligence
-repo_url: https://github.com/anote-ai/Autonomous-Intelligence
+repo_name: anote-ai/Panacea
+repo_url: https://github.com/anote-ai/Panacea
+
+extra:
+  homepage: https://anote.ai
+  alternate:
+    - name: English
+      link: /
+      lang: en
+  # Display-only language list for the header dropdown (overrides/partials/header.html).
+  # Kept separate from `alternate` above: mkdocs-material auto-emits
+  # <link rel="alternate" hreflang="..."> SEO tags from `alternate` on every page, so
+  # adding fake languages there would tell search engines this content has real
+  # French/German/etc. translations when it doesn't. Every entry below links to "/"
+  # (English) until real translated content ships.
+  language_menu:
+    - name: English
+      link: /
+      lang: en
+    - name: Français
+      link: /
+      lang: fr
+    - name: Deutsch
+      link: /
+      lang: de
+    - name: Italiano
+      link: /
+      lang: it
+    - name: 日本語
+      link: /
+      lang: ja
+    - name: Español
+      link: /
+      lang: es
+    - name: 한국어
+      link: /
+      lang: ko
+    - name: 简体中文
+      link: /
+      lang: zh-Hans
+    - name: 繁體中文
+      link: /
+      lang: zh-Hant
+    - name: Русский
+      link: /
+      lang: ru
+    - name: Bahasa Indonesia
+      link: /
+      lang: id
+    - name: Português (BR)
+      link: /
+      lang: pt-BR
 
 theme:
   name: material
+  custom_dir: overrides
+  font: false
   palette:
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: black
+      accent: light blue
       toggle:
-        icon: material/brightness-4
+        icon: material/toggle-switch
         name: Switch to light mode
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: black
+      accent: light blue
       toggle:
-        icon: material/brightness-7
+        icon: material/toggle-switch-off-outline
         name: Switch to dark mode
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.top
@@ -32,6 +85,9 @@ theme:
     - content.code.annotate
   icon:
     repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
 
 plugins:
   - search
