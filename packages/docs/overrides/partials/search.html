@@ -17,10 +17,6 @@
         {% set icon = config.theme.icon.previous or "material/arrow-left" %}
         {% include ".icons/" ~ icon ~ ".svg" %}
       </label>
-      <a href="https://chat.anote.ai" target="_blank" rel="noopener" class="anote-search__assistant" tabindex="-1">
-        <span>Ask Assistant</span>
-        <span class="anote-search__assistant-kbd">⌃↵</span>
-      </a>
       <nav class="md-search__options" aria-label="{{ lang.t('search') }}">
         {% if "search.share" in features %}
           <a href="javascript:void(0)" class="md-search__icon md-icon" title="{{ lang.t('search.share') }}" aria-label="{{ lang.t('search.share') }}" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">

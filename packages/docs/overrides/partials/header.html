@@ -60,11 +60,6 @@
       {% endif %}
     {% endif %}
 
-    <a href="https://chat.anote.ai" target="_blank" rel="noopener" class="anote-header__assistant">
-      {% include ".icons/material/creation.svg" %}
-      <span>Ask Assistant</span>
-    </a>
-
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
@@ -94,7 +89,7 @@
     </a>
 
     <a href="{{ base_url }}/desktop/overview/" class="anote-header__desktop-icon" aria-label="Desktop App" data-title="Desktop App">
-      <img src="{{ config.theme.logo | url }}" alt="Desktop App" class="anote-header__desktop-icon-img">
+      <img src="{{ 'assets/logonew.png' | url }}" alt="Desktop App" class="anote-header__desktop-icon-img">
     </a>
 
     {% if config.theme.palette %}
