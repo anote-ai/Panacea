@@ -49,7 +49,7 @@ def register() -> tuple:
         user_id = create_user(cnx, email, _hash_password(password), name)
         cnx.close()
         token = create_access_token(identity=str(user_id))
-        return jsonify({"token": token, "userId": user_id}), 201
+        return jsonify({"token": token, "userId": user_id, "isNewUser": True}), 201
     except Exception:
         return jsonify({"error": "Authentication service unavailable"}), 503
 
@@ -195,6 +195,7 @@ def google_oauth_callback():
         from database.db import create_user, get_connection, get_user_by_email
         cnx = get_connection()
         user = get_user_by_email(cnx, email)
+        is_new_user = not user
         if not user:
             random_password = _hash_password(secrets.token_urlsafe(32))
             user_id = create_user(cnx, email, random_password, name)
@@ -205,7 +206,10 @@ def google_oauth_callback():
         return redirect(f"{frontend_url}/login?error=service_unavailable")
 
     token = create_access_token(identity=str(user_id))
-    return redirect(f"{frontend_url}/oauth/callback?token={urllib.parse.quote(token)}")
+    new_user_param = "&isNewUser=1" if is_new_user else ""
+    return redirect(
+        f"{frontend_url}/oauth/callback?token={urllib.parse.quote(token)}{new_user_param}"
+    )
 
 
 @auth_bp.post("/refresh")
