@@ -156,7 +156,7 @@ def get_checkout_session(session_id: str) -> tuple:
         return jsonify({"error": "Checkout session not found"}), 404
     if session.get("status") == "complete":
         try:
-            _fulfill_checkout_session(session_id, session)
+            _fulfill_checkout_session(session_id, session, already_claimed=False)
         except Exception as exc:
             print(f"Checkout fulfillment error: {exc}")
     return jsonify({
@@ -250,20 +250,27 @@ def stripe_webhook() -> tuple:
     return jsonify({"received": True}), 200
 
 
-def _fulfill_checkout_session(session_id: str, obj: dict) -> None:
+def _fulfill_checkout_session(session_id: str, obj: dict, already_claimed: bool) -> None:
     """Grant the credits/plan for a completed Checkout Session.
 
     Called from both the webhook (`checkout.session.completed`) and, as a
     synchronous fallback, from the session-lookup endpoint the success page
     polls — so a purchase is reflected immediately even if the webhook is
-    slow, misconfigured, or (in local dev) not forwarded at all. Guarded by
-    a session-scoped claim, shared between both callers, so whichever one
-    runs first is the one that actually grants it.
+    slow, misconfigured, or (in local dev) not forwarded at all.
+
+    The webhook has already claimed this event by its Stripe event id before
+    calling in here (`already_claimed=True`), so it owns dedup/retry via that
+    claim and this function must not take out — or release — a second,
+    session-scoped claim of its own. The session-lookup endpoint has no such
+    claim, so it takes one out itself (`already_claimed=False`) to stay a
+    no-op against a webhook delivery that's already fulfilling (or already
+    fulfilled) the same session.
     """
     cnx = get_connection()
     try:
-        if not claim_stripe_event(cnx, f"checkout_session:{session_id}", "checkout_session_fulfillment"):
-            return
+        if not already_claimed:
+            if not claim_stripe_event(cnx, f"checkout_session:{session_id}", "checkout_session_fulfillment"):
+                return
         metadata = obj.get("metadata") or {}
         try:
             if metadata.get("kind") == "credit_pack":
@@ -277,7 +284,8 @@ def _fulfill_checkout_session(session_id: str, obj: dict) -> None:
                 upsert_stripe_customer(cnx, user_id, customer_id, plan, "active")
                 set_plan_and_credits(cnx, user_id, plan, PLAN_CREDITS.get(plan, 0))
         except Exception:
-            release_stripe_event(cnx, f"checkout_session:{session_id}")
+            if not already_claimed:
+                release_stripe_event(cnx, f"checkout_session:{session_id}")
             raise
     finally:
         cnx.close()
@@ -288,7 +296,7 @@ def _handle_webhook_event(event: dict) -> None:
     obj = event.get("data", {}).get("object", {})
 
     if event_type == "checkout.session.completed":
-        _fulfill_checkout_session(obj.get("id", ""), obj)
+        _fulfill_checkout_session(obj.get("id", ""), obj, already_claimed=True)
 
     elif event_type == "invoice.payment_succeeded":
         # Fired on subscription renewal (and the first invoice) — this is
