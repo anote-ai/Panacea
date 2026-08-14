@@ -1,4 +1,4 @@
-site_name: Anote AI
+site_name: Anote
 site_url: https://docs.anote.ai
 site_description: Unified AI coding assistant and chatbot platform
 site_author: Anote AI
@@ -80,6 +80,8 @@ theme:
     - content.code.annotate
   icon:
     repo: fontawesome/brands/github
+  logo: assets/rocketlogo.png
+  favicon: assets/favicon-removebg-preview.png
 
 extra_css:
   - stylesheets/extra.css

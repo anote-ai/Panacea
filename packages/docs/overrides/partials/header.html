@@ -93,8 +93,8 @@
       {% include ".icons/material/arrow-right.svg" %}
     </a>
 
-    <a href="{{ base_url }}/desktop/overview/" class="anote-header__desktop-icon md-icon" aria-label="Desktop App" data-title="Desktop App">
-      {% include ".icons/material/monitor.svg" %}
+    <a href="{{ base_url }}/desktop/overview/" class="anote-header__desktop-icon" aria-label="Desktop App" data-title="Desktop App">
+      <img src="{{ config.theme.logo | url }}" alt="Desktop App" class="anote-header__desktop-icon-img">
     </a>
 
     {% if config.theme.palette %}
