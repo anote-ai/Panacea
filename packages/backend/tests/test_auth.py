@@ -209,7 +209,7 @@ def _setup_google_callback(client, app, monkeypatch, email, fake_db):
     )
     _patch_db(monkeypatch, fake_db)
 
-    return client.get("/callback?code=abc&state={}".format(state))
+    return client.get(f"/callback?code=abc&state={state}")
 
 
 def test_callback_creates_account_for_new_google_user(client, app, monkeypatch):
