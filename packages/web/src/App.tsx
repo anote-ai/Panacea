@@ -6,6 +6,7 @@ import DocumentsPage from "./pages/DocumentsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
+import CheckoutResultPage from "./pages/CheckoutResultPage";
 import LandingPage from "./landing_page/LandingPage";
 import ContactPage from "./landing_page/ContactPage";
 import PrivacyPolicyPage from "./landing_page/PrivacyPolicyPage";
@@ -162,6 +163,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+            <Route path="/app/checkout" element={<RequireAuth><CheckoutResultPage /></RequireAuth>} />
             <Route path="/app" element={<RequireAuth><ChatPage /></RequireAuth>} />
             <Route path="/app/chat/:id" element={<RequireAuth><ChatPage /></RequireAuth>} />
             <Route path="/documents" element={<RequireAuth><DocumentsPage /></RequireAuth>} />
