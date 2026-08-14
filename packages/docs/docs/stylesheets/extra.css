@@ -156,14 +156,37 @@ body,
   border-radius: 8px;
 }
 
+/* Sidebar — bold, always-expanded section headers with generous spacing,
+   and a rounded pill highlight on the active item (needs navigation.sections
+   + navigation.expand in theme.features, already set above). */
 .md-nav__title {
+  margin-top: 1.3rem;
+  margin-bottom: 0.4rem;
   font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color);
 }
 
-.md-nav__link--active,
+.md-nav__item {
+  margin: 0.05rem 0;
+}
+
+.md-nav__link {
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  color: var(--md-default-fg-color--light);
+  transition: background-color 0.15s, color 0.15s;
+}
+
 .md-nav__link:focus,
 .md-nav__link:hover {
   color: var(--md-default-fg-color);
+  background-color: var(--md-code-bg-color);
+}
+
+.md-nav__link--active {
+  color: var(--md-default-fg-color);
+  background-color: var(--md-code-bg-color);
   font-weight: 600;
 }
 

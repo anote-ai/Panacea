@@ -60,19 +60,14 @@ theme:
   name: material
   custom_dir: overrides
   font: false
+  # A single (non-list) palette entry — Material only renders the light/dark
+  # toggle button when `palette` is a list of multiple schemes. Every
+  # reference screenshot from code.claude.com/docs shows one fixed light
+  # theme with no toggle, so this matches that intentionally.
   palette:
-    - scheme: slate
-      primary: black
-      accent: light blue
-      toggle:
-        icon: material/toggle-switch
-        name: Switch to light mode
-    - scheme: default
-      primary: black
-      accent: light blue
-      toggle:
-        icon: material/toggle-switch-off-outline
-        name: Switch to dark mode
+    scheme: default
+    primary: black
+    accent: light blue
   features:
     - navigation.tabs
     - navigation.tabs.sticky
