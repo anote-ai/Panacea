@@ -1,0 +1,14 @@
+# Auto-loaded by `docker compose up` alongside docker-compose.yml for local
+# dev only — mounts live source into the backend container so edits take
+# effect without a rebuild. This file must NOT be present wherever
+# docker-compose.yml is deployed (e.g. the EC2 host in .github/workflows/deploy.yml):
+# bind-mounting ./packages/backend over /app there shadows the image's own
+# entrypoint.sh with whatever (or nothing) sits in that host directory,
+# producing `sh: 0: cannot open entrypoint.sh: No such file`.
+version: "3.9"
+
+services:
+  backend:
+    volumes:
+      - ./packages/backend:/app
+      - backend_uploads:/app/uploads

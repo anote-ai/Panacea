@@ -1,5 +1,18 @@
 """Tests for search, user, and misc endpoints."""
+import io
 import json
+from unittest.mock import MagicMock, patch
+
+
+def _mock_cnx(fetchall=None, fetchone=None, lastrowid=1, rowcount=1):
+    cursor = MagicMock()
+    cursor.fetchall.return_value = fetchall if fetchall is not None else []
+    cursor.fetchone.return_value = fetchone
+    cursor.lastrowid = lastrowid
+    cursor.rowcount = rowcount
+    cnx = MagicMock()
+    cnx.cursor.return_value = cursor
+    return cnx
 
 
 def test_search_missing_query(client):
@@ -28,30 +41,161 @@ def test_search_with_index(client, tmp_path, monkeypatch):
 
 
 def test_user_profile(client, auth_headers):
-    resp = client.get("/api/user/profile", headers=auth_headers)
+    user = {"id": 1, "name": "Jane Doe", "email": "jane@example.com"}
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx(fetchone=user)):
+        resp = client.get("/api/user/profile", headers=auth_headers)
     assert resp.status_code == 200
-    assert "userId" in resp.get_json()
+    body = resp.get_json()
+    assert body["userId"] == 1
+    assert body["name"] == "Jane Doe"
+    assert body["email"] == "jane@example.com"
+    assert body["hasAvatar"] is False
+
+
+def test_user_profile_no_auth(client):
+    resp = client.get("/api/user/profile")
+    assert resp.status_code == 401
+
+
+def test_user_profile_not_found(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.get("/api/user/profile", headers=auth_headers)
+    assert resp.status_code == 404
 
 
 def test_user_update_profile(client, auth_headers):
-    resp = client.put("/api/user/profile", json={"name": "New Name"}, headers=auth_headers)
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.put("/api/user/profile", json={"name": "New Name"}, headers=auth_headers)
     assert resp.status_code == 200
 
 
-def test_api_keys_list(client, auth_headers):
-    resp = client.get("/api/user/api-keys", headers=auth_headers)
+def test_user_update_profile_no_name(client, auth_headers):
+    resp = client.put("/api/user/profile", json={}, headers=auth_headers)
     assert resp.status_code == 200
-    assert "keys" in resp.get_json()
 
 
-def test_api_keys_create(client, auth_headers):
-    resp = client.post("/api/user/api-keys", headers=auth_headers)
-    assert resp.status_code == 201
-    assert resp.get_json()["key"].startswith("ak-")
+def test_user_update_profile_empty_name(client, auth_headers):
+    resp = client.put("/api/user/profile", json={"name": "   "}, headers=auth_headers)
+    assert resp.status_code == 400
 
 
-def test_api_keys_delete_not_found(client, auth_headers):
-    resp = client.delete("/api/user/api-keys/nonexistent-prefix", headers=auth_headers)
+def test_user_update_profile_no_auth(client):
+    resp = client.put("/api/user/profile", json={"name": "New Name"})
+    assert resp.status_code == 401
+
+
+def test_upload_avatar_no_auth(client):
+    resp = client.post("/api/user/avatar")
+    assert resp.status_code == 401
+
+
+def test_upload_avatar_no_file(client, auth_headers):
+    resp = client.post("/api/user/avatar", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_upload_avatar_bad_type(client, auth_headers):
+    data = {"file": (io.BytesIO(b"not an image"), "avatar.gif", "image/gif")}
+    resp = client.post(
+        "/api/user/avatar", data=data,
+        content_type="multipart/form-data", headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_upload_avatar_too_large(client, auth_headers):
+    big = io.BytesIO(b"x" * (5 * 1024 * 1024 + 1))
+    data = {"file": (big, "avatar.png", "image/png")}
+    resp = client.post(
+        "/api/user/avatar", data=data,
+        content_type="multipart/form-data", headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_upload_avatar_success(client, auth_headers, tmp_path):
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (400, 400), "blue").save(buf, format="PNG")
+    buf.seek(0)
+
+    with patch("services.avatars.AVATAR_FOLDER", tmp_path):
+        data = {"file": (buf, "avatar.png", "image/png")}
+        resp = client.post(
+            "/api/user/avatar", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    assert (tmp_path / "1.png").exists()
+
+
+def test_get_avatar_no_auth(client):
+    resp = client.get("/api/user/avatar")
+    assert resp.status_code == 401
+
+
+def test_get_avatar_not_found(client, auth_headers, tmp_path):
+    with patch("api_endpoints.user.handler.avatar_path", return_value=tmp_path / "missing.png"):
+        resp = client.get("/api/user/avatar", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_avatar_success(client, auth_headers, tmp_path):
+    avatar_file = tmp_path / "1.png"
+    avatar_file.write_bytes(b"\x89PNG\r\n\x1a\nfakepngdata")
+    with patch("api_endpoints.user.handler.avatar_path", return_value=avatar_file):
+        resp = client.get("/api/user/avatar", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+
+
+def test_delete_avatar_no_auth(client):
+    resp = client.delete("/api/user/avatar")
+    assert resp.status_code == 401
+
+
+def test_delete_avatar(client, auth_headers, tmp_path):
+    avatar_file = tmp_path / "1.png"
+    avatar_file.write_bytes(b"fake")
+    with patch("services.avatars.AVATAR_FOLDER", tmp_path):
+        resp = client.delete("/api/user/avatar", headers=auth_headers)
+    assert resp.status_code == 200
+    assert not avatar_file.exists()
+
+
+def test_provider_keys_list(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx(fetchall=[])):
+        resp = client.get("/api/user/provider-keys", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()["keys"] == {}
+
+
+def test_provider_keys_set(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.put(
+            "/api/user/provider-keys",
+            json={"provider": "anthropic", "key": "sk-test-key-12345"},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["provider"] == "anthropic"
+    assert "..." in body["masked"]
+
+
+def test_provider_keys_set_unsupported_provider(client, auth_headers):
+    resp = client.put(
+        "/api/user/provider-keys",
+        json={"provider": "bogus", "key": "abc"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_provider_keys_delete_not_found(client, auth_headers):
+    with patch("api_endpoints.user.handler.get_connection", return_value=_mock_cnx(rowcount=0)):
+        resp = client.delete("/api/user/provider-keys/anthropic", headers=auth_headers)
     assert resp.status_code == 404
 
 
@@ -60,14 +204,26 @@ def test_workspaces_non_hosted(client):
     assert resp.status_code == 501
 
 
-def test_payments_no_stripe(client):
-    resp = client.post("/api/payments/checkout", json={"priceId": "price_test"})
+def test_payments_no_stripe(client, auth_headers):
+    resp = client.post(
+        "/api/payments/checkout", json={"priceId": "price_test", "plan": "basic"}, headers=auth_headers,
+    )
     assert resp.status_code == 503
 
 
-def test_payments_portal_no_stripe(client):
-    resp = client.post("/api/payments/portal", json={"customerId": "cus_test"})
+def test_payments_portal_no_stripe(client, auth_headers):
+    resp = client.post("/api/payments/portal", json={}, headers=auth_headers)
     assert resp.status_code == 503
+
+
+def test_payments_checkout_no_auth(client):
+    resp = client.post("/api/payments/checkout", json={"priceId": "price_test", "plan": "basic"})
+    assert resp.status_code == 401
+
+
+def test_payments_portal_no_auth(client):
+    resp = client.post("/api/payments/portal", json={})
+    assert resp.status_code == 401
 
 
 def test_rate_limiter():

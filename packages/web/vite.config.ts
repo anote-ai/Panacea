@@ -1,35 +1,36 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { transform } from "esbuild";
 
-// The landing page is written as plain .js files containing JSX (matching the
-// Anote marketing site's component style). Vite/rolldown only auto-enables
-// JSX parsing for .jsx/.tsx files, so pre-compile JSX out of these .js files
-// before they reach the bundler's native parser.
-function jsxInJs(): Plugin {
-  return {
-    name: "jsx-in-js",
-    enforce: "pre",
-    async transform(code, id) {
-      if (!id.includes("/landing_page/") || !id.endsWith(".js")) return null;
-      const result = await transform(code, {
-        loader: "jsx",
-        jsx: "automatic",
-        sourcefile: id,
-      });
-      return { code: result.code, map: result.map };
-    },
-  };
-}
+const buildMetadata = {
+  service: "panacea-web",
+  version: process.env.VITE_APP_VERSION || "1.0.0",
+  commit:
+    process.env.VITE_BUILD_SHA ||
+    process.env.GITHUB_SHA ||
+    process.env.COMMIT_SHA ||
+    "unknown",
+};
 
 export default defineConfig({
-  plugins: [jsxInJs(), react()],
+  plugins: [
+    react(),
+    {
+      name: "panacea-build-metadata",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "build.json",
+          source: `${JSON.stringify(buildMetadata, null, 2)}\n`,
+        });
+      },
+    },
+  ],
   server: {
     port: 3000,
     proxy: {
-      "/api": "http://localhost:5000",
-      "/auth": "http://localhost:5000",
-      "/health": "http://localhost:5000",
+      "/api": { target: "http://localhost:5000", changeOrigin: true, timeout: 120000 },
+      "/auth": { target: "http://localhost:5000", changeOrigin: true, timeout: 120000 },
+      "/health": { target: "http://localhost:5000", changeOrigin: true, timeout: 120000 },
     },
   },
 });

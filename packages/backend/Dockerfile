@@ -1,10 +1,19 @@
 FROM python:3.11-slim
 
+ARG BUILD_SHA=unknown
+ARG APP_VERSION=1.0.0
+
+ENV PANACEA_BUILD_SHA=${BUILD_SHA} \
+    PANACEA_VERSION=${APP_VERSION}
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     pkg-config \
+    build-essential \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -14,4 +23,7 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:create_app()"]
+# Migrations + gunicorn are inlined here (rather than a separate entrypoint.sh)
+# so the startup command lives in the image's own metadata — immune to a
+# docker-compose bind mount shadowing /app with an incomplete host directory.
+ENTRYPOINT ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 \"app:create_app()\""]

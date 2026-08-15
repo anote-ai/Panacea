@@ -1,50 +1,303 @@
 """Tests for document endpoints."""
+from __future__ import annotations
+
 import io
+from unittest.mock import MagicMock, patch
 
 
-def test_list_documents(client):
+def _mock_cnx(fetchall=None, fetchone=None, lastrowid=1, rowcount=1):
+    cursor = MagicMock()
+    cursor.fetchall.return_value = fetchall if fetchall is not None else []
+    cursor.fetchone.return_value = fetchone
+    cursor.lastrowid = lastrowid
+    cursor.rowcount = rowcount
+    cnx = MagicMock()
+    cnx.cursor.return_value = cursor
+    return cnx
+
+
+# ---------------------------------------------------------------------------
+# GET /api/documents
+# ---------------------------------------------------------------------------
+
+def test_list_documents_no_auth(client):
     resp = client.get("/api/documents")
+    assert resp.status_code == 401
+
+
+def test_list_documents(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.get("/api/documents", headers=auth_headers)
     assert resp.status_code == 200
     assert "documents" in resp.get_json()
 
 
-def test_upload_no_file(client):
-    resp = client.post("/api/documents/upload")
+def test_list_documents_with_folder(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.get("/api/documents?folder_id=1", headers=auth_headers)
+    assert resp.status_code == 200
+
+
+def test_list_documents_with_chat_id(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        resp = client.get("/api/documents?chat_id=5", headers=auth_headers)
+    assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# POST /api/documents/upload
+# ---------------------------------------------------------------------------
+
+def test_upload_no_file(client, auth_headers):
+    resp = client.post("/api/documents/upload", headers=auth_headers)
     assert resp.status_code == 400
 
 
-def test_upload_bad_type(client):
+def test_upload_bad_type(client, auth_headers):
     data = {"file": (io.BytesIO(b"data"), "test.exe")}
-    resp = client.post("/api/documents/upload", data=data, content_type="multipart/form-data")
+    resp = client.post(
+        "/api/documents/upload", data=data,
+        content_type="multipart/form-data", headers=auth_headers,
+    )
     assert resp.status_code == 400
 
 
-def test_upload_text_file(client):
-    data = {"file": (io.BytesIO(b"Hello world document."), "test.txt")}
-    resp = client.post("/api/documents/upload", data=data, content_type="multipart/form-data")
-    assert resp.status_code in (201, 500)
+def test_upload_text_file_success(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", return_value=5), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        data = {"file": (io.BytesIO(b"Hello world document."), "test.txt")}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["filename"] == "test.txt"
+    assert body["chunks"] == 5
 
 
-def test_get_document_not_found(client):
-    resp = client.get("/api/documents/nonexistent")
+def test_upload_with_folder_id(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", return_value=3), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        data = {"file": (io.BytesIO(b"Folder content."), "notes.txt"), "folder_id": "2"}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    assert resp.get_json()["folder_id"] == 2
+
+
+def test_upload_with_chat_id(client, auth_headers, tmp_path):
+    import datetime
+    chat_row = {"id": 5, "name": "New Chat", "created_at": datetime.datetime(2024, 1, 1)}
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", return_value=2), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=chat_row)):
+        data = {"file": (io.BytesIO(b"Chat context."), "notes.txt"), "chat_id": "5"}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    assert resp.get_json()["chat_id"] == 5
+
+
+def test_upload_with_chat_id_not_found(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        data = {"file": (io.BytesIO(b"data"), "notes.txt"), "chat_id": "999"}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
     assert resp.status_code == 404
 
 
-def test_delete_document_not_found(client):
-    resp = client.delete("/api/documents/nonexistent")
+def test_upload_ingest_failure(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", side_effect=RuntimeError("boom")):
+        data = {"file": (io.BytesIO(b"data"), "test.txt")}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# GET /api/documents/<doc_id>
+# ---------------------------------------------------------------------------
+
+def test_get_document_not_found(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.get("/api/documents/nonexistent", headers=auth_headers)
     assert resp.status_code == 404
 
 
-def test_ask_document_not_found(client):
-    resp = client.post("/api/documents/nonexistent/ask", json={"question": "what?"})
+def test_get_document_found(client, auth_headers):
+    doc = {"id": "abc", "filename": "test.txt", "chunk_count": 5, "folder_id": None, "created_at": None}
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc", headers=auth_headers)
+    assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# GET /api/documents/<doc_id>/file
+# ---------------------------------------------------------------------------
+
+def test_get_document_file_no_auth(client):
+    resp = client.get("/api/documents/abc/file")
+    assert resp.status_code == 401
+
+
+def test_get_document_file_not_found_in_db(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.get("/api/documents/abc/file", headers=auth_headers)
     assert resp.status_code == 404
 
 
-def test_ask_document_missing_question(client):
-    data = {"file": (io.BytesIO(b"Content."), "doc.txt")}
-    up = client.post("/api/documents/upload", data=data, content_type="multipart/form-data")
-    if up.status_code != 201:
-        return
-    doc_id = up.get_json()["id"]
-    resp = client.post(f"/api/documents/{doc_id}/ask", json={})
+def test_get_document_file_missing_on_disk(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.txt"}
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/file", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_file_success(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.txt"}
+    (tmp_path / "abc.txt").write_text("hello world")
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/file", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.data == b"hello world"
+    assert resp.mimetype == "text/plain"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/documents/<doc_id>/thumbnail
+# ---------------------------------------------------------------------------
+
+def test_get_document_thumbnail_no_auth(client):
+    resp = client.get("/api/documents/abc/thumbnail")
+    assert resp.status_code == 401
+
+
+def test_get_document_thumbnail_not_found_in_db(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.get("/api/documents/abc/thumbnail", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_thumbnail_missing_on_disk(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.pdf"}
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/thumbnail", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_document_thumbnail_success(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.pdf"}
+    (tmp_path / "abc_thumb.png").write_bytes(b"\x89PNG\r\n\x1a\nfakepngdata")
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.get("/api/documents/abc/thumbnail", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+
+
+def test_upload_generates_thumbnail(client, auth_headers, tmp_path):
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.ingest_document", return_value=1), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx()):
+        data = {"file": (io.BytesIO(b"Hello world, this is a preview."), "test.txt")}
+        resp = client.post(
+            "/api/documents/upload", data=data,
+            content_type="multipart/form-data", headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    doc_id = resp.get_json()["id"]
+    assert (tmp_path / f"{doc_id}_thumb.png").exists()
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/documents/<doc_id>
+# ---------------------------------------------------------------------------
+
+def test_delete_document_not_found(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=None)):
+        resp = client.delete("/api/documents/nonexistent", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_delete_document_found(client, auth_headers):
+    doc = {"id": "abc", "filename": "test.txt", "chunk_count": 5, "folder_id": None, "created_at": None}
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.delete("/api/documents/abc", headers=auth_headers)
+    assert resp.status_code == 200
+
+
+def test_delete_document_removes_thumbnail(client, auth_headers, tmp_path):
+    doc = {"id": "abc", "filename": "test.txt", "chunk_count": 5, "folder_id": None, "created_at": None}
+    thumb = tmp_path / "abc_thumb.png"
+    thumb.write_bytes(b"fake")
+    with patch("api_endpoints.documents.handler.UPLOAD_FOLDER", tmp_path), \
+         patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchone=doc)):
+        resp = client.delete("/api/documents/abc", headers=auth_headers)
+    assert resp.status_code == 200
+    assert not thumb.exists()
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/documents/<doc_id>/move
+# ---------------------------------------------------------------------------
+
+def test_move_document(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(rowcount=1)):
+        resp = client.patch("/api/documents/abc/move", json={"folder_id": 1}, headers=auth_headers)
+    assert resp.status_code == 200
+
+
+def test_move_document_to_root(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(rowcount=1)):
+        resp = client.patch("/api/documents/abc/move", json={"folder_id": None}, headers=auth_headers)
+    assert resp.status_code == 200
+
+
+def test_move_document_not_found(client, auth_headers):
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(rowcount=0)):
+        resp = client.patch("/api/documents/abc/move", json={"folder_id": 1}, headers=auth_headers)
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /api/documents/<doc_id>/ask
+# ---------------------------------------------------------------------------
+
+def test_ask_document_missing_question(client, auth_headers):
+    resp = client.post("/api/documents/abc/ask", json={}, headers=auth_headers)
     assert resp.status_code == 400
+
+
+def test_ask_document(client, auth_headers):
+    with patch("api_endpoints.documents.handler.query_documents", return_value="The answer."):
+        resp = client.post("/api/documents/abc/ask", json={"question": "what?"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()["answer"] == "The answer."
+
+
+def test_ask_document_with_folder(client, auth_headers):
+    docs = [{"id": "abc"}, {"id": "def"}]
+    with patch("api_endpoints.documents.handler.get_connection", return_value=_mock_cnx(fetchall=docs)), \
+         patch("api_endpoints.documents.handler.query_documents", return_value="Folder answer."):
+        resp = client.post(
+            "/api/documents/abc/ask",
+            json={"question": "what?", "folder_id": 1},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200

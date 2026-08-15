@@ -33,14 +33,26 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS folders (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    name        VARCHAR(255) NOT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS documents (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     user_id     INT NOT NULL,
+    folder_id   INT NULL,
+    chat_id     INT NULL,
     doc_uuid    VARCHAR(36) NOT NULL UNIQUE,
     filename    VARCHAR(500) NOT NULL,
     chunk_count INT DEFAULT 0,
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL,
+    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -49,6 +61,30 @@ CREATE TABLE IF NOT EXISTS api_keys (
     key_hash    VARCHAR(255) NOT NULL,
     key_prefix  VARCHAR(20) NOT NULL,
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user_provider_keys (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT NOT NULL,
+    provider       VARCHAR(20) NOT NULL,
+    key_encrypted  TEXT NOT NULL,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_provider (user_id, provider),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS api_usage (
+    id                 INT AUTO_INCREMENT PRIMARY KEY,
+    user_id            INT NOT NULL,
+    endpoint           VARCHAR(100) NOT NULL,
+    model              VARCHAR(100),
+    prompt_tokens      INT NOT NULL DEFAULT 0,
+    completion_tokens  INT NOT NULL DEFAULT 0,
+    total_tokens       INT NOT NULL DEFAULT 0,
+    credits_used       INT NOT NULL DEFAULT 1,
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -61,3 +97,25 @@ CREATE TABLE IF NOT EXISTS stripe_customers (
     period_end  DATETIME,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Tracks processed Stripe webhook event IDs so a redelivered event (Stripe
+-- retries and can send the same event more than once) is a no-op instead
+-- of double-crediting a purchase or reprocessing a subscription change.
+CREATE TABLE IF NOT EXISTS stripe_events (
+    event_id      VARCHAR(255) PRIMARY KEY,
+    event_type    VARCHAR(100) NOT NULL,
+    processed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tracks which database/migrations/*.sql files have been applied (see
+-- database/migrate.py). Fresh installs get the final schema directly from
+-- the CREATE TABLE statements above, so migrations that are already
+-- reflected here must be pre-marked as applied to avoid re-running them.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     VARCHAR(255) PRIMARY KEY,
+    applied_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0001_add_folders_and_document_columns.sql');
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0002_add_user_provider_keys.sql');
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0003_add_api_usage.sql');
+INSERT IGNORE INTO schema_migrations (version) VALUES ('0004_add_stripe_events.sql');

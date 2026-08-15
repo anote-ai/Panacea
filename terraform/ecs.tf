@@ -76,6 +76,13 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "DB_HOST", value = aws_db_instance.main.address },
       { name = "DB_NAME", value = var.db_name },
       { name = "DB_USER", value = var.db_username },
+      { name = "OLLAMA_BASE_URL", value = var.ollama_base_url },
+      { name = "STRIPE_PRICE_BASIC", value = var.stripe_price_basic },
+      { name = "STRIPE_PRICE_PRO", value = var.stripe_price_pro },
+      { name = "STRIPE_PRICE_ENTERPRISE", value = var.stripe_price_enterprise },
+      { name = "GOOGLE_CLIENT_ID", value = var.google_client_id },
+      { name = "GOOGLE_OAUTH_REDIRECT_URI", value = var.google_oauth_redirect_uri },
+      { name = "FRONTEND_URL", value = var.frontend_url },
     ]
 
     secrets = [
@@ -84,6 +91,9 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "ANTHROPIC_API_KEY", valueFrom = "${aws_secretsmanager_secret.backend.arn}:ANTHROPIC_API_KEY::" },
       { name = "OPENAI_API_KEY", valueFrom = "${aws_secretsmanager_secret.backend.arn}:OPENAI_API_KEY::" },
       { name = "STRIPE_SECRET_KEY", valueFrom = "${aws_secretsmanager_secret.backend.arn}:STRIPE_SECRET_KEY::" },
+      { name = "STRIPE_WEBHOOK_SECRET", valueFrom = "${aws_secretsmanager_secret.backend.arn}:STRIPE_WEBHOOK_SECRET::" },
+      { name = "PROVIDER_KEY_ENCRYPTION_KEY", valueFrom = "${aws_secretsmanager_secret.backend.arn}:PROVIDER_KEY_ENCRYPTION_KEY::" },
+      { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${aws_secretsmanager_secret.backend.arn}:GOOGLE_CLIENT_SECRET::" },
     ]
 
     logConfiguration = {

@@ -1,10 +1,10 @@
 """RAG pipeline — document ingestion and retrieval."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-# Hardcoded upload directory — not derived from env so CodeQL taint stops here
-_UPLOAD_DIR: Path = Path("/tmp/anote_uploads").resolve()
+_UPLOAD_DIR: Path = Path(os.environ.get("UPLOAD_FOLDER", "/tmp/anote_uploads")).resolve()
 _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Public alias used by other modules
@@ -15,15 +15,13 @@ def ingest_document(doc_id: str, file_path: Path) -> int:
     """Ingest a document into the vector store. Returns chunk count."""
     # Prevent path traversal: file_path must be within the upload directory
     resolved = file_path.resolve()
-    if not str(resolved).startswith(str(_UPLOAD_DIR) + "/"):
+    if not str(resolved).startswith(str(_UPLOAD_DIR) + os.sep):
         raise ValueError("Access to file outside upload folder is not allowed")
     text = _extract_text(resolved)
     chunks = _chunk_text(text)
     if not chunks:
         return 0
     try:
-        import os
-
         import chromadb
         from chromadb.utils import embedding_functions
         client = chromadb.PersistentClient(path=os.environ.get("CHROMA_PERSIST_DIR", "./chroma_db"))
@@ -38,15 +36,12 @@ def ingest_document(doc_id: str, file_path: Path) -> int:
     return len(chunks)
 
 
-def query_documents(
+def retrieve_context(
     question: str,
     doc_ids: list[str] | None = None,
-    model: str = "claude-sonnet-4-6",
     top_k: int = 5,
 ) -> str:
-    """Answer a question using RAG."""
-    import os
-    context = ""
+    """Return the most relevant chunks for `question`, scoped to `doc_ids` if given."""
     try:
         import chromadb
         from chromadb.utils import embedding_functions
@@ -59,9 +54,19 @@ def query_documents(
         results = collection.query(query_texts=[question], n_results=top_k, where=where)
         raw_docs = results.get("documents")
         docs: list[str] = raw_docs[0] if raw_docs else []  # type: ignore[index]
-        context = "\n\n".join(docs)
+        return "\n\n".join(docs)
     except Exception:
-        pass
+        return ""
+
+
+def query_documents(
+    question: str,
+    doc_ids: list[str] | None = None,
+    model: str = "claude-sonnet-4-6",
+    top_k: int = 5,
+) -> str:
+    """Answer a question using RAG."""
+    context = retrieve_context(question, doc_ids, top_k)
 
     if not context:
         return "I could not find relevant information in the documents."
@@ -84,7 +89,7 @@ def query_documents(
 
 def _extract_text(file_path: Path) -> str:
     # Validate again at extraction time — defensive in-depth
-    if not str(file_path.resolve()).startswith(str(_UPLOAD_DIR) + "/"):
+    if not str(file_path.resolve()).startswith(str(_UPLOAD_DIR) + os.sep):
         return ""
     ext = file_path.suffix.lower()
     if ext in (".txt", ".md", ".csv"):

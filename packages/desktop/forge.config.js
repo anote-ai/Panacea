@@ -15,7 +15,7 @@ module.exports = {
     {
       name: "@electron-forge/publisher-github",
       config: {
-        repository: { owner: "anote-ai", name: "Autonomous-Intelligence" },
+        repository: { owner: "anote-ai", name: "Panacea" },
         prerelease: false,
         draft: true,
       },

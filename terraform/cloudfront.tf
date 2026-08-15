@@ -108,6 +108,24 @@ resource "aws_cloudfront_distribution" "web" {
     }
   }
 
+  # Google OAuth redirects the browser straight to /callback (not under /auth/*)
+  # to match the exact "Authorized redirect URI" registered on the OAuth client.
+  ordered_cache_behavior {
+    path_pattern            = "/callback"
+    allowed_methods         = ["GET", "HEAD", "OPTIONS"]
+    cached_methods           = ["GET", "HEAD"]
+    target_origin_id         = "alb-backend"
+    viewer_protocol_policy   = "redirect-to-https"
+    min_ttl                  = 0
+    default_ttl               = 0
+    max_ttl                   = 0
+
+    forwarded_values {
+      query_string = true
+      cookies { forward = "none" }
+    }
+  }
+
   ordered_cache_behavior {
     path_pattern           = "/health"
     allowed_methods        = ["GET", "HEAD"]
