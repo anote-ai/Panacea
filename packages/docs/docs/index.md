@@ -135,7 +135,7 @@ Anote runs on several surfaces: the CLI, VS Code, the web, desktop, and mobile. 
     anote doctor
     ```
 
-    Checks Node.js version, API keys, config file, CLAUDE.md, semantic index, the Anote server, git, and the `gh` CLI.
+    Checks Node.js ≥ 18, `ANTHROPIC_API_KEY`, `.anote.json`, `CLAW.md`, and git.
 
 ## Use Anote everywhere
 
@@ -161,6 +161,9 @@ Anote runs on several surfaces: the CLI, VS Code, the web, desktop, and mobile. 
 ## Next steps
 
 - [Quick Start](getting-started/quickstart.md) — init, ask, fix, index, review, and changelog in order
+- [How Panacea Works](core-concepts/how-it-works.md) — the agentic loop, tools, and streaming
+- [Permission Modes](use-panacea/permission-modes.md) — control what the agent can do without asking
+- [Common Workflows](use-panacea/common-workflows.md) — step-by-step patterns for everyday tasks
 - [Configuration](getting-started/configuration.md) — API keys, provider setup, and `~/.anote/config.json`
 - [CLI Commands](cli/commands.md) — the full command reference
 - [Backend API](api/overview.md) — the REST endpoints powering every surface

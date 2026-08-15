@@ -12,8 +12,8 @@
   --md-primary-fg-color: #26221f;
   --md-primary-fg-color--light: #26221f;
   --md-primary-fg-color--dark: #26221f;
-  --md-primary-bg-color: #faf7f0;
-  --md-primary-bg-color--light: #faf7f0;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffff;
 }
 
 [data-md-color-scheme="default"] {
@@ -48,9 +48,39 @@
   --md-code-fg-color: #f1efe8;
 }
 
+/* code.claude.com/docs loads a private font ("Anthropic Sans", self-hosted
+   on Anthropic's own CDN — verified it 400s from Google Fonts, not public).
+   Their own CSS variable is literally named --font-inter, so Inter is what
+   it falls back to — and it's a real, public Google Font. Closest
+   legitimate match to "same to same" without their private font files. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
 body,
 .md-typeset {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Sizes/weights matched from code.claude.com/docs' compiled CSS */
+.md-typeset h1 {
+  font-size: 2.5rem;
+  line-height: 3.25rem;
+  font-weight: 800;
+}
+
+.md-typeset h2 {
+  margin-top: 3rem;
+  margin-bottom: 0.8rem;
+  font-size: 1.7rem;
+  line-height: 2rem;
+  font-weight: 700;
+}
+
+.md-typeset h3 {
+  margin-top: 2.5rem;
+  margin-bottom: 0.8rem;
+  font-size: 1.4rem;
+  line-height: 1.625rem;
+  font-weight: 600;
 }
 
 /* Links: underline instead of a foreign accent color — matches the monochrome brand */
@@ -65,8 +95,8 @@ body,
 }
 
 .md-typeset h1,
-.md-typeset h2 {
-  font-weight: 650;
+.md-typeset h2,
+.md-typeset h3 {
   letter-spacing: -0.01em;
 }
 
@@ -235,7 +265,7 @@ body,
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  color: var(--md-default-fg-color--light);
+  color: #ffffff;
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
@@ -250,7 +280,8 @@ body,
 }
 
 .anote-header__lang summary:hover {
-  color: var(--md-default-fg-color);
+  color: #ffffff;
+  opacity: 0.75;
 }
 
 .anote-header__lang svg {
@@ -307,24 +338,144 @@ body,
   font-weight: 600;
 }
 
-.anote-header__search-pill {
+/* System/Light/Dark theme dropdown — same visual pattern as the language
+   dropdown, but each item is a <label for="__palette_N"> that directly
+   selects that palette entry via native radio-button behavior (no JS). */
+.anote-header__theme {
+  position: relative;
+  display: flex;
+}
+
+.anote-header__theme summary {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: #ffffff;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.4rem;
+  border-radius: 0.5rem;
+}
+
+.anote-header__theme summary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.anote-header__theme summary::-webkit-details-marker,
+.anote-header__theme summary::marker {
+  display: none;
+  content: "";
+}
+
+.anote-header__theme summary svg {
+  fill: currentColor;
+}
+
+.anote-header__theme-icon {
+  display: none;
+  align-items: center;
+}
+
+.anote-header__theme-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.anote-header__theme-chevron {
+  display: flex;
+  align-items: center;
+}
+
+.anote-header__theme-chevron svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.anote-header__theme[open] .anote-header__theme-chevron svg {
+  transform: rotate(180deg);
+}
+
+/* Show only the icon matching the currently-selected palette radio.
+   #__palette_0 = System, #__palette_1 = Light, #__palette_2 = Dark. */
+.anote-header__theme-icon--system {
+  display: flex;
+}
+
+.md-header__option:has(#__palette_1:checked) ~ .anote-header__theme .anote-header__theme-icon--system,
+.md-header__option:has(#__palette_2:checked) ~ .anote-header__theme .anote-header__theme-icon--system {
+  display: none;
+}
+
+.md-header__option:has(#__palette_1:checked) ~ .anote-header__theme .anote-header__theme-icon--light {
+  display: flex;
+}
+
+.md-header__option:has(#__palette_2:checked) ~ .anote-header__theme .anote-header__theme-icon--dark {
+  display: flex;
+}
+
+.anote-header__theme-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 10;
+  min-width: 9rem;
+  margin: 0;
+  padding: 0.4rem;
+  list-style: none;
+  border-radius: 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-default-bg-color);
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.anote-header__theme-menu li label {
+  display: flex;
   align-items: center;
   gap: 0.6rem;
-  height: 2.35rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.4rem;
+  color: var(--md-default-fg-color) !important;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.anote-header__theme-menu li label:hover {
+  background-color: var(--md-code-bg-color);
+}
+
+.anote-header__theme-menu li label svg {
+  fill: var(--md-default-fg-color);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.anote-header__search-pill {
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
   min-width: 19rem;
   margin: 0;
-  padding: 0 0.5rem 0 0.85rem;
-  border-radius: 999px;
-  border: 1px solid var(--md-default-fg-color--lighter);
-  background-color: var(--md-code-bg-color);
-  color: var(--md-default-fg-color--light);
+  padding: 0 0.75rem 0 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.anote-header__search-pill:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .anote-header__search-pill svg {
   fill: currentColor;
-  width: 1rem;
-  height: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
   flex-shrink: 0;
 }
 
@@ -336,13 +487,29 @@ body,
 
 .anote-header__search-kbd {
   margin-left: auto;
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.4rem;
-  background-color: var(--md-default-bg-color);
-  border: 1px solid var(--md-default-fg-color--lighter);
-  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
   font-weight: 600;
   flex-shrink: 0;
+}
+
+/* Expanded search overlay — Material ships this with near-sharp corners
+   (0.1rem radius); round it to match the trigger pill's rounded-rectangle
+   look and give it a clean shadow instead of the flat default. */
+.md-search__form {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12) !important;
+}
+
+.md-search__output {
+  border-bottom-left-radius: 0.75rem !important;
+  border-bottom-right-radius: 0.75rem !important;
+}
+
+@media screen and (min-width: 60em) {
+  .md-search__form {
+    border-radius: 0.75rem !important;
+  }
 }
 
 .anote-header__links {
@@ -354,13 +521,14 @@ body,
 }
 
 .anote-header__links a {
-  color: var(--md-default-fg-color--light) !important;
+  color: #ffffff !important;
   text-decoration: none !important;
   white-space: nowrap;
 }
 
 .anote-header__links a:hover {
-  color: var(--md-default-fg-color) !important;
+  color: #ffffff !important;
+  opacity: 0.75;
 }
 
 /* Solid CTA pill — the one high-contrast element in the header */
@@ -389,21 +557,14 @@ body,
   opacity: 0.85;
 }
 
-.anote-header__desktop-icon {
-  display: none;
+/* Light/Dark/System palette toggle (replaces the old desktop-icon slot) */
+.anote-header .md-header__option {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0.3rem;
-  border-radius: 0.5rem;
 }
 
-.anote-header__desktop-icon:hover {
-  background-color: var(--md-code-bg-color);
-}
-
-.anote-header__desktop-icon-img {
-  height: 1.3rem;
-  width: auto;
+.anote-header .md-header__option .md-header__button {
+  color: #ffffff;
 }
 
 /* Claude's header doesn't show a GitHub star-count widget — hide it here too */
@@ -416,10 +577,12 @@ body,
  * tab, instead of Material's default dark colored bar.
  * ---------------------------------------------------------------------- */
 
+/* Continues the header's fixed-dark bar rather than switching to a light
+   strip — keeps "Home", "Getting Started", etc. readable in white. */
 .md-tabs {
-  background-color: var(--md-default-bg-color);
-  color: var(--md-default-fg-color--light);
-  border-bottom: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-primary-fg-color);
+  color: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .md-tabs__item {
@@ -431,28 +594,26 @@ body,
   font-size: 0.9rem;
   font-weight: 500;
   opacity: 1;
-  color: var(--md-default-fg-color--light);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .md-tabs__link:focus,
 .md-tabs__link:hover {
-  color: var(--md-default-fg-color);
+  color: #ffffff;
   opacity: 1;
 }
 
 .md-tabs__item--active .md-tabs__link {
-  color: var(--md-default-fg-color);
+  color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 2px 0 0 var(--md-default-fg-color);
+  box-shadow: 0 2px 0 0 #ffffff;
 }
 
 /* Only show the expanded header chrome once there's room — mirrors how
    Claude's header collapses to just logo + search + drawer on small screens. */
 @media screen and (min-width: 76.25em) {
   .anote-header__lang,
-  .anote-header__links,
-  .anote-header__cta,
-  .anote-header__desktop-icon {
+  .anote-header__links {
     display: flex;
   }
 }

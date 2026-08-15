@@ -80,21 +80,25 @@
     </div>
 
     <nav class="anote-header__links" aria-label="Product">
-      <a href="https://anote.ai" target="_blank" rel="noopener">Developer Platform</a>
+      <a href="https://github.com/anote-ai/Panacea" target="_blank" rel="noopener">Panacea Developer Platform</a>
     </nav>
-
-    <a href="https://chat.anote.ai" target="_blank" rel="noopener" class="anote-header__cta">
-      <span>Open Web App</span>
-      {% include ".icons/material/arrow-right.svg" %}
-    </a>
-
-    <a href="{{ base_url }}/desktop/overview/" class="anote-header__desktop-icon" aria-label="Desktop App" data-title="Desktop App">
-      <img src="{{ 'assets/logonew.png' | url }}" alt="Desktop App" class="anote-header__desktop-icon-img">
-    </a>
 
     {% if config.theme.palette %}
       {% if not config.theme.palette is mapping %}
         {% include "partials/palette.html" %}
+        <details class="anote-header__theme">
+          <summary>
+            <span class="anote-header__theme-icon anote-header__theme-icon--system">{% include ".icons/material/monitor.svg" %}</span>
+            <span class="anote-header__theme-icon anote-header__theme-icon--light">{% include ".icons/material/white-balance-sunny.svg" %}</span>
+            <span class="anote-header__theme-icon anote-header__theme-icon--dark">{% include ".icons/material/moon-waning-crescent.svg" %}</span>
+            <span class="anote-header__theme-chevron">{% include ".icons/material/chevron-down.svg" %}</span>
+          </summary>
+          <ul class="anote-header__theme-menu">
+            <li><label for="__palette_0" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/monitor.svg" %}<span>System</span></label></li>
+            <li><label for="__palette_1" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/white-balance-sunny.svg" %}<span>Light</span></label></li>
+            <li><label for="__palette_2" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/moon-waning-crescent.svg" %}<span>Dark</span></label></li>
+          </ul>
+        </details>
       {% endif %}
     {% endif %}
     {% if not config.theme.palette is mapping %}
