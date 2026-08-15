@@ -1,9 +1,13 @@
 import axios from 'axios';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type ThemeMode, useAuth, useModel, useTheme } from '../App';
+import { API_BASE_URL } from '../constants/constants';
 import { MODELS } from '../constants/models';
 import UserAvatar from './UserAvatar';
-import { API_BASE_URL } from '../constants/constants';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface Props {
   open: boolean;
@@ -11,21 +15,6 @@ interface Props {
 }
 
 type Section = 'general' | 'account' | 'api' | 'usage' | 'display' | 'billing';
-
-const NAV_ITEMS: { id: Section; label: string }[] = [
-  { id: 'general', label: 'General' },
-  { id: 'account', label: 'Account' },
-  { id: 'api', label: 'API' },
-  { id: 'usage', label: 'Usage' },
-  { id: 'billing', label: 'Billing' },
-  { id: 'display', label: 'Display' },
-];
-
-const PROVIDERS: { id: string; label: string }[] = [
-  { id: 'anthropic', label: 'Anthropic (Claude)' },
-  { id: 'openai', label: 'OpenAI (GPT)' },
-  { id: 'google', label: 'Google (Gemini)' },
-];
 
 interface UsageRow {
   id: number;
@@ -63,26 +52,107 @@ interface PlansData {
   creditPacks: Record<string, number>;
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const NAV_ITEMS: { id: Section; label: string }[] = [
+  { id: 'general', label: 'General' },
+  { id: 'account', label: 'Account' },
+  { id: 'api', label: 'API' },
+  { id: 'usage', label: 'Usage' },
+  { id: 'billing', label: 'Billing' },
+  { id: 'display', label: 'Display' },
+];
+
+const PROVIDERS: { id: string; label: string }[] = [
+  { id: 'anthropic', label: 'Anthropic (Claude)' },
+  { id: 'openai', label: 'OpenAI (GPT)' },
+  { id: 'google', label: 'Google (Gemini)' },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Extract a human-readable error message from an axios error. */
+function extractError(err: unknown, fallback: string): string {
+  const e = err as any;
+  return e?.response?.data?.error || e?.message || fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
+      <p className="text-xs text-gray-400 dark:text-gray-500">{label}</p>
+      <p className="text-sm font-medium text-gray-900 dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+function PlanCard({
+  plan,
+  currentPlan,
+  upgradingPlan,
+  onUpgrade,
+}: {
+  plan: PlanInfo;
+  currentPlan: string | undefined;
+  upgradingPlan: string | null;
+  onUpgrade: (plan: PlanInfo) => void;
+}) {
+  const isCurrent = currentPlan === plan.plan;
+  const isUpgrading = upgradingPlan === plan.plan;
+
+  return (
+    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
+      <div>
+        <p className="text-sm text-gray-900 dark:text-white capitalize">{plan.plan}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {plan.credits.toLocaleString()} credits/mo ·{' '}
+          {plan.monthlyLimit.toLocaleString()} messages/mo
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => onUpgrade(plan)}
+        disabled={!plan.available || isUpgrading || isCurrent}
+        title={plan.available ? undefined : 'Not configured yet'}
+        className="px-3 py-1.5 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        {isCurrent ? 'Current' : isUpgrading ? 'Opening…' : 'Upgrade'}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export default function SettingsModal({ open, onClose }: Props) {
-  const { token, user, refreshUser, avatarVersion, bumpAvatarVersion } =
-    useAuth();
+  // --- Context ---
+  const { token, user, refreshUser, avatarVersion, bumpAvatarVersion } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
   const { model, setModel } = useModel();
+
+  // --- State ---
   const [section, setSection] = useState<Section>('general');
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [providerKeys, setProviderKeys] = useState<Record<string, string>>({});
   const [providerKeysLoading, setProviderKeysLoading] = useState(false);
   const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
   const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
   const [keySaving, setKeySaving] = useState<Record<string, boolean>>({});
-  const [openProviders, setOpenProviders] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [openProviders, setOpenProviders] = useState<Record<string, boolean>>({});
 
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -96,6 +166,28 @@ export default function SettingsModal({ open, onClose }: Props) {
   const [buyingPack, setBuyingPack] = useState<number | null>(null);
   const [creditsError, setCreditsError] = useState<string | null>(null);
 
+  // --- Refs ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Derived state ---
+
+  /**
+   * Auth header memoized so all API calls share a stable reference and we never
+   * type `Bearer ${token}` inline more than once.
+   */
+  const authHeaders = useMemo(
+    () => ({ Authorization: `Bearer ${token}` }),
+    [token],
+  );
+
+  const usageBarPct = useMemo(() => {
+    if (!usage || usage.monthlyLimit <= 0) return 0;
+    return Math.min(100, (usage.monthlyUsed / usage.monthlyLimit) * 100);
+  }, [usage]);
+
+  // --- Effects ---
+
+  // Reset transient state every time the modal opens.
   useEffect(() => {
     if (open) {
       setSection('general');
@@ -110,189 +202,72 @@ export default function SettingsModal({ open, onClose }: Props) {
     }
   }, [open, user?.name]);
 
+  // Fetch provider API keys when the API section is shown.
   useEffect(() => {
-    if (open && section === 'api') {
-      setProviderKeysLoading(true);
-      axios
-        .get(`${API_BASE_URL}/api/user/provider-keys`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => setProviderKeys(res.data.keys || {}))
-        .catch(() => {})
-        .finally(() => setProviderKeysLoading(false));
-    }
-  }, [open, section, token]);
+    if (!open || section !== 'api') return;
+    setProviderKeysLoading(true);
+    axios
+      .get(`${API_BASE_URL}/api/user/provider-keys`, { headers: authHeaders })
+      .then((res) => setProviderKeys(res.data.keys || {}))
+      .catch(() => {})
+      .finally(() => setProviderKeysLoading(false));
+  }, [open, section, authHeaders]);
 
+  // Fetch billing plans once when usage or billing section is first shown.
   useEffect(() => {
-    if (open && (section === 'usage' || section === 'billing') && !plans) {
-      axios
-        .get(`${API_BASE_URL}/api/payments/plans`)
-        .then((res) => setPlans(res.data))
-        .catch(() => {});
-    }
+    if (!open || (section !== 'usage' && section !== 'billing') || plans) return;
+    axios
+      .get(`${API_BASE_URL}/api/payments/plans`)
+      .then((res) => setPlans(res.data))
+      .catch(() => {});
   }, [open, section, plans]);
 
+  // Fetch usage data when the usage section is shown.
   useEffect(() => {
-    if (open && section === 'usage') {
-      setUsageLoading(true);
-      setUsageError(null);
-      refreshUser();
-      axios
-        .get(`${API_BASE_URL}/api/user/usage`, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => setUsage(res.data))
-        .catch((err) =>
-          setUsageError(err?.response?.data?.error || err?.message || 'Failed to load usage.'),
-        )
-        .finally(() => setUsageLoading(false));
-    }
+    if (!open || section !== 'usage') return;
+    setUsageLoading(true);
+    setUsageError(null);
+    refreshUser();
+    axios
+      .get(`${API_BASE_URL}/api/user/usage`, { headers: authHeaders })
+      .then((res) => setUsage(res.data))
+      .catch((err) => setUsageError(extractError(err, 'Failed to load usage.')))
+      .finally(() => setUsageLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, section, token]);
+  }, [open, section, authHeaders]);
 
-  const saveProviderKey = async (provider: string) => {
-    const key = (keyInputs[provider] || '').trim();
-    if (!key) return;
-    setKeySaving((s) => ({ ...s, [provider]: true }));
-    setKeyErrors((e) => ({ ...e, [provider]: '' }));
-    try {
-      const res = await axios.put(
-        `${API_BASE_URL}/api/user/provider-keys`,
-        { provider, key },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      setProviderKeys((keys) => ({ ...keys, [provider]: res.data.masked }));
-      setKeyInputs((inputs) => ({ ...inputs, [provider]: '' }));
-      setOpenProviders((open) => ({ ...open, [provider]: false }));
-    } catch (err: any) {
-      setKeyErrors((e) => ({
-        ...e,
-        [provider]:
-          err?.response?.data?.error || err?.message || 'Failed to save key.',
-      }));
-    } finally {
-      setKeySaving((s) => ({ ...s, [provider]: false }));
-    }
-  };
+  // --- Handlers ---
 
-  const removeProviderKey = async (provider: string) => {
-    setKeyErrors((e) => ({ ...e, [provider]: '' }));
-    try {
-      await axios.delete(`${API_BASE_URL}/api/user/provider-keys/${provider}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setProviderKeys((keys) => {
-        const next = { ...keys };
-        delete next[provider];
-        return next;
-      });
-      setOpenProviders((open) => ({ ...open, [provider]: false }));
-    } catch (err: any) {
-      setKeyErrors((e) => ({
-        ...e,
-        [provider]:
-          err?.response?.data?.error || err?.message || 'Failed to remove key.',
-      }));
-    }
-  };
+  const uploadAvatar = useCallback(
+    async (file: File) => {
+      setAvatarError(null);
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        await axios.post(`${API_BASE_URL}/api/user/avatar`, form, {
+          headers: authHeaders,
+        });
+        bumpAvatarVersion();
+        refreshUser();
+      } catch (err) {
+        setAvatarError(extractError(err, 'Upload failed — please try again.'));
+      }
+    },
+    [authHeaders, bumpAvatarVersion, refreshUser],
+  );
 
-  const openBillingPortal = async () => {
-    setBillingLoading(true);
-    setBillingError(null);
-    try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/payments/portal`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      window.location.href = res.data.url;
-    } catch (err: any) {
-      setBillingError(
-        err?.response?.data?.error ||
-          err?.message ||
-          'Billing is not configured yet.',
-      );
-    } finally {
-      setBillingLoading(false);
-    }
-  };
-
-  const buyCredits = async (credits: number) => {
-    setBuyingPack(credits);
-    setCreditsError(null);
-    try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/payments/credits/checkout`,
-        { credits },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      window.location.href = res.data.url;
-    } catch (err: any) {
-      setCreditsError(
-        err?.response?.data?.error || err?.message || 'Unable to start checkout.',
-      );
-    } finally {
-      setBuyingPack(null);
-    }
-  };
-
-  const upgradePlan = async (plan: PlanInfo) => {
-    if (!plan.available) return;
-    setUpgradingPlan(plan.plan);
-    setBillingError(null);
-    try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/payments/checkout`,
-        {
-          plan: plan.plan,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      window.location.href = res.data.url;
-    } catch (err: any) {
-      setBillingError(
-        err?.response?.data?.error || err?.message || 'Unable to start checkout.',
-      );
-    } finally {
-      setUpgradingPlan(null);
-    }
-  };
-
-  if (!open) return null;
-
-  const uploadAvatar = async (file: File) => {
-    setAvatarError(null);
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      await axios.post(`${API_BASE_URL}/api/user/avatar`, form, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      bumpAvatarVersion();
-      refreshUser();
-    } catch (err: any) {
-      setAvatarError(
-        err?.response?.data?.error ||
-          err?.message ||
-          'Upload failed — please try again.',
-      );
-    }
-  };
-
-  const removeAvatar = async () => {
+  const removeAvatar = useCallback(async () => {
     setAvatarError(null);
     try {
-      await axios.delete(`${API_BASE_URL}/api/user/avatar`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(`${API_BASE_URL}/api/user/avatar`, { headers: authHeaders });
       bumpAvatarVersion();
       refreshUser();
-    } catch (err: any) {
-      setAvatarError(
-        err?.response?.data?.error || err?.message || 'Failed to remove photo.',
-      );
+    } catch (err) {
+      setAvatarError(extractError(err, 'Failed to remove photo.'));
     }
-  };
+  }, [authHeaders, bumpAvatarVersion, refreshUser]);
 
-  const saveName = async () => {
+  const saveName = useCallback(async () => {
     const trimmed = name.trim();
     if (!trimmed || trimmed === user?.name) return;
     setSaving(true);
@@ -301,18 +276,130 @@ export default function SettingsModal({ open, onClose }: Props) {
       await axios.put(
         `${API_BASE_URL}/api/user/profile`,
         { name: trimmed },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: authHeaders },
       );
       refreshUser();
-    } catch (err: any) {
-      setNameError(
-        err?.response?.data?.error || err?.message || 'Failed to save name.',
-      );
+    } catch (err) {
+      setNameError(extractError(err, 'Failed to save name.'));
     } finally {
       setSaving(false);
     }
-  };
+  }, [name, user?.name, authHeaders, refreshUser]);
 
+  const saveProviderKey = useCallback(
+    async (provider: string) => {
+      const key = (keyInputs[provider] || '').trim();
+      if (!key) return;
+      setKeySaving((s) => ({ ...s, [provider]: true }));
+      setKeyErrors((e) => ({ ...e, [provider]: '' }));
+      try {
+        const res = await axios.put(
+          `${API_BASE_URL}/api/user/provider-keys`,
+          { provider, key },
+          { headers: authHeaders },
+        );
+        setProviderKeys((keys) => ({ ...keys, [provider]: res.data.masked }));
+        setKeyInputs((inputs) => ({ ...inputs, [provider]: '' }));
+        setOpenProviders((prev) => ({ ...prev, [provider]: false }));
+      } catch (err) {
+        setKeyErrors((e) => ({ ...e, [provider]: extractError(err, 'Failed to save key.') }));
+      } finally {
+        setKeySaving((s) => ({ ...s, [provider]: false }));
+      }
+    },
+    [keyInputs, authHeaders],
+  );
+
+  const removeProviderKey = useCallback(
+    async (provider: string) => {
+      setKeyErrors((e) => ({ ...e, [provider]: '' }));
+      try {
+        await axios.delete(`${API_BASE_URL}/api/user/provider-keys/${provider}`, {
+          headers: authHeaders,
+        });
+        setProviderKeys((keys) => {
+          const next = { ...keys };
+          delete next[provider];
+          return next;
+        });
+        setOpenProviders((prev) => ({ ...prev, [provider]: false }));
+      } catch (err) {
+        setKeyErrors((e) => ({ ...e, [provider]: extractError(err, 'Failed to remove key.') }));
+      }
+    },
+    [authHeaders],
+  );
+
+  const openBillingPortal = useCallback(async () => {
+    setBillingLoading(true);
+    setBillingError(null);
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/payments/portal`,
+        {},
+        { headers: authHeaders },
+      );
+      window.location.href = res.data.url;
+    } catch (err) {
+      setBillingError(extractError(err, 'Billing is not configured yet.'));
+    } finally {
+      setBillingLoading(false);
+    }
+  }, [authHeaders]);
+
+  /**
+   * Redirect to Stripe checkout for a one-time credit top-up.
+   * `credits` is the pack size (e.g. 1000).
+   */
+  const buyCredits = useCallback(
+    async (credits: number) => {
+      setBuyingPack(credits);
+      setCreditsError(null);
+      try {
+        const res = await axios.post(
+          `${API_BASE_URL}/api/payments/credits/checkout`,
+          { credits },
+          { headers: authHeaders },
+        );
+        window.location.href = res.data.url;
+      } catch (err) {
+        setCreditsError(extractError(err, 'Unable to start checkout.'));
+      } finally {
+        setBuyingPack(null);
+      }
+    },
+    [authHeaders],
+  );
+
+  /**
+   * Redirect to Stripe checkout for a subscription plan upgrade.
+   * Guards against unavailable (unconfigured) plans before issuing any request.
+   */
+  const upgradePlan = useCallback(
+    async (plan: PlanInfo) => {
+      if (!plan.available) return;
+      setUpgradingPlan(plan.plan);
+      setBillingError(null);
+      try {
+        const res = await axios.post(
+          `${API_BASE_URL}/api/payments/checkout`,
+          { plan: plan.plan },
+          { headers: authHeaders },
+        );
+        window.location.href = res.data.url;
+      } catch (err) {
+        setBillingError(extractError(err, 'Unable to start checkout.'));
+      } finally {
+        setUpgradingPlan(null);
+      }
+    },
+    [authHeaders],
+  );
+
+  // --- Render guard ---
+  if (!open) return null;
+
+  // --- Render ---
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
@@ -331,6 +418,7 @@ export default function SettingsModal({ open, onClose }: Props) {
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => setSection(item.id)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                   section === item.id
@@ -351,6 +439,7 @@ export default function SettingsModal({ open, onClose }: Props) {
               {NAV_ITEMS.find((i) => i.id === section)?.label}
             </h3>
             <button
+              type="button"
               onClick={onClose}
               className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] transition-colors"
               aria-label="Close"
@@ -360,6 +449,7 @@ export default function SettingsModal({ open, onClose }: Props) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-5">
+            {/* ── General ─────────────────────────────────────────────────── */}
             {section === 'general' && (
               <div className="space-y-8">
                 <div>
@@ -388,6 +478,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                         }}
                       />
                       <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
                         className="px-3 py-1.5 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                       >
@@ -395,6 +486,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                       </button>
                       {user?.hasAvatar && (
                         <button
+                          type="button"
                           onClick={removeAvatar}
                           className="px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] transition-colors"
                         >
@@ -416,17 +508,14 @@ export default function SettingsModal({ open, onClose }: Props) {
                     <input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveName();
-                      }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveName(); }}
                       className="flex-1 bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
                       placeholder="Your name"
                     />
                     <button
+                      type="button"
                       onClick={saveName}
-                      disabled={
-                        saving || !name.trim() || name.trim() === user?.name
-                      }
+                      disabled={saving || !name.trim() || name.trim() === user?.name}
                       className="px-3 py-2 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       Save
@@ -436,10 +525,10 @@ export default function SettingsModal({ open, onClose }: Props) {
                     <p className="text-xs text-red-500 mt-2">{nameError}</p>
                   )}
                 </div>
-
               </div>
             )}
 
+            {/* ── Account ─────────────────────────────────────────────────── */}
             {section === 'account' && (
               <div className="space-y-4">
                 <div>
@@ -456,6 +545,7 @@ export default function SettingsModal({ open, onClose }: Props) {
               </div>
             )}
 
+            {/* ── Display ─────────────────────────────────────────────────── */}
             {section === 'display' && (
               <div className="space-y-8">
                 <div>
@@ -463,26 +553,26 @@ export default function SettingsModal({ open, onClose }: Props) {
                     Appearance
                   </h4>
                   <div className="flex gap-2">
-                    {(['light', 'dark', 'system'] as ThemeMode[]).map(
-                      (mode) => (
-                        <button
-                          key={mode}
-                          onClick={() => setThemeMode(mode)}
-                          className={`px-4 py-2 rounded-lg text-sm capitalize border transition-colors ${
-                            themeMode === mode
-                              ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-gray-900'
-                              : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F]'
-                          }`}
-                        >
-                          {mode}
-                        </button>
-                      ),
-                    )}
+                    {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setThemeMode(mode)}
+                        className={`px-4 py-2 rounded-lg text-sm capitalize border transition-colors ${
+                          themeMode === mode
+                            ? 'border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                            : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F]'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
+            {/* ── API ─────────────────────────────────────────────────────── */}
             {section === 'api' && (
               <div className="space-y-8">
                 <div>
@@ -510,14 +600,11 @@ export default function SettingsModal({ open, onClose }: Props) {
                     API keys
                   </h4>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-                    Bring your own provider keys — used for your chats instead
-                    of the shared default. Ollama runs locally and doesn't need
-                    a key.
+                    Bring your own provider keys — used for your chats instead of the shared
+                    default. Ollama runs locally and doesn't need a key.
                   </p>
                   {providerKeysLoading ? (
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      Loading…
-                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Loading…</p>
                   ) : (
                     <div className="space-y-2 max-w-sm">
                       {PROVIDERS.map((p) => {
@@ -540,9 +627,10 @@ export default function SettingsModal({ open, onClose }: Props) {
                                   {isSet ? 'API set' : 'Not set'}
                                 </span>
                                 <button
+                                  type="button"
                                   onClick={() =>
-                                    setOpenProviders((open) => ({
-                                      ...open,
+                                    setOpenProviders((prev) => ({
+                                      ...prev,
                                       [p.id]: !isOpen,
                                     }))
                                   }
@@ -566,26 +654,22 @@ export default function SettingsModal({ open, onClose }: Props) {
                                       }))
                                     }
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter')
-                                        saveProviderKey(p.id);
+                                      if (e.key === 'Enter') saveProviderKey(p.id);
                                     }}
-                                    placeholder={
-                                      isSet ? 'Replace key…' : 'Enter API key…'
-                                    }
+                                    placeholder={isSet ? 'Replace key…' : 'Enter API key…'}
                                     className="flex-1 bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
                                   />
                                   <button
+                                    type="button"
                                     onClick={() => saveProviderKey(p.id)}
-                                    disabled={
-                                      keySaving[p.id] ||
-                                      !keyInputs[p.id]?.trim()
-                                    }
+                                    disabled={keySaving[p.id] || !keyInputs[p.id]?.trim()}
                                     className="px-3 py-2 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                   >
                                     Save
                                   </button>
                                   {isSet && (
                                     <button
+                                      type="button"
                                       onClick={() => removeProviderKey(p.id)}
                                       className="px-2 py-2 text-xs text-red-500 hover:text-red-600"
                                     >
@@ -609,35 +693,19 @@ export default function SettingsModal({ open, onClose }: Props) {
               </div>
             )}
 
+            {/* ── Usage ───────────────────────────────────────────────────── */}
             {section === 'usage' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-3 gap-3 max-w-md">
-                  <div className="px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Plan</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                      {user?.plan || 'free'}
-                    </p>
-                  </div>
-                  <div className="px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Credits left</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user?.credits ?? '—'}
-                    </p>
-                  </div>
-                  <div className="px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Total tokens</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {usage?.summary.total_tokens ?? '—'}
-                    </p>
-                  </div>
+                  <StatCard label="Plan" value={<span className="capitalize">{user?.plan || 'free'}</span>} />
+                  <StatCard label="Credits left" value={user?.credits ?? '—'} />
+                  <StatCard label="Total tokens" value={usage?.summary.total_tokens ?? '—'} />
                 </div>
 
                 {usage && usage.monthlyLimit > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        Monthly messages
-                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">Monthly messages</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {usage.monthlyUsed} / {usage.monthlyLimit}
                       </p>
@@ -649,9 +717,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                             ? 'bg-red-500'
                             : 'bg-gray-900 dark:bg-white'
                         }`}
-                        style={{
-                          width: `${Math.min(100, (usage.monthlyUsed / usage.monthlyLimit) * 100)}%`,
-                        }}
+                        style={{ width: `${usageBarPct}%` }}
                       />
                     </div>
                   </div>
@@ -665,20 +731,26 @@ export default function SettingsModal({ open, onClose }: Props) {
                     One-time top-up, added on top of your plan's credits.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {Object.entries(plans?.creditPacks || {}).map(([credits, cents]) => (
-                      <button
-                        key={credits}
-                        onClick={() => buyCredits(Number(credits))}
-                        disabled={buyingPack === Number(credits)}
-                        className="px-3 py-2 rounded-lg text-sm border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {buyingPack === Number(credits)
-                          ? 'Opening…'
-                          : `${Number(credits).toLocaleString()} credits — $${(cents / 100).toFixed(0)}`}
-                      </button>
-                    ))}
+                    {Object.entries(plans?.creditPacks || {}).map(([credits, cents]) => {
+                      const creditNum = Number(credits);
+                      return (
+                        <button
+                          key={credits}
+                          type="button"
+                          onClick={() => buyCredits(creditNum)}
+                          disabled={buyingPack === creditNum}
+                          className="px-3 py-2 rounded-lg text-sm border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#3F3F3F] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {buyingPack === creditNum
+                            ? 'Opening…'
+                            : `${creditNum.toLocaleString()} credits — $${(cents / 100).toFixed(0)}`}
+                        </button>
+                      );
+                    })}
                   </div>
-                  {creditsError && <p className="text-xs text-red-500 mt-2">{creditsError}</p>}
+                  {creditsError && (
+                    <p className="text-xs text-red-500 mt-2">{creditsError}</p>
+                  )}
                 </div>
 
                 <div>
@@ -726,6 +798,7 @@ export default function SettingsModal({ open, onClose }: Props) {
               </div>
             )}
 
+            {/* ── Billing ─────────────────────────────────────────────────── */}
             {section === 'billing' && (
               <div className="space-y-6">
                 <div>
@@ -736,6 +809,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                     Manage your plan and payment method via Stripe.
                   </p>
                   <button
+                    type="button"
                     onClick={openBillingPortal}
                     disabled={billingLoading}
                     className="px-3 py-1.5 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -756,31 +830,13 @@ export default function SettingsModal({ open, onClose }: Props) {
                   </p>
                   <div className="space-y-2 max-w-sm">
                     {(plans?.plans || []).map((p) => (
-                      <div
+                      <PlanCard
                         key={p.plan}
-                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]"
-                      >
-                        <div>
-                          <p className="text-sm text-gray-900 dark:text-white capitalize">
-                            {p.plan}
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">
-                            {p.credits.toLocaleString()} credits/mo · {p.monthlyLimit.toLocaleString()} messages/mo
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => upgradePlan(p)}
-                          disabled={!p.available || upgradingPlan === p.plan || user?.plan === p.plan}
-                          title={p.available ? undefined : 'Not configured yet'}
-                          className="px-3 py-1.5 rounded-lg text-sm bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {user?.plan === p.plan
-                            ? 'Current'
-                            : upgradingPlan === p.plan
-                              ? 'Opening…'
-                              : 'Upgrade'}
-                        </button>
-                      </div>
+                        plan={p}
+                        currentPlan={user?.plan}
+                        upgradingPlan={upgradingPlan}
+                        onUpgrade={upgradePlan}
+                      />
                     ))}
                   </div>
                 </div>

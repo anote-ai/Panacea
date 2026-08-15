@@ -25,6 +25,10 @@ from middleware.auth import require_auth
 payments_bp = Blueprint("payments", __name__, url_prefix="/api/payments")
 
 
+def _frontend_url() -> str:
+    return os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+
 def _stripe_client() -> tuple:
     """Returns (stripe module, error response) — exactly one is non-None."""
     stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -79,13 +83,13 @@ def create_checkout() -> tuple:
     if not price_id:
         return jsonify({"error": "Plan is not configured"}), 503
     user_id = int(get_jwt_identity())
-    return_url = request.host_url.rstrip("/")
+    return_url = _frontend_url()
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=f"{return_url}/app?checkout=success",
-            cancel_url=f"{return_url}/app?checkout=cancelled",
+            success_url=f"{return_url}/app/checkout?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{return_url}/app/checkout?checkout=cancelled",
             metadata={"user_id": user_id, "plan": plan},
         )
         return jsonify({"url": session.url}), 200
@@ -107,7 +111,7 @@ def create_credit_checkout() -> tuple:
     if not amount_cents:
         return jsonify({"error": "Invalid credit pack"}), 400
     user_id = int(get_jwt_identity())
-    return_url = request.host_url.rstrip("/")
+    return_url = _frontend_url()
     try:
         session = stripe.checkout.Session.create(
             mode="payment",
@@ -119,14 +123,50 @@ def create_credit_checkout() -> tuple:
                 },
                 "quantity": 1,
             }],
-            success_url=f"{return_url}/app?checkout=success",
-            cancel_url=f"{return_url}/app?checkout=cancelled",
+            success_url=f"{return_url}/app/checkout?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{return_url}/app/checkout?checkout=cancelled",
             metadata={"user_id": user_id, "credits": credits, "kind": "credit_pack"},
         )
         return jsonify({"url": session.url}), 200
     except Exception as exc:
         print(f"Stripe error: {exc}")
         return jsonify({"error": "Internal server error"}), 500
+
+
+@payments_bp.get("/checkout/session/<session_id>")
+@require_auth
+def get_checkout_session(session_id: str) -> tuple:
+    """Look up a completed Checkout Session for display on the success page.
+
+    Reads directly from Stripe rather than local state so the amount shown
+    is accurate immediately on redirect, without waiting on the webhook.
+    Restricted to the session's own owner via its metadata.user_id.
+    """
+    stripe, err = _stripe_client()
+    if err:
+        return err
+    user_id = int(get_jwt_identity())
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as exc:
+        print(f"Stripe error: {exc}")
+        return jsonify({"error": "Checkout session not found"}), 404
+    metadata = session.get("metadata") or {}
+    if metadata.get("user_id") != str(user_id):
+        return jsonify({"error": "Checkout session not found"}), 404
+    if session.get("status") == "complete":
+        try:
+            _fulfill_checkout_session(session_id, session, already_claimed=False)
+        except Exception as exc:
+            print(f"Checkout fulfillment error: {exc}")
+    return jsonify({
+        "status": session.get("payment_status"),
+        "amountTotal": session.get("amount_total"),
+        "currency": session.get("currency"),
+        "kind": metadata.get("kind") or ("subscription" if session.get("mode") == "subscription" else "credit_pack"),
+        "plan": metadata.get("plan"),
+        "credits": int(metadata["credits"]) if metadata.get("credits") else None,
+    }), 200
 
 
 @payments_bp.post("/portal")
@@ -149,7 +189,7 @@ def create_portal() -> tuple:
         cnx.close()
     if not customer:
         return jsonify({"error": "No billing account found for this user"}), 404
-    return_url = request.host_url.rstrip("/")
+    return_url = _frontend_url()
     try:
         session = stripe.billing_portal.Session.create(
             customer=customer["stripe_id"],
@@ -210,13 +250,28 @@ def stripe_webhook() -> tuple:
     return jsonify({"received": True}), 200
 
 
-def _handle_webhook_event(event: dict) -> None:
-    event_type = event.get("type", "")
-    obj = event.get("data", {}).get("object", {})
+def _fulfill_checkout_session(session_id: str, obj: dict, already_claimed: bool) -> None:
+    """Grant the credits/plan for a completed Checkout Session.
 
-    if event_type == "checkout.session.completed":
+    Called from both the webhook (`checkout.session.completed`) and, as a
+    synchronous fallback, from the session-lookup endpoint the success page
+    polls — so a purchase is reflected immediately even if the webhook is
+    slow, misconfigured, or (in local dev) not forwarded at all.
+
+    The webhook has already claimed this event by its Stripe event id before
+    calling in here (`already_claimed=True`), so it owns dedup/retry via that
+    claim and this function must not take out — or release — a second,
+    session-scoped claim of its own. The session-lookup endpoint has no such
+    claim, so it takes one out itself (`already_claimed=False`) to stay a
+    no-op against a webhook delivery that's already fulfilling (or already
+    fulfilled) the same session.
+    """
+    cnx = get_connection()
+    try:
+        if not already_claimed:
+            if not claim_stripe_event(cnx, f"checkout_session:{session_id}", "checkout_session_fulfillment"):
+                return
         metadata = obj.get("metadata") or {}
-        cnx = get_connection()
         try:
             if metadata.get("kind") == "credit_pack":
                 user_id = int(metadata["user_id"])
@@ -228,8 +283,20 @@ def _handle_webhook_event(event: dict) -> None:
                 customer_id = obj.get("customer", "")
                 upsert_stripe_customer(cnx, user_id, customer_id, plan, "active")
                 set_plan_and_credits(cnx, user_id, plan, PLAN_CREDITS.get(plan, 0))
-        finally:
-            cnx.close()
+        except Exception:
+            if not already_claimed:
+                release_stripe_event(cnx, f"checkout_session:{session_id}")
+            raise
+    finally:
+        cnx.close()
+
+
+def _handle_webhook_event(event: dict) -> None:
+    event_type = event.get("type", "")
+    obj = event.get("data", {}).get("object", {})
+
+    if event_type == "checkout.session.completed":
+        _fulfill_checkout_session(obj.get("id", ""), obj, already_claimed=True)
 
     elif event_type == "invoice.payment_succeeded":
         # Fired on subscription renewal (and the first invoice) — this is

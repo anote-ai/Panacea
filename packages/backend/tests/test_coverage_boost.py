@@ -549,8 +549,10 @@ def test_payments_checkout_success(client, auth_headers):
             assert call_kwargs["line_items"] == [
                 {"price": "price_server_owned", "quantity": 1},
             ]
-            assert call_kwargs["success_url"] == "http://localhost/app?checkout=success"
-            assert call_kwargs["cancel_url"] == "http://localhost/app?checkout=cancelled"
+            assert call_kwargs["success_url"] == (
+                "http://localhost:3000/app/checkout?checkout=success&session_id={CHECKOUT_SESSION_ID}"
+            )
+            assert call_kwargs["cancel_url"] == "http://localhost:3000/app/checkout?checkout=cancelled"
 
 
 def test_payments_portal_success(client, auth_headers):
