@@ -1,0 +1,119 @@
+{#-
+  Custom header, based on material/templates/partials/header.html, restyled to
+  match code.claude.com/docs' header layout: logo, language selector, a pill
+  search bar, an "Ask Assistant" link, and right-aligned product nav links.
+
+  Ported from anote-ai/Documentation (the repo behind docs.anote.ai) so this
+  site follows the same style guide.
+
+  NOTE: the URLs below (chat.anote.ai, anote.ai) are best-guess placeholders
+  based on context in this conversation, not confirmed production URLs —
+  swap them for the real ones before this ships.
+-#}
+{% set class = "md-header" %}
+{% if "navigation.tabs.sticky" in features %}
+  {% set class = class ~ " md-header--shadow md-header--lifted" %}
+{% elif "navigation.tabs" not in features %}
+  {% set class = class ~ " md-header--shadow" %}
+{% endif %}
+<header class="{{ class }} anote-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
+    <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo anote-header__logo" aria-label="{{ config.site_name }}" data-md-component="logo">
+      {% include "partials/logo.html" %}
+      <span class="anote-header__site-name">{{ config.site_name }}</span>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      {% set icon = config.theme.icon.menu or "material/menu" %}
+      {% include ".icons/" ~ icon ~ ".svg" %}
+    </label>
+
+    {% set lang_menu = config.extra.language_menu or config.extra.alternate %}
+    {% if lang_menu %}
+      <details class="anote-header__lang">
+        <summary>
+          <span class="anote-header__lang-label">{{ lang_menu[0].name }}</span>
+          {% include ".icons/material/chevron-down.svg" %}
+        </summary>
+        <ul class="anote-header__lang-menu">
+          {% for alt in lang_menu %}
+            <li class="anote-header__lang-menu-item{% if loop.first %} anote-header__lang-menu-item--active{% endif %}">
+              <a href="{{ alt.link | url }}" hreflang="{{ alt.lang }}">
+                <span>{{ alt.name }}</span>
+                {% if loop.first %}{% include ".icons/material/check.svg" %}{% endif %}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+
+    {% if "material/search" in config.plugins %}
+      {% set search = config.plugins["material/search"] | attr("config") %}
+      {% if search.enabled %}
+        <label class="md-header__button anote-header__search-pill md-icon" for="__search">
+          {% set icon = config.theme.icon.search or "material/magnify" %}
+          {% include ".icons/" ~ icon ~ ".svg" %}
+          <span class="anote-header__search-label">Search...</span>
+          <span class="anote-header__search-kbd">⌘K</span>
+        </label>
+        {% include "partials/search.html" %}
+      {% endif %}
+    {% endif %}
+
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            {{ config.site_name }}
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            {% if page.meta and page.meta.title %}
+              {{ page.meta.title }}
+            {% else %}
+              {{ page.title }}
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="anote-header__links" aria-label="Product">
+      <a href="https://chat.anote.ai/" target="_blank" rel="noopener">Panacea Developer Platform</a>
+    </nav>
+
+    {% if config.theme.palette %}
+      {% if not config.theme.palette is mapping %}
+        {% include "partials/palette.html" %}
+        <details class="anote-header__theme">
+          <summary>
+            <span class="anote-header__theme-icon anote-header__theme-icon--system">{% include ".icons/material/monitor.svg" %}</span>
+            <span class="anote-header__theme-icon anote-header__theme-icon--light">{% include ".icons/material/white-balance-sunny.svg" %}</span>
+            <span class="anote-header__theme-icon anote-header__theme-icon--dark">{% include ".icons/material/moon-waning-crescent.svg" %}</span>
+            <span class="anote-header__theme-chevron">{% include ".icons/material/chevron-down.svg" %}</span>
+          </summary>
+          <ul class="anote-header__theme-menu">
+            <li><label for="__palette_0" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/monitor.svg" %}<span>System</span></label></li>
+            <li><label for="__palette_1" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/white-balance-sunny.svg" %}<span>Light</span></label></li>
+            <li><label for="__palette_2" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/moon-waning-crescent.svg" %}<span>Dark</span></label></li>
+          </ul>
+        </details>
+      {% endif %}
+    {% endif %}
+    {% if not config.theme.palette is mapping %}
+      {% include "partials/javascripts/palette.html" %}
+    {% endif %}
+
+    {% if config.repo_url %}
+      <div class="md-header__source anote-header__source">
+        {% include "partials/source.html" %}
+      </div>
+    {% endif %}
+  </nav>
+  {% if "navigation.tabs.sticky" in features %}
+    {% if "navigation.tabs" in features %}
+      {% include "partials/tabs.html" %}
+    {% endif %}
+  {% endif %}
+</header>

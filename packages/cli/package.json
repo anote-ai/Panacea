@@ -1,6 +1,6 @@
 {
   "name": "@anote-ai/anote",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Anote's AI coding assistant — CLI, web UI, VS Code extension",
   "keywords": [
     "ai",

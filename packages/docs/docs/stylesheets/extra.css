@@ -1,88 +1,619 @@
-/*
-  Re-skin Material for MkDocs to match the Panacea web app's monochrome
-  ChatGPT-style palette (packages/web/src/index.css, App.tsx, ChatPage.tsx)
-  instead of Material's default indigo theme. No color accent — buttons,
-  links, and highlights are all black/white, same as the app.
+/* Anote brand skin for Material for MkDocs.
+   Palette matches packages/web/tailwind.config.js (the actual Anote product UI) —
+   warm off-white / near-black, monochrome accent. Layout + header follow
+   code.claude.com/docs' structure (see overrides/partials/header.html for the
+   template that adds the language selector, search pill, Ask Assistant link,
+   and right-aligned product nav).
 
-  !important is required here: Material's compiled palette CSS keys several
-  of these variables off compound attribute selectors (e.g.
-  [data-md-color-scheme][data-md-color-accent]) that outrank a plain
-  [data-md-color-scheme="slate"] selector on specificity alone.
-*/
+   Ported from anote-ai/Documentation (docs.anote.ai) so this site follows the
+   same style guide. */
 
-:root, [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #ffffff !important;
-  --md-primary-fg-color--light: #ffffff !important;
-  --md-primary-fg-color--dark: #ffffff !important;
-  --md-primary-bg-color: #111111 !important;
-  --md-primary-bg-color--light: #4b5563 !important;
+:root {
+  --md-primary-fg-color: #26221f;
+  --md-primary-fg-color--light: #26221f;
+  --md-primary-fg-color--dark: #26221f;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffff;
+}
 
-  --md-accent-fg-color: #111111 !important;
-  --md-accent-fg-color--transparent: rgba(17, 17, 17, 0.1) !important;
-  --md-accent-bg-color: #ffffff !important;
-
-  --md-default-bg-color: #ffffff !important;
-  --md-default-fg-color: #111111 !important;
-  --md-default-fg-color--light: #4b5563 !important;
-  --md-default-fg-color--lighter: #9ca3af !important;
-  --md-default-fg-color--lightest: #e5e7eb !important;
-
-  --md-typeset-a-color: #111111 !important;
-
-  --md-code-bg-color: #f7f7f8 !important;
-  --md-code-fg-color: #111111 !important;
-
-  --md-footer-bg-color: #f7f7f8 !important;
-  --md-footer-bg-color--dark: #f7f7f8 !important;
-  --md-footer-fg-color: #111111 !important;
-  --md-footer-fg-color--light: #4b5563 !important;
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #faf7f0;
+  --md-default-fg-color: #2c2c2a;
+  --md-default-fg-color--light: #888780;
+  --md-default-fg-color--lighter: #d3d1c7;
+  --md-accent-fg-color: #2c2c2a;
+  --md-accent-fg-color--transparent: rgba(44, 44, 42, 0.08);
+  --md-accent-bg-color: #ffffff;
+  --md-typeset-a-color: #2c2c2a;
+  --md-footer-bg-color: #26221f;
+  --md-footer-bg-color--dark: #1c1917;
+  --md-footer-fg-color: #faf7f0;
+  --md-footer-fg-color--light: #d3d1c7;
+  --md-code-bg-color: #f1efe8;
+  --md-code-fg-color: #2c2c2a;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #171717 !important;
-  --md-primary-fg-color--light: #171717 !important;
-  --md-primary-fg-color--dark: #171717 !important;
-  --md-primary-bg-color: #ffffff !important;
-  --md-primary-bg-color--light: #d1d5db !important;
-
-  --md-accent-fg-color: #ffffff !important;
-  --md-accent-fg-color--transparent: rgba(255, 255, 255, 0.1) !important;
-  --md-accent-bg-color: #111111 !important;
-
-  --md-default-bg-color: #212121 !important;
-  --md-default-fg-color: #ffffff !important;
-  --md-default-fg-color--light: #d1d5db !important;
-  --md-default-fg-color--lighter: #9ca3af !important;
-  --md-default-fg-color--lightest: #4b5563 !important;
-
-  --md-typeset-a-color: #ffffff !important;
-
-  --md-code-bg-color: #2f2f2f !important;
-  --md-code-fg-color: #e5e7eb !important;
-
-  --md-footer-bg-color: #171717 !important;
-  --md-footer-bg-color--dark: #171717 !important;
-  --md-footer-fg-color: #ffffff !important;
-  --md-footer-fg-color--light: #d1d5db !important;
+  --md-default-bg-color: #26221f;
+  --md-default-fg-color: #f1efe8;
+  --md-default-fg-color--light: #a6a59c;
+  --md-default-fg-color--lighter: #4a453e;
+  --md-accent-fg-color: #f1efe8;
+  --md-accent-fg-color--transparent: rgba(241, 239, 232, 0.1);
+  --md-accent-bg-color: #26221f;
+  --md-typeset-a-color: #f1efe8;
+  --md-footer-bg-color: #1c1917;
+  --md-footer-bg-color--dark: #131110;
+  --md-code-bg-color: #332f28;
+  --md-code-fg-color: #f1efe8;
 }
 
-/* Same system font stack as packages/web/src/index.css, so text renders
-   identically whether you're on the app or the docs. */
-:root {
-  --md-text-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  --md-code-font: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace !important;
+/* code.claude.com/docs loads a private font ("Anthropic Sans", self-hosted
+   on Anthropic's own CDN — verified it 400s from Google Fonts, not public).
+   Their own CSS variable is literally named --font-inter, so Inter is what
+   it falls back to — and it's a real, public Google Font. Closest
+   legitimate match to "same to same" without their private font files. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+body,
+.md-typeset {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Nav sidebar active/hover items: Material dims these via accent opacity,
-   which reads fine already once --md-accent-fg-color is monochrome. */
-.md-nav__link--active,
+/* Sizes/weights matched from code.claude.com/docs' compiled CSS */
+.md-typeset h1 {
+  font-size: 2.5rem;
+  line-height: 3.25rem;
+  font-weight: 800;
+}
+
+.md-typeset h2 {
+  margin-top: 3rem;
+  margin-bottom: 0.8rem;
+  font-size: 1.7rem;
+  line-height: 2rem;
+  font-weight: 700;
+}
+
+.md-typeset h3 {
+  margin-top: 2.5rem;
+  margin-bottom: 0.8rem;
+  font-size: 1.4rem;
+  line-height: 1.625rem;
+  font-weight: 600;
+}
+
+/* Links: underline instead of a foreign accent color — matches the monochrome brand */
+.md-typeset a {
+  text-decoration: underline;
+  text-decoration-color: var(--md-default-fg-color--lighter);
+  text-underline-offset: 2px;
+}
+
+.md-typeset a:hover {
+  text-decoration-color: currentColor;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Buttons — solid black (light) / solid white (dark), like the product's own CTAs */
+.md-typeset .md-button {
+  border-radius: 999px;
+  border-color: var(--md-default-fg-color);
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--md-default-fg-color);
+  border-color: var(--md-default-fg-color);
+  color: var(--md-default-bg-color);
+}
+
+/* Tabbed "Get started" surfaces */
+.md-typeset .tabbed-set {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lighter);
+}
+
+.md-typeset .tabbed-labels {
+  background-color: var(--md-code-bg-color);
+}
+
+.md-typeset .tabbed-labels > label {
+  font-weight: 600;
+}
+
+.md-typeset .tabbed-labels > label.tabbed-label--active,
+.md-typeset .tabbed-set > input:checked + label {
+  color: var(--md-default-fg-color);
+  opacity: 1;
+}
+
+.md-typeset .tabbed-content {
+  padding: 0.2rem 1.2rem 1rem;
+}
+
+/* Collapsible "What you can do" cards — force every admonition/detail type
+   (note, tip, bug, example, question, abstract, search, info, ...) to the
+   same neutral styling. Material's built-in per-type selectors are more
+   specific than a bare .admonition/.details rule, so !important is needed
+   here to actually win that battle and keep the look monochrome. */
+.md-typeset details,
+.md-typeset .admonition {
+  border-radius: 10px !important;
+  border: 1px solid var(--md-default-fg-color--lighter) !important;
+  border-left-width: 4px !important;
+}
+
+.md-typeset details > summary,
+.md-typeset .admonition-title {
+  font-weight: 600;
+  background-color: var(--md-code-bg-color) !important;
+}
+
+.md-typeset details > summary::before,
+.md-typeset .admonition-title::before {
+  background-color: var(--md-default-fg-color) !important;
+}
+
+.md-typeset details > summary::after,
+.md-typeset .admonition-title::after {
+  color: var(--md-default-fg-color) !important;
+}
+
+.md-typeset .admonition:focus-within,
+.md-typeset details:focus-within {
+  box-shadow: 0 0 0 0.2rem var(--md-accent-fg-color--transparent) !important;
+}
+
+/* Routing tables ("Use Panacea everywhere") */
+.md-typeset table:not([class]) {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lighter);
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-code-bg-color);
+}
+
+.md-typeset pre > code {
+  border-radius: 8px;
+}
+
+/* Sidebar — bold, always-expanded section headers with generous spacing,
+   and a rounded pill highlight on the active item (needs navigation.sections
+   + navigation.expand in theme.features, already set above). */
+.md-nav__title {
+  margin-top: 1.3rem;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color);
+}
+
+.md-nav__item {
+  margin: 0.05rem 0;
+}
+
+.md-nav__link {
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  color: var(--md-default-fg-color--light);
+  transition: background-color 0.15s, color 0.15s;
+}
+
 .md-nav__link:focus,
 .md-nav__link:hover {
-  color: var(--md-accent-fg-color);
+  color: var(--md-default-fg-color);
+  background-color: var(--md-code-bg-color);
 }
 
-/* Rounded, borderless code blocks matching the app's chat/card corners. */
-.md-typeset pre > code,
-.md-typeset code {
-  border-radius: 6px;
+.md-nav__link--active {
+  color: var(--md-default-fg-color);
+  background-color: var(--md-code-bg-color);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Header — Claude-Code-docs-style layout: logo, language selector, a pill
+ * search bar, an "Ask Assistant" link, then product nav pushed to the right.
+ * ---------------------------------------------------------------------- */
+
+.anote-header .md-header__inner {
+  gap: 0.9rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+/* Logo + site name, side by side, like "🌸 Claude Code Docs" */
+.anote-header__logo {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.25rem;
+}
+
+/* Always shown right next to the logo, at every screen size — unlike the
+   rest of the header chrome below, this one does not collapse. */
+.anote-header__site-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+/* The page-title breadcrumb is kept in the DOM (it drives the search-open
+   flex transition) but fully hidden — Claude's header doesn't show one, and
+   the logo + site name above now plays that role. */
+.anote-header .md-header__title {
+  visibility: hidden;
+}
+
+.anote-header__lang {
+  position: relative;
+  display: none;
+}
+
+.anote-header__lang summary {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+}
+
+.anote-header__lang summary::-webkit-details-marker,
+.anote-header__lang summary::marker {
+  display: none;
+  content: "";
+}
+
+.anote-header__lang summary:hover {
+  color: #ffffff;
+  opacity: 0.75;
+}
+
+.anote-header__lang svg {
+  fill: currentColor;
+  width: 0.8rem;
+  height: 0.8rem;
+  transition: transform 0.2s;
+}
+
+.anote-header__lang[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.anote-header__lang-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  z-index: 10;
+  min-width: 10rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.4rem;
+  list-style: none;
+  border-radius: 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-default-bg-color);
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.anote-header__lang-menu-item a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.4rem;
+  color: var(--md-default-fg-color) !important;
+  font-size: 0.85rem;
+  text-decoration: none !important;
+}
+
+.anote-header__lang-menu-item a:hover {
+  background-color: var(--md-code-bg-color);
+}
+
+.anote-header__lang-menu-item a svg {
+  fill: var(--md-default-fg-color);
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.anote-header__lang-menu-item--active a {
+  font-weight: 600;
+}
+
+/* System/Light/Dark theme dropdown — same visual pattern as the language
+   dropdown, but each item is a <label for="__palette_N"> that directly
+   selects that palette entry via native radio-button behavior (no JS). */
+.anote-header__theme {
+  position: relative;
+  display: flex;
+}
+
+.anote-header__theme summary {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: #ffffff;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.4rem;
+  border-radius: 0.5rem;
+}
+
+.anote-header__theme summary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.anote-header__theme summary::-webkit-details-marker,
+.anote-header__theme summary::marker {
+  display: none;
+  content: "";
+}
+
+.anote-header__theme summary svg {
+  fill: currentColor;
+}
+
+.anote-header__theme-icon {
+  display: none;
+  align-items: center;
+}
+
+.anote-header__theme-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.anote-header__theme-chevron {
+  display: flex;
+  align-items: center;
+}
+
+.anote-header__theme-chevron svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.anote-header__theme[open] .anote-header__theme-chevron svg {
+  transform: rotate(180deg);
+}
+
+/* Show only the icon matching the currently-selected palette radio.
+   #__palette_0 = System, #__palette_1 = Light, #__palette_2 = Dark. */
+.anote-header__theme-icon--system {
+  display: flex;
+}
+
+.md-header__option:has(#__palette_1:checked) ~ .anote-header__theme .anote-header__theme-icon--system,
+.md-header__option:has(#__palette_2:checked) ~ .anote-header__theme .anote-header__theme-icon--system {
+  display: none;
+}
+
+.md-header__option:has(#__palette_1:checked) ~ .anote-header__theme .anote-header__theme-icon--light {
+  display: flex;
+}
+
+.md-header__option:has(#__palette_2:checked) ~ .anote-header__theme .anote-header__theme-icon--dark {
+  display: flex;
+}
+
+.anote-header__theme-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 10;
+  min-width: 9rem;
+  margin: 0;
+  padding: 0.4rem;
+  list-style: none;
+  border-radius: 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-default-bg-color);
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.anote-header__theme-menu li label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.4rem;
+  color: var(--md-default-fg-color) !important;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.anote-header__theme-menu li label:hover {
+  background-color: var(--md-code-bg-color);
+}
+
+.anote-header__theme-menu li label svg {
+  fill: var(--md-default-fg-color);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.anote-header__search-pill {
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  min-width: 19rem;
+  margin: 0;
+  padding: 0 0.75rem 0 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.anote-header__search-pill:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.anote-header__search-pill svg {
+  fill: currentColor;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.anote-header__search-label {
+  flex: 1;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.anote-header__search-kbd {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Expanded search overlay — Material ships this with near-sharp corners
+   (0.1rem radius); round it to match the trigger pill's rounded-rectangle
+   look and give it a clean shadow instead of the flat default. */
+.md-search__form {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12) !important;
+}
+
+.md-search__output {
+  border-bottom-left-radius: 0.75rem !important;
+  border-bottom-right-radius: 0.75rem !important;
+}
+
+@media screen and (min-width: 60em) {
+  .md-search__form {
+    border-radius: 0.75rem !important;
+  }
+}
+
+.anote-header__links {
+  display: none;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.anote-header__links a {
+  color: #ffffff !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.anote-header__links a:hover {
+  color: #ffffff !important;
+  opacity: 0.75;
+}
+
+/* Solid CTA pill — the one high-contrast element in the header */
+.anote-header__cta {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background-color: var(--md-default-fg-color) !important;
+  color: var(--md-default-bg-color) !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.anote-header__cta svg {
+  fill: currentColor;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.anote-header__cta:hover {
+  opacity: 0.85;
+}
+
+/* Light/Dark/System palette toggle (replaces the old desktop-icon slot) */
+.anote-header .md-header__option {
+  display: flex;
+  align-items: center;
+}
+
+.anote-header .md-header__option .md-header__button {
+  color: #ffffff;
+}
+
+/* Claude's header doesn't show a GitHub star-count widget — hide it here too */
+.anote-header__source {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Secondary nav-tabs row — light background with a bold+underlined active
+ * tab, instead of Material's default dark colored bar.
+ * ---------------------------------------------------------------------- */
+
+/* Continues the header's fixed-dark bar rather than switching to a light
+   strip — keeps "Home", "Getting Started", etc. readable in white. */
+.md-tabs {
+  background-color: var(--md-primary-fg-color);
+  color: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.md-tabs__item {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.md-tabs__link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.md-tabs__link:focus,
+.md-tabs__link:hover {
+  color: #ffffff;
+  opacity: 1;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 0 0 #ffffff;
+}
+
+/* Only show the expanded header chrome once there's room — mirrors how
+   Claude's header collapses to just logo + search + drawer on small screens. */
+@media screen and (min-width: 76.25em) {
+  .anote-header__lang,
+  .anote-header__links {
+    display: flex;
+  }
 }

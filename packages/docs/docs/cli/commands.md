@@ -60,7 +60,7 @@ Check your environment for configuration issues.
 anote doctor
 ```
 
-Checks: Node.js version, API keys, config file, CLAUDE.md, semantic index, Anote server, git, gh CLI.
+Checks: Node.js ≥ 18, `ANTHROPIC_API_KEY` set, `.anote.json` present, `CLAW.md` present, git installed.
 
 ## `anote changelog`
 

@@ -56,4 +56,36 @@ If Docker is installed but not running, start Docker Desktop first or `docker co
 
 For native local development and testing instructions, see [`CODEBASE_SETUP.md`](/Users/natanvidra/Workspace/Autonomous-Intelligence/CODEBASE_SETUP.md).
 
+### Publishing
+
+#### VS Code Extension
+
+```bash
+rm -rf /tmp/anote-vscode-package
+mkdir -p /tmp/anote-vscode-package
+rsync -a packages/vscode/ /tmp/anote-vscode-package/
+cd /tmp/anote-vscode-package
+npm install
+npm run build
+npx vsce login Anote
+npx vsce publish
+```
+
+#### npm CLI Package
+
+```bash
+cd packages/cli
+npm login          # enter your npm credentials
+npm publish --access public      # builds automatically via prepublishOnly
+```
+
+#### Troubleshooting
+
+If cloning the private repository fails, authenticate GitHub CLI first:
+
+```bash
+brew install gh
+gh auth login
+```
+
 For any questions or issues, please [join our slack community](https://join.slack.com/t/anote-ai/shared_invite/zt-2vdh1p5xt-KWvtBZEprhrCzU6wrRPwNA) or [contact us](mailto:nvidra@anote.ai).

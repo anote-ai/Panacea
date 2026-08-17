@@ -1,31 +1,39 @@
-site_name: Anote AI
+site_name: Anote Panacea Docs
 site_url: https://docs.anote.ai
 site_description: Unified AI coding assistant and chatbot platform
 site_author: Anote AI
 
-repo_name: anote-ai/autonomous-intelligence
-repo_url: https://github.com/anote-ai/Autonomous-Intelligence
+repo_name: anote-ai/Panacea
+repo_url: https://github.com/anote-ai/Panacea
+
+extra:
+  homepage: https://anote.ai
+  # `extra.alternate` is no longer hand-maintained here — the i18n plugin
+  # below (reconfigure_material: true) populates it automatically from the
+  # `languages` list, with real per-language URLs and correct hreflang tags.
 
 theme:
   name: material
-  logo: assets/anote-icon.png
-  favicon: assets/anote-icon.png
+  custom_dir: overrides
   font: false
+  # Three-way palette: System (auto, follows OS) / Light / Dark. No `toggle:`
+  # keys here on purpose — Material's own toggle is a single cycling button;
+  # we render our own System/Light/Dark dropdown instead (see
+  # overrides/partials/header.html), wired to these same hidden radio inputs
+  # via plain <label for="__palette_N"> — no custom JS needed.
   palette:
-    - scheme: slate
+    - media: "(prefers-color-scheme)"
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: black
-      accent: indigo
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-    - scheme: default
-      primary: white
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
+      accent: light blue
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: light blue
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.top
@@ -35,12 +43,59 @@ theme:
     - content.code.annotate
   icon:
     repo: fontawesome/brands/github
+  logo: assets/rocketlogo.png
+  favicon: assets/favicon-removebg-preview.png
+
+extra_css:
+  - stylesheets/extra.css
 
 extra_css:
   - stylesheets/extra.css
 
 plugins:
   - search
+  - i18n:
+      docs_structure: suffix
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+        - locale: fr
+          name: Français
+          build: true
+        - locale: de
+          name: Deutsch
+          build: true
+        - locale: it
+          name: Italiano
+          build: true
+        - locale: ja
+          name: 日本語
+          build: true
+        - locale: es
+          name: Español
+          build: true
+        - locale: ko
+          name: 한국어
+          build: true
+        - locale: zh
+          name: 简体中文
+          build: true
+        - locale: zh-Hant
+          name: 繁體中文
+          build: true
+        - locale: ru
+          name: Русский
+          build: true
+        - locale: id
+          name: Bahasa Indonesia
+          build: true
+        - locale: pt-BR
+          name: Português (BR)
+          build: true
 
 markdown_extensions:
   - admonition
@@ -61,7 +116,17 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
+    - Changelog: getting-started/changelog.md
     - Configuration: getting-started/configuration.md
+  - Core Concepts:
+    - How Panacea Works: core-concepts/how-it-works.md
+    - Extend Panacea: core-concepts/extend.md
+    - Explore the .anote Directory: core-concepts/anote-directory.md
+  - Use Panacea:
+    - Permission Modes: use-panacea/permission-modes.md
+    - Manage Sessions: use-panacea/sessions.md
+    - Common Workflows: use-panacea/common-workflows.md
+    - Prompt Library: use-panacea/prompt-library.md
   - CLI:
     - Overview: cli/overview.md
     - Commands: cli/commands.md
