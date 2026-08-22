@@ -352,7 +352,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setCreditsError(null);
     try {
       const res = await axios.post(
-        '/api/payments/credits/checkout',
+        `${API_BASE_URL}/api/payments/credits/checkout`,
         { credits },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -372,7 +372,7 @@ export default function SettingsModal({ open, onClose }: Props) {
     setBillingError(null);
     try {
       const res = await axios.post(
-        '/api/payments/checkout',
+        `${API_BASE_URL}/api/payments/checkout`,
         {
           plan: plan.plan,
         },
