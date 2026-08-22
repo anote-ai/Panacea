@@ -347,54 +347,46 @@ export default function SettingsModal({ open, onClose }: Props) {
     }
   }, [authHeaders]);
 
-  /**
-   * Redirect to Stripe checkout for a one-time credit top-up.
-   * `credits` is the pack size (e.g. 1000).
-   */
-  const buyCredits = useCallback(
-    async (credits: number) => {
-      setBuyingPack(credits);
-      setCreditsError(null);
-      try {
-        const res = await axios.post(
-          `${API_BASE_URL}/api/payments/credits/checkout`,
-          { credits },
-          { headers: authHeaders },
-        );
-        window.location.href = res.data.url;
-      } catch (err) {
-        setCreditsError(extractError(err, 'Unable to start checkout.'));
-      } finally {
-        setBuyingPack(null);
-      }
-    },
-    [authHeaders],
-  );
+  const buyCredits = async (credits: number) => {
+    setBuyingPack(credits);
+    setCreditsError(null);
+    try {
+      const res = await axios.post(
+        '/api/payments/credits/checkout',
+        { credits },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      window.location.href = res.data.url;
+    } catch (err: any) {
+      setCreditsError(
+        err?.response?.data?.error || err?.message || 'Unable to start checkout.',
+      );
+    } finally {
+      setBuyingPack(null);
+    }
+  };
 
-  /**
-   * Redirect to Stripe checkout for a subscription plan upgrade.
-   * Guards against unavailable (unconfigured) plans before issuing any request.
-   */
-  const upgradePlan = useCallback(
-    async (plan: PlanInfo) => {
-      if (!plan.available) return;
-      setUpgradingPlan(plan.plan);
-      setBillingError(null);
-      try {
-        const res = await axios.post(
-          `${API_BASE_URL}/api/payments/checkout`,
-          { plan: plan.plan },
-          { headers: authHeaders },
-        );
-        window.location.href = res.data.url;
-      } catch (err) {
-        setBillingError(extractError(err, 'Unable to start checkout.'));
-      } finally {
-        setUpgradingPlan(null);
-      }
-    },
-    [authHeaders],
-  );
+  const upgradePlan = async (plan: PlanInfo) => {
+    if (!plan.available) return;
+    setUpgradingPlan(plan.plan);
+    setBillingError(null);
+    try {
+      const res = await axios.post(
+        '/api/payments/checkout',
+        {
+          plan: plan.plan,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      window.location.href = res.data.url;
+    } catch (err: any) {
+      setBillingError(
+        err?.response?.data?.error || err?.message || 'Unable to start checkout.',
+      );
+    } finally {
+      setUpgradingPlan(null);
+    }
+  };
 
   // --- Render guard ---
   if (!open) return null;
