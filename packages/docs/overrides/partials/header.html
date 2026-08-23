@@ -29,17 +29,28 @@
 
     {% set lang_menu = config.extra.language_menu or config.extra.alternate %}
     {% if lang_menu %}
+      {#- Determine current language: config.theme.language is set per-build by
+          the i18n plugin (e.g. "en", "ja", "fr"). We fall back to "en". -#}
+      {% set current_lang = config.theme.language | d("en", true) %}
+      {#- Find the display name for the current language -#}
+      {% set current_name = namespace(value=lang_menu[0].name) %}
+      {% for alt in lang_menu %}
+        {% if alt.lang == current_lang %}
+          {% set current_name.value = alt.name %}
+        {% endif %}
+      {% endfor %}
       <details class="anote-header__lang">
         <summary>
-          <span class="anote-header__lang-label">{{ lang_menu[0].name }}</span>
+          <span class="anote-header__lang-label">{{ current_name.value }}</span>
           {% include ".icons/material/chevron-down.svg" %}
         </summary>
         <ul class="anote-header__lang-menu">
           {% for alt in lang_menu %}
-            <li class="anote-header__lang-menu-item{% if loop.first %} anote-header__lang-menu-item--active{% endif %}">
+            {% set is_active = (alt.lang == current_lang) %}
+            <li class="anote-header__lang-menu-item{% if is_active %} anote-header__lang-menu-item--active{% endif %}">
               <a href="{{ alt.link | url }}" hreflang="{{ alt.lang }}">
                 <span>{{ alt.name }}</span>
-                {% if loop.first %}{% include ".icons/material/check.svg" %}{% endif %}
+                {% if is_active %}{% include ".icons/material/check.svg" %}{% endif %}
               </a>
             </li>
           {% endfor %}
