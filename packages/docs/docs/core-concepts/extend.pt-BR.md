@@ -1,42 +1,42 @@
-# Estender o Panacea
+# Estender Panacea
 
-Duas formas de personalizar como o Panacea se comporta no seu projeto: **CLAW.md** para instruções persistentes, e **hooks** para executar seus próprios comandos ao redor das chamadas de ferramentas.
+Duas maneiras de personalizar como o Panacea se comporta em seu projeto: **CLAW.md** para instruções persistentes e **hooks** para executar seus próprios comandos em torno das chamadas de ferramentas.
 
 ## CLAW.md — memória do projeto
 
-`CLAW.md` é um arquivo markdown que o Panacea lê para obter contexto do projeto — a mesma ideia de um README, mas voltado para o agente em vez de um humano. O `anote init` gera um automaticamente, pré-preenchido com seu stack detectado e comandos de verificação (test/lint/build):
+`CLAW.md` é um arquivo markdown que o Panacea lê para o contexto do projeto — a mesma ideia de um README voltado para o agente em vez de um humano. `anote init` gera um automaticamente, pré-preenchido com sua pilha detectada e comandos de verificação (teste/lint/construção):
 
 ```markdown
 # CLAW.md
 
-This file provides guidance to Anote AI when working with code in this repository.
+Este arquivo fornece orientações para o Anote AI ao trabalhar com código neste repositório.
 
-## Project overview
+## Visão geral do projeto
 
-<!-- Describe what this project does -->
+<!-- Descreva o que este projeto faz -->
 
-## Stack
+## Pilha
 
 TypeScript · Next.js
 
-## Verification
+## Verificação
 
-Run these before considering a change complete:
+Execute estes antes de considerar uma alteração como completa:
 
   npm test
   npm run lint
 
-## Working agreement
+## Acordo de trabalho
 
-- Read relevant files before making changes
-- Run the verification commands after modifying logic
-- Keep changes small and focused
-- Prefer editing existing files over creating new ones
+- Leia arquivos relevantes antes de fazer alterações
+- Execute os comandos de verificação após modificar a lógica
+- Mantenha as alterações pequenas e focadas
+- Prefira editar arquivos existentes em vez de criar novos
 ```
 
-Edite livremente — adicione notas de arquitetura, convenções, ou coisas que o agente continua errando. O Panacea o lê no início de cada sessão naquele diretório.
+Edite-o livremente — adicione notas de arquitetura, convenções ou coisas que o agente continua errando. O Panacea o lê no início de cada sessão naquele diretório.
 
-## Hooks — execute seus próprios comandos ao redor das chamadas de ferramentas
+## Hooks — execute seus próprios comandos em torno das chamadas de ferramentas
 
 Hooks executam um comando shell antes (`preToolUse`) ou depois (`postToolUse`) de cada chamada de ferramenta, configurados em `.anote.json`:
 
@@ -49,17 +49,17 @@ Hooks executam um comando shell antes (`preToolUse`) ou depois (`postToolUse`) d
 }
 ```
 
-**Semântica dos códigos de saída:**
+**Semântica do código de saída:**
 
 | Código de saída | Efeito |
 |---|---|
-| `0` | Permitir — stdout é capturado como mensagem informativa |
-| `2` | Negar — stdout é capturado como motivo, mostrado ao agente |
+| `0` | Permitir — stdout é capturado como uma mensagem informativa |
+| `2` | Negar — stdout é capturado como o motivo, mostrado ao agente |
 | qualquer outro | Avisar, mas permitir |
 
-Use `preToolUse` para bloquear comandos arriscados ou aplicar políticas antes que sejam executados; use `postToolUse` para coisas como formatação automática após cada edição.
+Use `preToolUse` para bloquear comandos arriscados ou impor políticas antes que eles sejam executados; use `postToolUse` para coisas como autoformatação após cada edição.
 
 ## Próximos passos
 
-- [Explorar o diretório .anote](anote-directory.md) — onde ficam o CLAW.md e a configuração
+- [Explore o diretório .anote](anote-directory.md) — onde CLAW.md e a configuração estão
 - [Modos de permissão](../use-panacea/permission-modes.md) — a outra alavanca sobre o que o agente pode fazer

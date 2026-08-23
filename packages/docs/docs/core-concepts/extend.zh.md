@@ -1,44 +1,44 @@
 # 扩展 Panacea
 
-有两种方式可以自定义 Panacea 在你项目中的行为：用于持久性指令的 **CLAW.md**，以及用于在工具调用前后运行自定义命令的**钩子（hooks）**。
+有两种方法可以自定义 Panacea 在您的项目中的行为：**CLAW.md** 用于持久指令，以及 **hooks** 用于在工具调用周围运行您自己的命令。
 
 ## CLAW.md — 项目记忆
 
-`CLAW.md` 是 Panacea 用于获取项目上下文而读取的 Markdown 文件 — 概念上类似于 README，只不过面向的是智能体而非人类。`anote init` 会自动生成一个，并预先填入检测到的技术栈和验证命令（test/lint/build）：
+`CLAW.md` 是一个 markdown 文件，Panacea 用于读取项目上下文 — 这个想法与面向代理的 README 相同，而不是面向人类。`anote init` 会自动生成一个，预填充您检测到的堆栈和验证命令（测试/代码检查/构建）：
 
 ```markdown
 # CLAW.md
 
-This file provides guidance to Anote AI when working with code in this repository.
+此文件为 Anote AI 在处理此代码库中的代码时提供指导。
 
-## Project overview
+## 项目概述
 
-<!-- Describe what this project does -->
+<!-- 描述此项目的功能 -->
 
-## Stack
+## 堆栈
 
 TypeScript · Next.js
 
-## Verification
+## 验证
 
-Run these before considering a change complete:
+在考虑更改完成之前运行这些命令：
 
   npm test
   npm run lint
 
-## Working agreement
+## 工作协议
 
-- Read relevant files before making changes
-- Run the verification commands after modifying logic
-- Keep changes small and focused
-- Prefer editing existing files over creating new ones
+- 在进行更改之前阅读相关文件
+- 修改逻辑后运行验证命令
+- 保持更改小而集中
+- 优先编辑现有文件而不是创建新文件
 ```
 
-你可以自由编辑它 — 添加架构说明、约定，或智能体一直出错的地方。Panacea 会在该目录下每次会话开始时读取此文件。
+可以自由编辑 — 添加架构说明、约定或代理经常出错的内容。Panacea 在每次会话开始时都会读取它。
 
-## 钩子 — 在工具调用前后运行自定义命令
+## Hooks — 在工具调用周围运行您自己的命令
 
-钩子会在每次工具调用之前（`preToolUse`）或之后（`postToolUse`）运行一个 shell 命令，在 `.anote.json` 中配置：
+Hooks 在每次工具调用之前（`preToolUse`）或之后（`postToolUse`）运行一个 shell 命令，配置在 `.anote.json` 中：
 
 ```json
 {
@@ -49,17 +49,17 @@ Run these before considering a change complete:
 }
 ```
 
-**退出码语义：**
+**退出代码语义：**
 
-| 退出码 | 效果 |
+| 退出代码 | 效果 |
 |---|---|
-| `0` | 允许 — stdout 会被捕获为提示信息 |
-| `2` | 拒绝 — stdout 会被捕获为拒绝原因，并展示给智能体 |
-| 其他任意值 | 警告但仍然允许 |
+| `0` | 允许 — 标准输出被捕获为信息消息 |
+| `2` | 拒绝 — 标准输出被捕获为原因，显示给代理 |
+| 其他 | 警告但允许 |
 
-使用 `preToolUse` 在风险命令执行前拦截它们或强制执行策略；使用 `postToolUse` 实现诸如每次编辑后自动格式化之类的功能。
+使用 `preToolUse` 阻止风险命令或在它们运行之前强制执行策略；使用 `postToolUse` 进行每次编辑后的自动格式化等操作。
 
 ## 下一步
 
-- [了解 .anote 目录](anote-directory.md) — CLAW.md 和配置文件的存放位置
-- [权限模式](../use-panacea/permission-modes.md) — 控制智能体能做什么的另一个开关
+- [探索 .anote 目录](anote-directory.md) — CLAW.md 和配置所在的位置
+- [权限模式](../use-panacea/permission-modes.md) — 代理可以做的另一种杠杆

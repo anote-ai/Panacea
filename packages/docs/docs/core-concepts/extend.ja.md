@@ -1,44 +1,44 @@
-# Panaceaを拡張する
+# Panaceaの拡張
 
-プロジェクトでのPanaceaの動作をカスタマイズする方法は2つあります：永続的な指示のための **CLAW.md** と、ツール呼び出しの前後で独自のコマンドを実行するための **フック** です。
+Panaceaの動作をプロジェクト内でカスタマイズする方法は2つあります：**CLAW.md**は永続的な指示のためのもので、**hooks**はツール呼び出しの周りで独自のコマンドを実行するためのものです。
 
 ## CLAW.md — プロジェクトメモリ
 
-`CLAW.md` はPanaceaがプロジェクトのコンテキストのために読み取るMarkdownファイルです — 人間ではなくエージェント向けのREADMEのようなものです。`anote init` は検出したスタックと検証コマンド（test/lint/build）を事前に入力した状態で自動的に生成します：
+`CLAW.md`はPanaceaがプロジェクトのコンテキストを読み取るためのマークダウンファイルです — 人間ではなくエージェントを対象としたREADMEのようなものです。`anote init`を実行すると、自動的に生成され、検出されたスタックと検証コマンド（テスト/リンティング/ビルド）で事前に記入されます：
 
 ```markdown
 # CLAW.md
 
-This file provides guidance to Anote AI when working with code in this repository.
+このファイルは、このリポジトリ内のコードで作業する際にAnote AIにガイダンスを提供します。
 
-## Project overview
+## プロジェクト概要
 
-<!-- Describe what this project does -->
+<!-- このプロジェクトが何をするのかを説明 -->
 
-## Stack
+## スタック
 
 TypeScript · Next.js
 
-## Verification
+## 検証
 
-Run these before considering a change complete:
+変更が完了したと考える前に、これらを実行してください：
 
   npm test
   npm run lint
 
-## Working agreement
+## 作業合意
 
-- Read relevant files before making changes
-- Run the verification commands after modifying logic
-- Keep changes small and focused
-- Prefer editing existing files over creating new ones
+- 変更を加える前に関連ファイルを読む
+- ロジックを修正した後に検証コマンドを実行する
+- 変更は小さく、焦点を絞る
+- 新しいファイルを作成するよりも既存のファイルを編集することを優先する
 ```
 
-自由に編集してください — アーキテクチャのメモ、規約、エージェントが繰り返し間違えることなどを追加しましょう。Panaceaはそのディレクトリでの各セッション開始時にこれを読み取ります。
+自由に編集してください — アーキテクチャノート、規約、またはエージェントが繰り返し間違えることを追加できます。Panaceaは、そのディレクトリ内の各セッションの開始時にこれを読み取ります。
 
-## フック — ツール呼び出しの前後で独自のコマンドを実行する
+## Hooks — ツール呼び出しの周りで独自のコマンドを実行
 
-フックは、各ツール呼び出しの前（`preToolUse`）または後（`postToolUse`）にシェルコマンドを実行します。`.anote.json` で設定します：
+Hooksは、各ツール呼び出しの前（`preToolUse`）または後（`postToolUse`）にシェルコマンドを実行し、`.anote.json`で設定されます：
 
 ```json
 {
@@ -49,17 +49,17 @@ Run these before considering a change complete:
 }
 ```
 
-**終了コードのセマンティクス：**
+**終了コードの意味：**
 
 | 終了コード | 効果 |
 |---|---|
-| `0` | 許可 — 標準出力は情報メッセージとしてキャプチャされます |
-| `2` | 拒否 — 標準出力は理由としてキャプチャされ、エージェントに表示されます |
-| それ以外 | 警告するが許可する |
+| `0` | 許可 — stdoutは情報メッセージとしてキャプチャされます |
+| `2` | 拒否 — stdoutは理由としてキャプチャされ、エージェントに表示されます |
+| その他 | 警告を出すが許可 |
 
-`preToolUse` を使って、リスクのあるコマンドを実行前にブロックしたりポリシーを適用したりできます。`postToolUse` は、編集のたびに自動フォーマットするなどの用途に使えます。
+`preToolUse`を使用してリスクのあるコマンドをブロックしたり、実行前にポリシーを強制したりします；`postToolUse`は、編集後の自動フォーマットなどに使用します。
 
 ## 次のステップ
 
-- [.anoteディレクトリを探索する](anote-directory.md) — CLAW.mdと設定がどこにあるか
-- [権限モード](../use-panacea/permission-modes.md) — エージェントが何をできるかを制御するもう一つのレバー
+- [.anoteディレクトリを探る](anote-directory.md) — CLAW.mdと設定が存在する場所
+- [権限モード](../use-panacea/permission-modes.md) — エージェントができることに関するもう一つのレバー

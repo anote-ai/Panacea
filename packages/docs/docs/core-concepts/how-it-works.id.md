@@ -1,36 +1,36 @@
 # Cara Kerja Panacea
 
-Panacea menjalankan **loop agentic**: ia membaca prompt Anda, memutuskan tools mana yang akan dipanggil, mengeksekusinya, membaca hasilnya, dan mengulanginya — melakukan streaming penalaran dan perubahannya kembali kepada Anda — sampai tugas selesai atau mencapai batas turn.
+Panacea menjalankan **loop agensi**: ia membaca prompt Anda, memutuskan alat mana yang akan dipanggil, mengeksekusinya, membaca hasilnya, dan mengulangi — mengalirkan penalaran dan editannya kembali kepada Anda — sampai tugas selesai atau mencapai batas giliran.
 
-## Tools
+## Alat-alat
 
-Secara default, agent Panacea dapat memanggil:
+Secara default, agen Panacea dapat memanggil:
 
-| Tool | Tujuan |
+| Alat | Tujuan |
 |---|---|
 | `Read` | Membaca file |
 | `Write` | Membuat atau menimpa file |
-| `Edit` | Membuat perubahan yang ditargetkan pada file |
+| `Edit` | Melakukan perubahan terarah pada file |
 | `Bash` | Menjalankan perintah shell |
-| `Glob` | Menemukan file berdasarkan pola |
-| `Grep` | Mencari isi file |
+| `Glob` | Mencari file berdasarkan pola |
+| `Grep` | Mencari konten file |
 
-Beberapa perintah mempersempit daftar ini — `anote review` dan `anote diff`, misalnya, hanya mengizinkan `Read`, `Glob`, `Grep`, dan `Bash`, karena review seharusnya tidak menulis file.
+Beberapa perintah mempersempit daftar ini — `anote review` dan `anote diff`, misalnya, hanya memperbolehkan `Read`, `Glob`, `Grep`, dan `Bash`, karena sebuah review seharusnya tidak menulis file.
 
-## Turn dan kompaksi
+## Giliran dan kompaksi
 
-Setiap pasangan panggilan tool/respons dihitung sebagai satu turn. Agent berhenti setelah `maxTurns` (default 30, dapat dikonfigurasi via `anote config set maxTurns <n>` atau `.anote.json`). Sesi panjang akan dikompaksi setelah `compactAfterMessages` (default 40) agar context window tetap terkelola.
+Setiap pasangan panggilan/respons alat dihitung sebagai satu giliran. Agen berhenti setelah `maxTurns` (default 30, dapat dikonfigurasi melalui `anote config set maxTurns <n>` atau `.anote.json`). Sesi panjang dikompaksi setelah `compactAfterMessages` (default 40) untuk menjaga jendela konteks tetap dapat dikelola.
 
 ## Streaming
 
-Setiap permukaan — CLI, VS Code, Web, Desktop — berkomunikasi dengan endpoint backend yang sama (`POST /api/chat/stream`), yang melakukan streaming respons model dan aktivitas tool melalui SSE saat terjadi. Anda dapat melihat pembacaan file, perubahan, dan output perintah secara langsung, bukan hanya jawaban akhir.
+Setiap permukaan — CLI, VS Code, Web, Desktop — berbicara dengan endpoint backend yang sama (`POST /api/chat/stream`), yang mengalirkan respons model dan aktivitas alat melalui SSE saat terjadi. Anda melihat pembacaan file, editan, dan output perintah secara langsung, bukan hanya jawaban akhir.
 
 ## Multi-provider
 
-Loop agent tidak terikat pada satu model. `anote ask --compare` menjalankan prompt yang sama di beberapa model secara berdampingan, dan `--model` pada sebagian besar perintah menerima penyedia mana pun yang telah dikonfigurasi (`claude-sonnet-4-6`, `gpt-4.1`, `gemini-2.5-pro`, atau `ollama/<model>` lokal).
+Loop agen tidak terikat pada satu model. `anote ask --compare` menjalankan prompt yang sama di beberapa model secara berdampingan, dan `--model` pada sebagian besar perintah menerima penyedia yang telah dikonfigurasi (`claude-sonnet-4-6`, `gpt-4.1`, `gemini-2.5-pro`, atau `ollama/<model>` lokal).
 
 ## Langkah selanjutnya
 
-- [Mode Izin](../use-panacea/permission-modes.md) — kendalikan apakah agent bertanya sebelum mengedit file atau menjalankan perintah
-- [Memperluas Panacea](extend.md) — CLAW.md dan hooks
+- [Mode izin](../use-panacea/permission-modes.md) — mengontrol apakah agen meminta izin sebelum mengedit atau menjalankan perintah
+- [Perluas Panacea](extend.md) — CLAW.md dan hooks
 - [Perintah CLI](../cli/commands.md) — referensi perintah lengkap
