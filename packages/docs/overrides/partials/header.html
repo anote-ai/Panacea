@@ -105,9 +105,9 @@
             <span class="anote-header__theme-chevron">{% include ".icons/material/chevron-down.svg" %}</span>
           </summary>
           <ul class="anote-header__theme-menu">
-            <li><label for="__palette_0" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/monitor.svg" %}<span>System</span></label></li>
-            <li><label for="__palette_1" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/white-balance-sunny.svg" %}<span>Light</span></label></li>
-            <li><label for="__palette_2" onclick="this.closest('details').removeAttribute('open')">{% include ".icons/material/moon-waning-crescent.svg" %}<span>Dark</span></label></li>
+            <li><button type="button" onclick="__setTheme('system'); this.closest('details').removeAttribute('open')">{% include ".icons/material/monitor.svg" %}<span>System</span></button></li>
+            <li><button type="button" onclick="__setTheme('light'); this.closest('details').removeAttribute('open')">{% include ".icons/material/white-balance-sunny.svg" %}<span>Light</span></button></li>
+            <li><button type="button" onclick="__setTheme('dark'); this.closest('details').removeAttribute('open')">{% include ".icons/material/moon-waning-crescent.svg" %}<span>Dark</span></button></li>
           </ul>
         </details>
       {% endif %}

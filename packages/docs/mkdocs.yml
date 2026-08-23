@@ -25,7 +25,7 @@ theme:
     - media: "(prefers-color-scheme)"
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: black
+      primary: white
       accent: light blue
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
@@ -49,8 +49,6 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
-extra_css:
-  - stylesheets/extra.css
 
 plugins:
   - search

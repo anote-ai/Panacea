@@ -9,14 +9,20 @@
    same style guide. */
 
 :root {
-  --md-primary-fg-color: #26221f;
-  --md-primary-fg-color--light: #26221f;
-  --md-primary-fg-color--dark: #26221f;
-  --md-primary-bg-color: #ffffff;
-  --md-primary-bg-color--light: #ffffff;
+  --md-primary-fg-color: #faf7f0;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: #f1efe8;
+  --md-primary-bg-color: #2c2c2a;
+  --md-primary-bg-color--light: #2c2c2a;
 }
 
 [data-md-color-scheme="default"] {
+  --md-primary-fg-color: #faf7f0;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: #f1efe8;
+  --md-primary-bg-color: #2c2c2a;
+  --md-primary-bg-color--light: #2c2c2a;
+
   --md-default-bg-color: #faf7f0;
   --md-default-fg-color: #2c2c2a;
   --md-default-fg-color--light: #888780;
@@ -34,6 +40,12 @@
 }
 
 [data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1c1917;
+  --md-primary-fg-color--light: #26221f;
+  --md-primary-fg-color--dark: #131110;
+  --md-primary-bg-color: #f1efe8;
+  --md-primary-bg-color--light: #f1efe8;
+
   --md-default-bg-color: #26221f;
   --md-default-fg-color: #f1efe8;
   --md-default-fg-color--light: #a6a59c;
@@ -225,6 +237,12 @@ body,
  * search bar, an "Ask Assistant" link, then product nav pushed to the right.
  * ---------------------------------------------------------------------- */
 
+.anote-header {
+  background-color: var(--md-primary-fg-color);
+  color: var(--md-default-fg-color);
+  border-bottom: 1px solid var(--md-default-fg-color--lighter);
+}
+
 .anote-header .md-header__inner {
   gap: 0.9rem;
   padding-top: 0.4rem;
@@ -245,7 +263,7 @@ body,
   display: block;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--md-default-fg-color);
   white-space: nowrap;
 }
 
@@ -265,7 +283,7 @@ body,
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  color: #ffffff;
+  color: var(--md-default-fg-color);
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
@@ -280,7 +298,7 @@ body,
 }
 
 .anote-header__lang summary:hover {
-  color: #ffffff;
+  color: var(--md-default-fg-color);
   opacity: 0.75;
 }
 
@@ -350,7 +368,7 @@ body,
   display: flex;
   align-items: center;
   gap: 0.2rem;
-  color: #ffffff;
+  color: var(--md-default-fg-color);
   cursor: pointer;
   list-style: none;
   padding: 0.4rem;
@@ -358,7 +376,7 @@ body,
 }
 
 .anote-header__theme summary:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--md-accent-fg-color--transparent);
 }
 
 .anote-header__theme summary::-webkit-details-marker,
@@ -396,23 +414,36 @@ body,
   transform: rotate(180deg);
 }
 
-/* Show only the icon matching the currently-selected palette radio.
-   #__palette_0 = System, #__palette_1 = Light, #__palette_2 = Dark. */
+/* Show only the icon matching the currently-selected theme mode */
 .anote-header__theme-icon--system {
   display: flex;
 }
 
-.md-header__option:has(#__palette_1:checked) ~ .anote-header__theme .anote-header__theme-icon--system,
-.md-header__option:has(#__palette_2:checked) ~ .anote-header__theme .anote-header__theme-icon--system {
-  display: none;
+[data-theme-mode="system"] .anote-header__theme-icon--system {
+  display: flex !important;
 }
 
-.md-header__option:has(#__palette_1:checked) ~ .anote-header__theme .anote-header__theme-icon--light {
-  display: flex;
+[data-theme-mode="system"] .anote-header__theme-icon--light,
+[data-theme-mode="system"] .anote-header__theme-icon--dark {
+  display: none !important;
 }
 
-.md-header__option:has(#__palette_2:checked) ~ .anote-header__theme .anote-header__theme-icon--dark {
-  display: flex;
+[data-theme-mode="light"] .anote-header__theme-icon--light {
+  display: flex !important;
+}
+
+[data-theme-mode="light"] .anote-header__theme-icon--system,
+[data-theme-mode="light"] .anote-header__theme-icon--dark {
+  display: none !important;
+}
+
+[data-theme-mode="dark"] .anote-header__theme-icon--dark {
+  display: flex !important;
+}
+
+[data-theme-mode="dark"] .anote-header__theme-icon--system,
+[data-theme-mode="dark"] .anote-header__theme-icon--light {
+  display: none !important;
 }
 
 .anote-header__theme-menu {
@@ -430,21 +461,29 @@ body,
   box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
 }
 
+.anote-header__theme-menu li button,
 .anote-header__theme-menu li label {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  width: 100%;
   padding: 0.4rem 0.5rem;
+  border: 0;
+  background: transparent;
   border-radius: 0.4rem;
   color: var(--md-default-fg-color) !important;
+  font-family: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+  text-align: left;
 }
 
+.anote-header__theme-menu li button:hover,
 .anote-header__theme-menu li label:hover {
   background-color: var(--md-code-bg-color);
 }
 
+.anote-header__theme-menu li button svg,
 .anote-header__theme-menu li label svg {
   fill: var(--md-default-fg-color);
   width: 1rem;
@@ -460,16 +499,16 @@ body,
   margin: 0;
   padding: 0 0.75rem 0 0.875rem;
   border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background-color: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background-color: var(--md-code-bg-color);
+  color: var(--md-default-fg-color--light);
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s;
 }
 
 .anote-header__search-pill:hover {
-  border-color: rgba(255, 255, 255, 0.35);
-  color: rgba(255, 255, 255, 0.8);
+  border-color: var(--md-default-fg-color--light);
+  color: var(--md-default-fg-color);
 }
 
 .anote-header__search-pill svg {
@@ -487,7 +526,7 @@ body,
 
 .anote-header__search-kbd {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--md-default-fg-color--light);
   font-size: 0.75rem;
   font-weight: 600;
   flex-shrink: 0;
@@ -521,13 +560,13 @@ body,
 }
 
 .anote-header__links a {
-  color: #ffffff !important;
+  color: var(--md-default-fg-color) !important;
   text-decoration: none !important;
   white-space: nowrap;
 }
 
 .anote-header__links a:hover {
-  color: #ffffff !important;
+  color: var(--md-default-fg-color) !important;
   opacity: 0.75;
 }
 
@@ -557,14 +596,12 @@ body,
   opacity: 0.85;
 }
 
-/* Light/Dark/System palette toggle (replaces the old desktop-icon slot) */
-.anote-header .md-header__option {
-  display: flex;
-  align-items: center;
+.anote-header .md-header__button {
+  color: var(--md-default-fg-color);
 }
 
-.anote-header .md-header__option .md-header__button {
-  color: #ffffff;
+.anote-header .md-header__button svg {
+  fill: currentColor;
 }
 
 /* Claude's header doesn't show a GitHub star-count widget — hide it here too */
@@ -577,12 +614,10 @@ body,
  * tab, instead of Material's default dark colored bar.
  * ---------------------------------------------------------------------- */
 
-/* Continues the header's fixed-dark bar rather than switching to a light
-   strip — keeps "Home", "Getting Started", etc. readable in white. */
 .md-tabs {
   background-color: var(--md-primary-fg-color);
-  color: rgba(255, 255, 255, 0.7);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--md-default-fg-color--light);
+  border-bottom: 1px solid var(--md-default-fg-color--lighter);
 }
 
 .md-tabs__item {
@@ -594,19 +629,19 @@ body,
   font-size: 0.9rem;
   font-weight: 500;
   opacity: 1;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--md-default-fg-color--light);
 }
 
 .md-tabs__link:focus,
 .md-tabs__link:hover {
-  color: #ffffff;
+  color: var(--md-default-fg-color);
   opacity: 1;
 }
 
 .md-tabs__item--active .md-tabs__link {
-  color: #ffffff;
+  color: var(--md-default-fg-color);
   font-weight: 700;
-  box-shadow: 0 2px 0 0 #ffffff;
+  box-shadow: 0 2px 0 0 var(--md-default-fg-color);
 }
 
 /* Only show the expanded header chrome once there's room — mirrors how
