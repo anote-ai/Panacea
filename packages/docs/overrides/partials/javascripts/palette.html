@@ -1,0 +1,48 @@
+<script>
+  (function() {
+    function __getTheme() {
+      try {
+        return localStorage.getItem("__theme") || "system";
+      } catch (e) {
+        return "system";
+      }
+    }
+
+    window.__applyTheme = function(theme) {
+      theme = theme || __getTheme();
+      var isDark = theme === "dark" || (theme === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      var scheme = isDark ? "slate" : "default";
+      var primary = isDark ? "black" : "white";
+      if (document.body) {
+        document.body.setAttribute("data-md-color-scheme", scheme);
+        document.body.setAttribute("data-md-color-primary", primary);
+      }
+      document.documentElement.setAttribute("data-theme-mode", theme);
+      document.documentElement.setAttribute("data-md-color-scheme", scheme);
+    };
+
+    window.__setTheme = function(theme) {
+      try {
+        localStorage.setItem("__theme", theme);
+        localStorage.removeItem("__palette");
+      } catch (e) {}
+      window.__applyTheme(theme);
+    };
+
+    window.__applyTheme();
+
+    if (window.matchMedia) {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      var mqHandler = function() {
+        if (__getTheme() === "system") {
+          window.__applyTheme("system");
+        }
+      };
+      if (mq.addEventListener) {
+        mq.addEventListener("change", mqHandler);
+      } else if (mq.addListener) {
+        mq.addListener(mqHandler);
+      }
+    }
+  })();
+</script>

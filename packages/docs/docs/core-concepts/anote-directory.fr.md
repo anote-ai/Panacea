@@ -1,10 +1,10 @@
 # Explorer le répertoire .anote
 
-Le CLI de Panacea lit la configuration depuis deux endroits : un fichier par projet et un fichier global.
+Le CLI de Panacea lit la configuration à partir de deux endroits : un fichier par projet et un fichier global.
 
 ## Configuration du projet
 
-Panacea recherche en remontant depuis votre répertoire actuel le premier fichier trouvé, dans cet ordre :
+Panacea recherche vers le haut à partir de votre répertoire actuel pour le premier fichier qu'il trouve, dans cet ordre :
 
 - `.anote.json`
 - `.claw.json`
@@ -23,24 +23,24 @@ Panacea recherche en remontant depuis votre répertoire actuel le premier fichie
 }
 ```
 
-| Clé | Objectif |
+| Clé | But |
 |---|---|
 | `model` | Modèle par défaut pour ce projet |
 | `permissionMode` | `default`, `acceptEdits`, ou `bypassPermissions` — voir [Modes de permission](../use-panacea/permission-modes.md) |
-| `provider` | Remplacement explicite du fournisseur (généralement auto-détecté à partir de `model`) |
-| `baseUrl` | URL de base pour les endpoints compatibles OpenAI, par ex. `http://localhost:11434/v1` pour Ollama |
-| `maxTurns` | Plafond de tours par session |
-| `compactAfterMessages` | Quand compacter l'historique de session |
+| `provider` | Remplacement explicite du fournisseur (généralement détecté automatiquement à partir de `model`) |
+| `baseUrl` | URL de base pour les points de terminaison compatibles OpenAI, par exemple `http://localhost:11434/v1` pour Ollama |
+| `maxTurns` | Limite de tours par session |
+| `compactAfterMessages` | Quand compacter l'historique de la session |
 | `hooks` | Hooks shell `preToolUse` / `postToolUse` — voir [Étendre Panacea](extend.md) |
 
 `anote init` crée `.anote.json` pour vous. `anote config` le lit et l'écrit :
 
 ```bash
-anote config              # afficher la config effective (globale + locale)
+anote config              # afficher la configuration effective (globale + locale)
 anote config get model
 anote config set model gpt-4.1
-anote config path         # afficher le chemin du fichier de config global
-anote config edit         # ouvrir la config globale dans $EDITOR
+anote config path         # imprimer le chemin du fichier de configuration global
+anote config edit         # ouvrir la configuration globale dans $EDITOR
 ```
 
 ## Configuration globale
@@ -49,7 +49,7 @@ anote config edit         # ouvrir la config globale dans $EDITOR
 
 ## CLAW.md
 
-Pas du JSON — un fichier markdown que l'agent lit pour le contexte du projet au début de chaque session. Voir [Étendre Panacea](extend.md) pour savoir ce qu'il contient.
+Pas du JSON — un fichier markdown que l'agent lit pour le contexte du projet au début de chaque session. Voir [Étendre Panacea](extend.md) pour ce qui y va.
 
 ## Prochaines étapes
 

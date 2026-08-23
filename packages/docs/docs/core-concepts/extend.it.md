@@ -1,44 +1,44 @@
-# Estendere Panacea
+# Estendi Panacea
 
-Due modi per personalizzare il comportamento di Panacea nel tuo progetto: **CLAW.md** per istruzioni persistenti, e gli **hook** per eseguire i tuoi comandi attorno alle chiamate degli strumenti.
+Due modi per personalizzare il comportamento di Panacea nel tuo progetto: **CLAW.md** per istruzioni persistenti e **hooks** per eseguire i tuoi comandi attorno alle chiamate degli strumenti.
 
 ## CLAW.md — memoria del progetto
 
-`CLAW.md` è un file markdown che Panacea legge per il contesto del progetto — la stessa idea di un README, ma rivolto all'agente invece che a un umano. `anote init` ne genera uno automaticamente, precompilato con lo stack rilevato e i comandi di verifica (test/lint/build):
+`CLAW.md` è un file markdown che Panacea legge per il contesto del progetto — la stessa idea di un README destinato all'agente invece che a un umano. `anote init` ne genera uno automaticamente, precompilato con il tuo stack rilevato e i comandi di verifica (test/lint/build):
 
 ```markdown
 # CLAW.md
 
-This file provides guidance to Anote AI when working with code in this repository.
+Questo file fornisce indicazioni ad Anote AI quando lavora con il codice in questo repository.
 
-## Project overview
+## Panoramica del progetto
 
-<!-- Describe what this project does -->
+<!-- Descrivi cosa fa questo progetto -->
 
 ## Stack
 
 TypeScript · Next.js
 
-## Verification
+## Verifica
 
-Run these before considering a change complete:
+Esegui questi comandi prima di considerare un cambiamento completato:
 
   npm test
   npm run lint
 
-## Working agreement
+## Accordo di lavoro
 
-- Read relevant files before making changes
-- Run the verification commands after modifying logic
-- Keep changes small and focused
-- Prefer editing existing files over creating new ones
+- Leggi i file pertinenti prima di apportare modifiche
+- Esegui i comandi di verifica dopo aver modificato la logica
+- Mantieni le modifiche piccole e mirate
+- Preferisci modificare file esistenti piuttosto che crearne di nuovi
 ```
 
-Modificalo liberamente — aggiungi note di architettura, convenzioni, o cose su cui l'agente continua a sbagliare. Panacea lo legge all'inizio di ogni sessione in quella directory.
+Modificalo liberamente — aggiungi note architettoniche, convenzioni o cose che l'agente continua a sbagliare. Panacea lo legge all'inizio di ogni sessione in quella directory.
 
-## Hook — eseguire i tuoi comandi attorno alle chiamate degli strumenti
+## Hooks — esegui i tuoi comandi attorno alle chiamate degli strumenti
 
-Gli hook eseguono un comando shell prima (`preToolUse`) o dopo (`postToolUse`) ogni chiamata di strumento, configurati in `.anote.json`:
+Gli hooks eseguono un comando shell prima (`preToolUse`) o dopo (`postToolUse`) ogni chiamata agli strumenti, configurati in `.anote.json`:
 
 ```json
 {
@@ -49,17 +49,17 @@ Gli hook eseguono un comando shell prima (`preToolUse`) o dopo (`postToolUse`) o
 }
 ```
 
-**Semantica dei codici di uscita:**
+**Semantica del codice di uscita:**
 
 | Codice di uscita | Effetto |
 |---|---|
-| `0` | Consenti — stdout viene acquisito come messaggio informativo |
-| `2` | Nega — stdout viene acquisito come motivo, mostrato all'agente |
-| qualsiasi altro | Avvisa ma consenti |
+| `0` | Consenti — stdout viene catturato come messaggio informativo |
+| `2` | Negare — stdout viene catturato come motivo, mostrato all'agente |
+| qualsiasi altro valore | Avvisa ma consenti |
 
-Usa `preToolUse` per bloccare comandi rischiosi o applicare policy prima che vengano eseguiti; usa `postToolUse` per cose come la formattazione automatica dopo ogni modifica.
+Usa `preToolUse` per bloccare comandi rischiosi o far rispettare la politica prima che vengano eseguiti; usa `postToolUse` per cose come l'auto-formattazione dopo ogni modifica.
 
 ## Prossimi passi
 
-- [Esplorare la directory .anote](anote-directory.md) — dove risiedono CLAW.md e la configurazione
-- [Modalità di permesso](../use-panacea/permission-modes.md) — l'altra leva su cosa può fare l'agente
+- [Esplora la directory .anote](anote-directory.md) — dove vivono CLAW.md e la configurazione
+- [Modalità di autorizzazione](../use-panacea/permission-modes.md) — l'altro leva su ciò che l'agente può fare

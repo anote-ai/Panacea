@@ -1,44 +1,44 @@
-# 擴充 Panacea
+# 擴展 Panacea
 
-有兩種方式可以自訂 Panacea 在你專案中的行為：用於持久性指示的 **CLAW.md**，以及用於在工具呼叫前後執行自訂指令的 **hooks**。
+有兩種方法可以自訂 Panacea 在您的專案中的行為：**CLAW.md** 用於持久指令，以及 **hooks** 用於在工具調用周圍運行您自己的命令。
 
 ## CLAW.md — 專案記憶
 
-`CLAW.md` 是 Panacea 用於取得專案背景資訊而讀取的 Markdown 檔案 — 概念上類似於 README，只不過面向的是代理而非人類。`anote init` 會自動產生一份，並預先填入偵測到的技術堆疊與驗證指令（test/lint/build）：
+`CLAW.md` 是一個 Panacea 讀取的 markdown 檔案，用於專案上下文 — 與針對人類的 README 相同的概念，但針對代理。`anote init` 自動生成一個，預填充您的檢測堆疊和驗證命令（測試/檢查/構建）：
 
 ```markdown
 # CLAW.md
 
-This file provides guidance to Anote AI when working with code in this repository.
+此檔案在處理此程式碼庫中的程式碼時為 Anote AI 提供指導。
 
-## Project overview
+## 專案概述
 
-<!-- Describe what this project does -->
+<!-- 描述此專案的功能 -->
 
-## Stack
+## 堆疊
 
 TypeScript · Next.js
 
-## Verification
+## 驗證
 
-Run these before considering a change complete:
+在考慮變更完成之前運行這些命令：
 
   npm test
   npm run lint
 
-## Working agreement
+## 工作協議
 
-- Read relevant files before making changes
-- Run the verification commands after modifying logic
-- Keep changes small and focused
-- Prefer editing existing files over creating new ones
+- 在進行更改之前閱讀相關檔案
+- 修改邏輯後運行驗證命令
+- 保持更改小而專注
+- 優先編輯現有檔案而非創建新檔案
 ```
 
-你可以自由編輯它 — 加入架構說明、慣例，或代理一直出錯的地方。Panacea 會在該目錄下每次工作階段開始時讀取此檔案。
+隨意編輯 — 添加架構筆記、約定或代理經常出錯的事項。Panacea 在每個工作階段開始時會在該目錄中讀取它。
 
-## Hooks — 在工具呼叫前後執行自訂指令
+## Hooks — 在工具調用周圍運行您自己的命令
 
-Hooks 會在每次工具呼叫之前（`preToolUse`）或之後（`postToolUse`）執行一個 shell 指令，於 `.anote.json` 中設定：
+Hooks 在每次工具調用之前（`preToolUse`）或之後（`postToolUse`）運行一個 shell 命令，配置在 `.anote.json` 中：
 
 ```json
 {
@@ -49,17 +49,17 @@ Hooks 會在每次工具呼叫之前（`preToolUse`）或之後（`postToolUse`�
 }
 ```
 
-**結束代碼語意：**
+**退出代碼語義：**
 
-| 結束代碼 | 效果 |
+| 退出代碼 | 效果 |
 |---|---|
-| `0` | 允許 — stdout 會被擷取為提示訊息 |
-| `2` | 拒絕 — stdout 會被擷取為拒絕原因，並顯示給代理 |
-| 其他任意值 | 警告但仍然允許 |
+| `0` | 允許 — 標準輸出被捕獲為資訊性消息 |
+| `2` | 拒絕 — 標準輸出被捕獲為原因，顯示給代理 |
+| 其他任何值 | 警告但允許 |
 
-使用 `preToolUse` 在風險指令執行前攔截它們或強制套用政策；使用 `postToolUse` 實現諸如每次編輯後自動格式化之類的功能。
+使用 `preToolUse` 來阻止風險命令或在它們運行之前強制執行政策；使用 `postToolUse` 來進行自動格式化等操作，在每次編輯後執行。
 
 ## 下一步
 
-- [瞭解 .anote 目錄](anote-directory.md) — CLAW.md 與設定檔的存放位置
-- [權限模式](../use-panacea/permission-modes.md) — 控制代理能做什麼的另一個開關
+- [探索 .anote 目錄](anote-directory.md) — CLAW.md 和配置所在的位置
+- [權限模式](../use-panacea/permission-modes.md) — 代理可以做的另一個槓桿
