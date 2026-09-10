@@ -34,4 +34,4 @@ anote sessions rm a1b2c3d4
 ## Next steps
 
 - [Common workflows](common-workflows.md)
-- [How Panacea works](../core-concepts/how-it-works.md) — turns, compaction, and how session length affects context
+- [How Ourogen works](../core-concepts/how-it-works.md) — turns, compaction, and how session length affects context

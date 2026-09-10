@@ -1,10 +1,10 @@
-# How Panacea Works
+# How Ourogen Works
 
-Panacea runs an **agentic loop**: it reads your prompt, decides which tools to call, executes them, reads the results, and repeats — streaming its reasoning and edits back to you — until the task is done or it hits a turn limit.
+Ourogen runs an **agentic loop**: it reads your prompt, decides which tools to call, executes them, reads the results, and repeats — streaming its reasoning and edits back to you — until the task is done or it hits a turn limit.
 
 ## The tools
 
-By default, Panacea's agent can call:
+By default, Ourogen's agent can call:
 
 | Tool | Purpose |
 |---|---|
@@ -32,5 +32,5 @@ The agent loop isn't tied to one model. `anote ask --compare` runs the same prom
 ## Next steps
 
 - [Permission modes](../use-panacea/permission-modes.md) — control whether the agent asks before editing or running commands
-- [Extend Panacea](extend.md) — CLAW.md and hooks
+- [Extend Ourogen](extend.md) — CLAW.md and hooks
 - [CLI Commands](../cli/commands.md) — the full command reference

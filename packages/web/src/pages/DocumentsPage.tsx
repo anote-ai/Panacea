@@ -31,6 +31,8 @@ export default function DocumentsPage() {
   const nav = useNavigate();
 
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(true);
+  const [documentsError, setDocumentsError] = useState('');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [draggingDoc, setDraggingDoc] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function DocumentsPage() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
 
   // Multi-select state
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
@@ -64,10 +66,16 @@ export default function DocumentsPage() {
   }, [token]);
 
   const loadDocuments = useCallback(async () => {
+    setLoadingDocuments(true);
+    setDocumentsError('');
     try {
       const res = await axios.get(`${API_BASE_URL}/api/documents`, { headers });
       setDocuments(res.data.documents || []);
-    } catch {}
+    } catch {
+      setDocumentsError('We couldn’t load your documents. Please try again.');
+    } finally {
+      setLoadingDocuments(false);
+    }
   }, [token]);
 
   useEffect(() => {
@@ -292,7 +300,7 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative">
+    <div className="flex h-dvh bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative">
       {/* Rubber band selection rectangle */}
       {rubberBand && (
         <div
@@ -303,7 +311,7 @@ export default function DocumentsPage() {
 
       {/* Left sidebar */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-14'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col border-r border-gray-200 dark:border-gray-700`}
+        className={`${sidebarOpen ? 'w-64 max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl' : 'w-14 max-md:hidden'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col border-r border-gray-200 dark:border-gray-700`}
       >
         <div className={`p-3 flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}>
           <OurogenLogo className="w-7 h-7 flex-shrink-0" />
@@ -393,6 +401,10 @@ export default function DocumentsPage() {
           {folders.map((folder) => (
             <div
               key={folder.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open folder ${folder.name}`}
+              onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setSelectedFolder(folder); } }}
               onDragOver={(e) => onFolderDragOver(e, folder.id)}
               onDrop={(e) => onFolderDrop(e, folder.id)}
               className={`group flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${selectedFolder?.id === folder.id ? 'bg-gray-200 dark:bg-[#2F2F2F]' : 'hover:bg-gray-200 dark:hover:bg-[#2F2F2F]'} ${draggingOver === folder.id ? 'ring-2 ring-gray-400' : ''}`}
@@ -523,12 +535,15 @@ export default function DocumentsPage() {
         <UserMenu sidebarOpen={sidebarOpen} />
       </aside>
 
+      {sidebarOpen && <button className="fixed inset-0 z-30 bg-black/40 md:hidden" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       {/* Main panel */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen((o) => !o)}
+              aria-label="Toggle sidebar"
+              aria-expanded={sidebarOpen}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
             >
               <svg
@@ -572,6 +587,7 @@ export default function DocumentsPage() {
             </span>
             <div className="flex items-center gap-1">
               <select
+                aria-label="Move selected documents to folder"
                 value={bulkMoveFolder}
                 onChange={(e) => setBulkMoveFolder(e.target.value)}
                 className="text-xs bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none"
@@ -620,7 +636,14 @@ export default function DocumentsPage() {
           className="flex-1 overflow-y-auto px-6 py-4 select-none"
           onMouseDown={onListMouseDown}
         >
-          {displayDocs.length === 0 ? (
+          {loadingDocuments ? (
+            <p role="status" className="py-16 text-center text-sm text-gray-600 dark:text-gray-400">Loading your documents…</p>
+          ) : documentsError ? (
+            <div className="py-16 text-center">
+              <p role="alert" className="text-sm text-gray-700 dark:text-gray-300">{documentsError}</p>
+              <button onClick={loadDocuments} className="mt-4 rounded-xl border border-gray-300 dark:border-gray-600 px-5 py-3 text-sm font-medium">Try again</button>
+            </div>
+          ) : displayDocs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
               <svg
                 className="w-16 h-16 text-gray-200 dark:text-gray-700"
@@ -635,12 +658,13 @@ export default function DocumentsPage() {
                   d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <p className="text-gray-400 dark:text-gray-500">
-                No documents yet
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {selectedFolder ? 'This folder is empty' : 'No documents yet'}
               </p>
-              <p className="text-xs text-gray-300 dark:text-gray-600">
-                Upload files from a chat to use them as context — they'll show up here too
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedFolder ? 'Move documents here using the folder menu on each file.' : 'Upload a file in a chat, then find and organize it here.'}
               </p>
+              <button onClick={() => selectedFolder ? setSelectedFolder(null) : nav('/app')} className="rounded-xl bg-gray-900 dark:bg-white px-5 py-3 text-sm font-semibold text-white dark:text-black">{selectedFolder ? 'View all documents' : 'Start a chat'}</button>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -665,7 +689,10 @@ export default function DocumentsPage() {
                         : 'bg-[#F7F7F8] dark:bg-[#2F2F2F] hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
                     }`}
                   >
-                    <div
+                    <button
+                      type="button"
+                      aria-label={`Select ${doc.filename}`}
+                      aria-pressed={isSelected}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedDocs((prev) => {
@@ -696,7 +723,7 @@ export default function DocumentsPage() {
                           />
                         </svg>
                       )}
-                    </div>
+                    </button>
                     <div className="absolute top-3 right-3 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => {
@@ -759,7 +786,7 @@ export default function DocumentsPage() {
                       {doc.filename}
                     </p>
                     <p className="text-[10px] text-gray-400 dark:text-gray-500 px-0.5 mt-0.5">
-                      {doc.chunks} chunks
+                      {doc.chunks > 0 ? 'Ready to use' : 'No text extracted'}
                     </p>
                     {doc.chat_id && (
                       <span

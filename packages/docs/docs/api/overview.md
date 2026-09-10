@@ -1,6 +1,6 @@
 # Backend API Overview
 
-The Anote backend is a unified Flask API serving all client surfaces.
+The Ourogen backend is a unified Flask API serving all client surfaces.
 
 Base URL: `http://localhost:5000` (local) or your deployed backend URL.
 

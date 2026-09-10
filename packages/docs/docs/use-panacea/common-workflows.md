@@ -1,6 +1,6 @@
 # Common Workflows
 
-Step-by-step patterns for everyday tasks with Panacea's CLI.
+Step-by-step patterns for everyday tasks with Ourogen's CLI.
 
 ## Explore an unfamiliar codebase
 

@@ -1,22 +1,35 @@
-# Web App Overview
+# Ourogen web app
 
-The Anote AI web app is a ChatGPT-style chat interface that connects to the Anote backend.
+Chat, write, and ask questions about your documents from your browser.
 
-## Features
+[Open Ourogen Chat](https://chat.ourogen.ai){ .md-button .md-button--primary }
 
-- Light and dark mode (auto-detects system preference)
-- Streaming responses via SSE
-- Chat session history in a collapsible sidebar
-- Model selector (Claude, GPT-4o, etc.)
-- Document upload and Q&A
-- Responsive design
+## Start a conversation
 
-## Running Locally
+1. Create an account or sign in with email or Google, when enabled on your server.
+2. Choose **New Chat** and type a question. Use a suggested prompt if you need a starting point.
+3. Press **Enter** to send. Use **Shift + Enter** to add a new line.
+4. Use **Stop** to interrupt a response. Your conversations appear in the sidebar.
+
+## Work with a document
+
+Use the upload button beside the message box, or drag a file into the chat. Wait for processing to finish before asking a question. Try “Summarize the main findings in this document.”
+
+Open **Library** to view uploaded files, organize them into folders, or return to an attached conversation. Check the source document when you need to verify an answer.
+
+## Make the app comfortable
+
+- Open your account menu for settings and model selection.
+- Choose **System**, **Light**, or **Dark** appearance to match your workspace.
+- Collapse the sidebar when you want more room for a conversation.
+
+## Run locally
+
+For the full app, follow [self-hosted installation](../getting-started/installation.md#web-app-self-hosted). To develop only the frontend with a backend already running:
 
 ```bash
-cd packages/web
 npm install
-npm run dev
+npm run dev --workspace=packages/web
 ```
 
-The app runs at `http://localhost:3000` and proxies API calls to `http://localhost:5000`.
+The app runs at `http://localhost:3000` and proxies API calls to `http://localhost:5000`. See [configuration](../getting-started/configuration.md) for backend settings.

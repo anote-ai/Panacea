@@ -1,6 +1,6 @@
-# Panacea Multi-Channel Messaging Bots
+# Ourogen Multi-Channel Messaging Bots
 
-This recipe explains Panacea's chat-ops style integrations: standalone Slack, SMS, and WhatsApp bots that let users ask coding questions from the messaging apps they already use.
+This recipe explains Ourogen's chat-ops style integrations: standalone Slack, SMS, and WhatsApp bots that let users ask coding questions from the messaging apps they already use.
 
 ## What you'll learn
 
@@ -11,9 +11,9 @@ This recipe explains Panacea's chat-ops style integrations: standalone Slack, SM
 
 ## Why this matters
 
-Not every user wants to open a web UI or IDE to ask a question — chat-ops style integrations meet people where they already are. Each bot is a small, independently deployable Flask service, so a team can run just the channels they need (e.g. Slack only) without standing up the rest of Panacea's stack.
+Not every user wants to open a web UI or IDE to ask a question — chat-ops style integrations meet people where they already are. Each bot is a small, independently deployable Flask service, so a team can run just the channels they need (e.g. Slack only) without standing up the rest of Ourogen's stack.
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|
@@ -27,12 +27,12 @@ Not every user wants to open a web UI or IDE to ask a question — chat-ops styl
 1. **Slack** (`slack/app.py`): listens for `app_mention` events. `extract_query()` strips the `<@BOT_ID>` mention out of the message text. It immediately posts a `_Anote is thinking…_` placeholder message, then runs the LLM call on a background thread and either edits that placeholder in place via `client.chat_update(...)` or, if the placeholder post failed, sends a fresh threaded reply.
 2. **SMS** (`sms/app.py`): Twilio POSTs each inbound text to `/sms` as form data (`Body`, `From`). The handler calls the LLM synchronously and returns a `MessagingResponse` (TwiML) with the reply — Twilio delivers it as a follow-up text.
 3. **WhatsApp** (`whatsapp/app.py`): same TwiML pattern as SMS, wired to Twilio's WhatsApp sandbox webhook instead of a phone number.
-4. All three call the **Anthropic API directly** (`anthropic.Anthropic(...).messages.create(...)`) with a shared system prompt describing Anote as a coding assistant — they do not currently proxy through Panacea's own backend, so they don't get RAG/document grounding, credit metering, or multi-agent orchestration from recipes 03/04/08.
+4. All three call the **Anthropic API directly** (`anthropic.Anthropic(...).messages.create(...)`) with a shared system prompt describing Anote as a coding assistant — they do not currently proxy through Ourogen's own backend, so they don't get RAG/document grounding, credit metering, or multi-agent orchestration from recipes 03/04/08.
 5. Responses are trimmed to each channel's limit before sending: Slack 2900 characters, SMS/WhatsApp 1600 characters, each with a truncation notice appended if cut.
 
 ### Architectural gap to know about
 
-Because these bots call Anthropic directly instead of routing through Panacea's backend, a Slack/SMS/WhatsApp user can't currently ask questions grounded in documents they've uploaded to Panacea, and their usage isn't metered through the credit system in recipe 08. If you want channel parity with the web UI, the natural next step is swapping the direct `anthropic_client.messages.create(...)` call for a request to Panacea's own `/v1/chat/completions` (recipe 07's OpenAI-compatible gateway) so these bots inherit RAG, orchestration, and billing for free.
+Because these bots call Anthropic directly instead of routing through Ourogen's backend, a Slack/SMS/WhatsApp user can't currently ask questions grounded in documents they've uploaded to Ourogen, and their usage isn't metered through the credit system in recipe 08. If you want channel parity with the web UI, the natural next step is swapping the direct `anthropic_client.messages.create(...)` call for a request to Ourogen's own `/v1/chat/completions` (recipe 07's OpenAI-compatible gateway) so these bots inherit RAG, orchestration, and billing for free.
 
 ## Run it locally
 
@@ -75,4 +75,4 @@ Each bot also exposes `GET /health` for a quick liveness check.
 
 ## Notes for the cookbook
 
-This is a good "extend Panacea" recipe: readers can see the direct-to-Anthropic version working in minutes, then follow the architectural-gap note above to wire it through Panacea's backend instead for grounded, metered answers.
+This is a good "extend Ourogen" recipe: readers can see the direct-to-Anthropic version working in minutes, then follow the architectural-gap note above to wire it through Ourogen's backend instead for grounded, metered answers.

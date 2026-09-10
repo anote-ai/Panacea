@@ -33,7 +33,7 @@ All settings can be overridden with environment variables:
 | `OPENAI_API_KEY` | OpenAI API key |
 | `GEMINI_API_KEY` | Google Gemini API key |
 | `ANOTE_MODEL` | Default model |
-| `ANOTE_SERVER_URL` | Anote backend URL |
+| `ANOTE_SERVER_URL` | Ourogen backend URL |
 
 ## Backend Configuration
 

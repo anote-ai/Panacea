@@ -1,10 +1,10 @@
-# Panacea Multi-Modal Document Ingestion
+# Ourogen Multi-Modal Document Ingestion
 
-This recipe explains how Panacea extends document Q&A + RAG (see [recipe 03](03-panacea-document-qa-rag.md)) beyond plain text to images, audio, video, and spreadsheets — making all of them searchable through the same chunking and embedding pipeline.
+This recipe explains how Ourogen extends document Q&A + RAG (see [recipe 03](03-panacea-document-qa-rag.md)) beyond plain text to images, audio, video, and spreadsheets — making all of them searchable through the same chunking and embedding pipeline.
 
 ## What you'll learn
 
-- How Panacea classifies an upload by MIME type and routes it to a dedicated ingestion service
+- How Ourogen classifies an upload by MIME type and routes it to a dedicated ingestion service
 - How images and video frames are turned into indexable text using a vision-capable LLM
 - How audio (including the audio track of a video) is transcribed with Whisper
 - How spreadsheets are converted into Markdown tables instead of being flattened into an unsearchable text dump
@@ -12,9 +12,9 @@ This recipe explains how Panacea extends document Q&A + RAG (see [recipe 03](03-
 
 ## Why this matters
 
-Tika (the default document-text extractor) can only usefully handle text-based formats. Without extra handling, an uploaded image, audio clip, video, or spreadsheet would either fail to ingest or lose all of its structure. Panacea instead detects the media type at upload time and calls a purpose-built service that produces clean text, which is then stored as `document_text` and flows through the exact same retrieval path as any other document — so a screenshot, a call recording, or a sales spreadsheet all become answerable through chat like a PDF would.
+Tika (the default document-text extractor) can only usefully handle text-based formats. Without extra handling, an uploaded image, audio clip, video, or spreadsheet would either fail to ingest or lose all of its structure. Ourogen instead detects the media type at upload time and calls a purpose-built service that produces clean text, which is then stored as `document_text` and flows through the exact same retrieval path as any other document — so a screenshot, a call recording, or a sales spreadsheet all become answerable through chat like a PDF would.
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|
@@ -71,7 +71,7 @@ curl -X POST http://localhost:5000/ingest-pdf \
   -F "files[]=@./quarterly_sales.xlsx"
 ```
 
-Then, in the web UI at `http://localhost:3000`, open the same chat session and ask a question about the image or spreadsheet you just uploaded — Panacea answers from the generated description/Markdown table exactly as it would from a PDF.
+Then, in the web UI at `http://localhost:3000`, open the same chat session and ask a question about the image or spreadsheet you just uploaded — Ourogen answers from the generated description/Markdown table exactly as it would from a PDF.
 
 ## Notes for the cookbook
 

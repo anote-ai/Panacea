@@ -54,7 +54,7 @@ That starts the frontend, backend, MySQL, Redis, and Tika together.
 
 If Docker is installed but not running, start Docker Desktop first or `docker compose up` will fail before the app boots.
 
-For native local development and testing instructions, see [`CODEBASE_SETUP.md`](/Users/natanvidra/Workspace/Autonomous-Intelligence/CODEBASE_SETUP.md).
+For native local development and testing instructions, see [`CODEBASE_SETUP.md`](CODEBASE_SETUP.md).
 
 ### Publishing
 

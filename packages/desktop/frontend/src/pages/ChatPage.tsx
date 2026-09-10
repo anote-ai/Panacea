@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth, useTheme } from "../App";
-import RocketLogo from "../components/RocketLogo";
+import OurogenLogo from "../components/OurogenLogo";
 import { getSessions, getSession, deleteSession, streamChat } from "../api";
 
 interface Message { role: "user" | "assistant"; content: string; }
@@ -100,8 +100,8 @@ export default function ChatPage() {
     <div className="flex h-screen bg-white dark:bg-[#212121] text-gray-900 dark:text-white">
       <aside className={`${sidebarOpen ? "w-64" : "w-0"} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col`}>
         <div className="p-3 flex items-center gap-2">
-          <RocketLogo className="w-7 h-7 flex-shrink-0" />
-          <span className="font-semibold text-sm truncate">Anote AI</span>
+          <OurogenLogo className="w-7 h-7 flex-shrink-0" />
+          <span className="font-semibold text-sm truncate">Ourogen</span>
         </div>
         <div className="px-2 pb-2">
           <button onClick={newChat} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-[#2F2F2F] flex items-center gap-2">
@@ -132,7 +132,7 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
-              <RocketLogo className="w-16 h-16 opacity-30" />
+              <OurogenLogo className="w-16 h-16 opacity-30" />
               <p className="text-gray-400 dark:text-gray-500 text-lg">How can I help you today?</p>
             </div>
           ) : (
@@ -141,7 +141,7 @@ export default function ChatPage() {
                 <div key={i} className={`flex gap-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && (
                     <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[#2F2F2F] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <RocketLogo className="w-5 h-5" />
+                      <OurogenLogo className="w-5 h-5" />
                     </div>
                   )}
                   <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "bg-gray-100 dark:bg-[#2F2F2F]" : "bg-transparent"}`}>
@@ -165,7 +165,7 @@ export default function ChatPage() {
           <div className="max-w-3xl mx-auto">
             <div className="relative flex items-end bg-[#F7F7F8] dark:bg-[#2F2F2F] rounded-2xl border border-gray-300 dark:border-gray-600">
               <textarea ref={textareaRef} value={input} onChange={(e) => { setInput(e.target.value); autoResize(); }}
-                onKeyDown={handleKeyDown} placeholder="Message Anote AI..." rows={1}
+                onKeyDown={handleKeyDown} placeholder="Message Ourogen..." rows={1}
                 className="flex-1 bg-transparent px-4 py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px]" />
               <button onClick={streaming ? () => abortRef.current?.abort() : sendMessage}
                 disabled={!streaming && !input.trim()}

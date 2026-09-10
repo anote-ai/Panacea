@@ -1,6 +1,6 @@
-# Panacea MCP Tool Server
+# Ourogen MCP Tool Server
 
-This recipe explains how Panacea exposes its document/chat primitives as standard [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) tools, so any MCP-compatible client (Claude Desktop, other MCP hosts) can use Panacea's retrieval and chat-history capabilities directly.
+This recipe explains how Ourogen exposes its document/chat primitives as standard [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) tools, so any MCP-compatible client (Claude Desktop, other MCP hosts) can use Ourogen's retrieval and chat-history capabilities directly.
 
 ## What you'll learn
 
@@ -11,9 +11,9 @@ This recipe explains how Panacea exposes its document/chat primitives as standar
 
 ## Why this matters
 
-Recipe 04 covers how Panacea's *internal* orchestrator registers tools for its own agents to call. This is a different integration surface: it packages the same underlying document/chat functions as **external, standardized MCP tools** that any MCP client can invoke — no Panacea-specific SDK or API contract required, just the MCP protocol.
+Recipe 04 covers how Ourogen's *internal* orchestrator registers tools for its own agents to call. This is a different integration surface: it packages the same underlying document/chat functions as **external, standardized MCP tools** that any MCP client can invoke — no Ourogen-specific SDK or API contract required, just the MCP protocol.
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|
@@ -24,7 +24,7 @@ Recipe 04 covers how Panacea's *internal* orchestrator registers tools for its o
 ## How it works
 
 1. `mcp_server.py` initializes Ray (`ray.init(...)`) and a `FastMCP` server instance named `"Document Agent Server"`.
-2. Each function decorated with `@mcp.tool()` wraps an existing Panacea function and returns a plain-text result or error string — the shape an LLM tool call expects back:
+2. Each function decorated with `@mcp.tool()` wraps an existing Ourogen function and returns a plain-text result or error string — the shape an LLM tool call expects back:
    - `retrieve_relevant_chunks(query, chat_id, user_email, k=2)` — semantic search over a chat's documents via `get_relevant_chunks`
    - `ingest_document(text, document_name, chat_id, chunk_size=1000)` — registers a document via `add_document_to_db`
    - `list_documents(chat_id, user_email)` / `delete_document(doc_id, user_email)` — document management
@@ -34,7 +34,7 @@ Recipe 04 covers how Panacea's *internal* orchestrator registers tools for its o
    - `execute_database_query(query, params)` — raw SQL passthrough (see security note below)
 3. `ingest_document` doesn't block on chunking — it calls `chunk_document.remote(text, chunk_size, doc_id)`, a Ray remote task, so large documents are processed asynchronously while the tool call returns immediately.
 4. Running `python backend/mcp/mcp_server.py` starts `mcp.run()`, which serves these tools over MCP's stdio transport — ready for an MCP client to launch and connect to.
-5. An MCP client (e.g. Claude Desktop) configured to launch this script gets access to all nine tools automatically, without writing any Panacea-specific integration code.
+5. An MCP client (e.g. Claude Desktop) configured to launch this script gets access to all nine tools automatically, without writing any Ourogen-specific integration code.
 
 ### Security note
 

@@ -2,7 +2,7 @@
 
 ## Chat Sidebar
 
-Open the Anote AI chat panel from the activity bar. Ask questions about your codebase, get code suggestions, and review diffs.
+Open the Ourogen chat panel from the activity bar. Ask questions about your codebase, get code suggestions, and review diffs.
 
 ## Inline Diff Review
 

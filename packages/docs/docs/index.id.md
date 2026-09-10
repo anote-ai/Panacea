@@ -1,6 +1,6 @@
 # Ikhtisar
 
-**Anote AI** adalah asisten pengkodean AI terpadu dan platform chatbot pribadi. Ini membaca basis kode Anda, mengedit file, menjalankan perintah, meninjau PR, dan menjawab pertanyaan tentang dokumen Anda — tersedia di terminal, IDE, browser, aplikasi desktop, dan ponsel Anda.
+**Ourogen** adalah asisten pengkodean AI terpadu dan platform chatbot pribadi. Ini membaca basis kode Anda, mengedit file, menjalankan perintah, meninjau PR, dan menjawab pertanyaan tentang dokumen Anda — tersedia di terminal, IDE, browser, aplikasi desktop, dan ponsel Anda.
 
 ## Memulai
 

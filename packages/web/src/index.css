@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* Custom scrollbar */
@@ -33,4 +33,21 @@ html {
 textarea {
   resize: none;
   overflow: hidden;
+}
+
+/* Shared Ourogen typography and accessible interaction states. */
+html { -webkit-font-smoothing: antialiased; color-scheme: light; }
+html.dark { color-scheme: dark; }
+.eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; }
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+button:disabled { cursor: not-allowed; }
+@media (hover: none) {
+  .group .opacity-0 { opacity: 1; }
+}
+.group:focus-within .opacity-0 { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

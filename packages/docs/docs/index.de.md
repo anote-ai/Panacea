@@ -1,6 +1,6 @@
 # Übersicht
 
-**Anote AI** ist ein einheitlicher KI-Coding-Assistent und private Chatbot-Plattform. Er liest Ihren Code, bearbeitet Dateien, führt Befehle aus, überprüft PRs und beantwortet Fragen zu Ihren Dokumenten – verfügbar in Ihrem Terminal, IDE, Browser, Desktop-App und auf Ihrem Handy.
+**Ourogen** ist ein einheitlicher KI-Coding-Assistent und private Chatbot-Plattform. Er liest Ihren Code, bearbeitet Dateien, führt Befehle aus, überprüft PRs und beantwortet Fragen zu Ihren Dokumenten – verfügbar in Ihrem Terminal, IDE, Browser, Desktop-App und auf Ihrem Handy.
 
 ## Erste Schritte
 
