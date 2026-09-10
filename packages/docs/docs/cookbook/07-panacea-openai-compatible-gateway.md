@@ -1,30 +1,30 @@
-# Panacea OpenAI-Compatible API Gateway
+# Ourogen OpenAI-Compatible API Gateway
 
-This recipe explains how to point any tool built against the OpenAI SDK at Panacea instead — with zero code changes — while still getting access to Panacea-specific RAG extensions like grounded document sources.
+This recipe explains how to point any tool built against the OpenAI SDK at Ourogen instead — with zero code changes — while still getting access to Ourogen-specific RAG extensions like grounded document sources.
 
 ## What you'll learn
 
 - How `AnoteOpenAI` mirrors the real `openai.OpenAI` client's interface
 - How to upload documents and get document-grounded answers through a chat-completions-shaped API
 - How streaming works over Server-Sent Events (SSE), OpenAI-style
-- Where the Panacea-specific extensions (`anote_sources`, `anote_message_id`) show up in the response
+- Where the Ourogen-specific extensions (`anote_sources`, `anote_message_id`) show up in the response
 
 ## Why this matters
 
-A huge amount of existing tooling — LangChain integrations, internal scripts, third-party agent frameworks — is written against the OpenAI SDK's shape (`client.chat.completions.create(...)`, `client.models.list()`). Rather than asking every integrator to learn a bespoke Panacea SDK, Panacea ships a drop-in client that speaks the same interface, so teams can adopt Panacea's private, document-grounded backend without rewriting their integration code.
+A huge amount of existing tooling — LangChain integrations, internal scripts, third-party agent frameworks — is written against the OpenAI SDK's shape (`client.chat.completions.create(...)`, `client.models.list()`). Rather than asking every integrator to learn a bespoke Ourogen SDK, Ourogen ships a drop-in client that speaks the same interface, so teams can adopt Ourogen's private, document-grounded backend without rewriting their integration code.
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|
 | `Panacea/backend/sdk/anoteai/openai_compat.py` | `AnoteOpenAI` client: `CompletionsClient`, `ModelsClient`, `DocumentsClient`, and the SSE stream parser |
 | `Panacea/backend/sdk/anoteai/core.py` | The underlying `PrivateChatbot` SDK class that the compat layer wraps |
 | `Panacea/backend/sdk/anoteai/handlers/private_handlers.py` | Request handling shared with the native SDK |
-| Server routes: `POST /v1/chat/completions`, `GET /v1/models`, `POST /v1/question-answer`, `POST /public/upload` | The OpenAI-shaped (and one Panacea-specific) endpoints the client calls |
+| Server routes: `POST /v1/chat/completions`, `GET /v1/models`, `POST /v1/question-answer`, `POST /public/upload` | The OpenAI-shaped (and one Ourogen-specific) endpoints the client calls |
 
 ## How it works
 
-1. Instantiate the client exactly like the OpenAI SDK, but pointed at your Panacea backend:
+1. Instantiate the client exactly like the OpenAI SDK, but pointed at your Ourogen backend:
 
    ```python
    from anoteai.openai_compat import AnoteOpenAI
@@ -51,7 +51,7 @@ A huge amount of existing tooling — LangChain integrations, internal scripts, 
    print("Sources:", response.anote_sources)
    ```
 
-4. The response is mapped into dataclasses that mirror the real OpenAI SDK (`ChatCompletion`, `Choice`, `Message`, `Usage`), plus two Panacea extensions: `anote_message_id` and `anote_sources` (the retrieved chunks/citations backing the answer).
+4. The response is mapped into dataclasses that mirror the real OpenAI SDK (`ChatCompletion`, `Choice`, `Message`, `Usage`), plus two Ourogen extensions: `anote_message_id` and `anote_sources` (the retrieved chunks/citations backing the answer).
 5. Pass `stream=True` to get a generator of `ChatCompletionChunk` objects parsed from `text/event-stream` SSE lines (`data: {...}` per token, terminated by `data: [DONE]`) — the same shape OpenAI's streaming client produces.
 6. `client.models.list()` calls `GET /v1/models` for model discovery, returning `Model`/`ModelList` objects just like the OpenAI SDK.
 
@@ -100,4 +100,4 @@ for chunk in client.chat.completions.create(
 
 ## Notes for the cookbook
 
-This recipe is a good complement to recipe 03 — it's the same document Q&A/RAG capability, but exposed through an interface that existing OpenAI-SDK-based tooling can consume unmodified. Worth flagging to readers that `DocumentsClient.upload()`/`question_answer()` are Panacea-specific helpers layered on top of the OpenAI-compatible core, not part of the OpenAI spec itself.
+This recipe is a good complement to recipe 03 — it's the same document Q&A/RAG capability, but exposed through an interface that existing OpenAI-SDK-based tooling can consume unmodified. Worth flagging to readers that `DocumentsClient.upload()`/`question_answer()` are Ourogen-specific helpers layered on top of the OpenAI-compatible core, not part of the OpenAI spec itself.

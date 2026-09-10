@@ -3,8 +3,8 @@ site_url: https://docs.ourogen.ai
 site_description: Unified AI coding assistant and chatbot platform
 site_author: Ourogen
 
-repo_name: anote-ai/Panacea
-repo_url: https://github.com/anote-ai/Panacea
+repo_name: anote-ai/Autonomous-Intelligence
+repo_url: https://github.com/anote-ai/Autonomous-Intelligence
 
 extra:
   homepage: https://ourogen.ai
@@ -110,6 +110,8 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.tabbed:
       alternate_style: true
+  - attr_list
+  - md_in_html
   - tables
   - toc:
       permalink: true
@@ -122,10 +124,10 @@ nav:
     - Changelog: getting-started/changelog.md
     - Configuration: getting-started/configuration.md
   - Core Concepts:
-    - How Panacea Works: core-concepts/how-it-works.md
-    - Extend Panacea: core-concepts/extend.md
+    - How Ourogen Works: core-concepts/how-it-works.md
+    - Extend Ourogen: core-concepts/extend.md
     - Explore the .anote Directory: core-concepts/anote-directory.md
-  - Use Panacea:
+  - Use Ourogen:
     - Permission Modes: use-panacea/permission-modes.md
     - Manage Sessions: use-panacea/sessions.md
     - Common Workflows: use-panacea/common-workflows.md

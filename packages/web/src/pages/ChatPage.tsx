@@ -131,7 +131,7 @@ export default function ChatPage() {
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(
     null,
   );
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
@@ -628,7 +628,7 @@ export default function ChatPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       sendMessage();
     }
@@ -721,6 +721,7 @@ export default function ChatPage() {
           }}
           onKeyDown={handleKeyDown}
           placeholder="Message Ourogen..."
+          aria-label="Message Ourogen"
           rows={1}
           className="w-full bg-transparent px-4 pt-3.5 pb-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px] resize-none"
         />
@@ -795,7 +796,7 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
-      <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-2">
+      <p className="text-xs text-center text-gray-600 dark:text-gray-400 mt-2">
         Ourogen can make mistakes. Verify important information.
       </p>
     </div>
@@ -803,7 +804,7 @@ export default function ChatPage() {
 
   return (
     <div
-      className="flex h-screen bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative"
+      className="flex h-dvh bg-white dark:bg-[#212121] text-gray-900 dark:text-white relative"
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
@@ -989,7 +990,7 @@ export default function ChatPage() {
                   >
                     <p className="truncate font-medium">{r.title}</p>
                     {r.snippet && (
-                      <p className="truncate text-xs text-gray-400 dark:text-gray-500">
+                      <p className="truncate text-xs text-gray-600 dark:text-gray-400">
                         {r.snippet}
                       </p>
                     )}
@@ -1003,7 +1004,7 @@ export default function ChatPage() {
 
       {/* Sidebar */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-14'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col`}
+        className={`${sidebarOpen ? 'w-64 max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl' : 'w-14 max-md:hidden'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col`}
       >
         <div
           className={`p-3 flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}
@@ -1115,6 +1116,7 @@ export default function ChatPage() {
         <UserMenu sidebarOpen={sidebarOpen} />
       </aside>
 
+      {sidebarOpen && <button className="fixed inset-0 z-30 bg-black/40 md:hidden" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
@@ -1123,6 +1125,7 @@ export default function ChatPage() {
             onClick={() => setSidebarOpen((o) => !o)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2F2F2F] text-gray-500 dark:text-gray-400"
             aria-label="Toggle sidebar"
+            aria-expanded={sidebarOpen}
           >
             <svg
               className="w-4 h-4"
@@ -1143,15 +1146,27 @@ export default function ChatPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
-              <OurogenLogo className="w-16 h-16 opacity-30" />
-              <p className="text-gray-600 dark:text-gray-300 text-lg">
-                How can I help you today?
+            <div className="flex flex-col items-center justify-center min-h-full gap-4 px-5 py-10 text-center">
+              <OurogenLogo className="w-12 h-12" />
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
+                What would you like to work on?
+              </h1>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Ask a question, explore an idea, or bring a document.
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Drop a file anywhere to upload — {ACCEPTED_LABEL}
-              </p>
-              <div className="w-full mt-2">
+              <div className="grid w-full max-w-3xl gap-3 sm:grid-cols-3 my-3 text-left">
+                {[
+                  { title: 'Make a plan', prompt: 'Help me turn an idea into a practical plan. Ask me about my goal first.' },
+                  { title: 'Improve my writing', prompt: 'Help me make a draft clearer and more concise. Ask me to share it.' },
+                  { title: 'Understand some code', prompt: 'Help me understand a piece of code. Ask me to paste it and explain what I want to learn.' },
+                ].map(({ title, prompt }) => (
+                  <button key={title} onClick={() => { setInput(prompt); requestAnimationFrame(() => { textareaRef.current?.focus(); autoResize(); }); }}
+                    className="rounded-2xl border border-gray-200 dark:border-gray-700 px-4 py-4 text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left">
+                    {title}<span aria-hidden="true" className="float-right text-gray-500">↗</span>
+                  </button>
+                ))}
+              </div>
+              <div className="w-full mt-2 text-left">
                 {uploadsRow}
                 {composerBox}
               </div>

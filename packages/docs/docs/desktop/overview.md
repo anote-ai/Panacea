@@ -1,6 +1,6 @@
 # Desktop App Overview
 
-The Anote AI desktop app is a private, offline-capable AI assistant built with Electron.
+The Ourogen desktop app is a private, offline-capable AI assistant built with Electron.
 
 ## Key Properties
 

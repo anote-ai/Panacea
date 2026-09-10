@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useAppTheme, useAppAuth } from "./_layout";
-import RocketLogo from "../src/components/RocketLogo";
+import OurogenLogo from "../src/components/OurogenLogo";
 import { getSessions, getSession, deleteSession, Session, Message } from "../src/api";
 import { API_BASE, MODELS } from "../src/constants";
 
@@ -134,7 +134,7 @@ export default function ChatScreen() {
     ]}>
       {item.role === "assistant" && (
         <View style={[styles.avatar, { backgroundColor: theme.surfaceAlt }]}>
-          <RocketLogo size={18} bodyColor={theme.rocketBody} accentColor={theme.rocketAccent} />
+          <OurogenLogo size={18} dark={dark} />
         </View>
       )}
       <View style={[
@@ -159,7 +159,7 @@ export default function ChatScreen() {
           <Text style={{ fontSize: 20, color: theme.text }}>{"☰"}</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
-          {MODELS.find((m) => m === model)?.split("-").slice(0, 2).join("-") ?? "Anote AI"}
+          {MODELS.find((m) => m === model)?.split("-").slice(0, 2).join("-") ?? "Ourogen"}
         </Text>
         <TouchableOpacity onPress={toggle} style={styles.headerBtn}>
           <Text style={{ fontSize: 20 }}>{dark ? "☀️" : "🌙"}</Text>
@@ -177,8 +177,8 @@ export default function ChatScreen() {
       {showSidebar && (
         <View style={[styles.sidebar, { backgroundColor: theme.surface }]}>
           <View style={styles.sidebarHeader}>
-            <RocketLogo size={24} bodyColor={theme.rocketBody} accentColor={theme.rocketAccent} />
-            <Text style={[styles.sidebarTitle, { color: theme.text }]}>Anote AI</Text>
+            <OurogenLogo size={24} dark={dark} />
+            <Text style={[styles.sidebarTitle, { color: theme.text }]}>Ourogen</Text>
           </View>
           <TouchableOpacity
             style={[styles.newChatBtn, { backgroundColor: theme.surfaceAlt }]}
@@ -219,7 +219,7 @@ export default function ChatScreen() {
       {/* Messages */}
       {messages.length === 0 ? (
         <View style={styles.emptyState}>
-          <RocketLogo size={64} bodyColor={theme.rocketBody} accentColor={theme.rocketAccent} />
+          <OurogenLogo size={64} dark={dark} />
           <Text style={[styles.emptyText, { color: theme.textMuted }]}>How can I help you today?</Text>
         </View>
       ) : (
@@ -239,7 +239,7 @@ export default function ChatScreen() {
           <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
             <TextInput
               style={[styles.textInput, { color: theme.text }]}
-              placeholder="Message Anote AI..."
+              placeholder="Message Ourogen..."
               placeholderTextColor={theme.textMuted}
               value={input}
               onChangeText={setInput}

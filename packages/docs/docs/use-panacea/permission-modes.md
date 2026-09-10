@@ -1,6 +1,6 @@
 # Permission Modes
 
-Panacea has three permission modes, controlling whether the agent asks before writing files or running commands.
+Ourogen has three permission modes, controlling whether the agent asks before writing files or running commands.
 
 | Mode | Behavior |
 |---|---|
@@ -35,9 +35,9 @@ Most commands don't require you to touch global config — they take their own f
 
 ## Hooks as a policy layer
 
-For anything more specific than "ask vs. don't ask" — like blocking `Bash` calls that touch a certain path — use a `preToolUse` hook instead. See [Extend Panacea](../core-concepts/extend.md).
+For anything more specific than "ask vs. don't ask" — like blocking `Bash` calls that touch a certain path — use a `preToolUse` hook instead. See [Extend Ourogen](../core-concepts/extend.md).
 
 ## Next steps
 
-- [How Panacea works](../core-concepts/how-it-works.md) — the agent loop these modes control
+- [How Ourogen works](../core-concepts/how-it-works.md) — the agent loop these modes control
 - [Explore the .anote directory](../core-concepts/anote-directory.md) — where `permissionMode` lives in config

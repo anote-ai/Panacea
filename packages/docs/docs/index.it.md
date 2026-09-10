@@ -1,6 +1,6 @@
 # Panoramica
 
-**Anote AI** è un assistente alla codifica AI unificato e una piattaforma di chatbot privata. Legge il tuo codice sorgente, modifica file, esegue comandi, rivede PR e risponde a domande sui tuoi documenti — disponibile nel tuo terminale, IDE, browser, app desktop e telefono.
+**Ourogen** è un assistente alla codifica AI unificato e una piattaforma di chatbot privata. Legge il tuo codice sorgente, modifica file, esegue comandi, rivede PR e risponde a domande sui tuoi documenti — disponibile nel tuo terminale, IDE, browser, app desktop e telefono.
 
 ## Iniziare
 

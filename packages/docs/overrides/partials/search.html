@@ -1,16 +1,16 @@
 {#-
   Based on material/templates/partials/search.html — changes the placeholder
-  to "Search or ask a question..." and adds an "Ask Assistant" chip inside the
+  to "Search documentation..." and adds an "Ask Assistant" chip inside the
   expanded search box, matching code.claude.com/docs' search overlay.
 
   Ported from anote-ai/Documentation (docs.anote.ai) so this site follows the
   same style guide.
 -#}
-<div class="md-search" data-md-component="search" role="dialog">
+<div class="md-search" data-md-component="search" role="dialog" aria-label="Search documentation">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form anote-search__form" name="search">
-      <input type="text" class="md-search__input" name="query" aria-label="Search or ask a question..." placeholder="Search or ask a question..." autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <input type="text" class="md-search__input" name="query" aria-label="Search documentation..." placeholder="Search documentation..." autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         {% set icon = config.theme.icon.search or "material/magnify" %}
         {% include ".icons/" ~ icon ~ ".svg" %}

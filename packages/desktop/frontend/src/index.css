@@ -19,3 +19,9 @@ html, body, #root {
 .dark ::-webkit-scrollbar-thumb { background: #4b5563; }
 
 textarea { resize: none; }
+
+html { -webkit-font-smoothing: antialiased; color-scheme: light; }
+html.dark { color-scheme: dark; }
+:where(a, button, input, textarea, select):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.group:focus-within .opacity-0 { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }

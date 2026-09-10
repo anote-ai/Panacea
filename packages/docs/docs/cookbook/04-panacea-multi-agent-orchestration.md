@@ -1,18 +1,18 @@
-# Panacea Multi-Agent Orchestration
+# Ourogen Multi-Agent Orchestration
 
-This recipe explains Panacea’s agent orchestration architecture: how the orchestrator assigns tasks, picks agents, and supports sequential and hierarchical workflows.
+This recipe explains Ourogen’s agent orchestration architecture: how the orchestrator assigns tasks, picks agents, and supports sequential and hierarchical workflows.
 
 ## What you'll learn
 
 - The role of the orchestrator as the system brain
-- How Panacea routes tasks to specialized agents
+- How Ourogen routes tasks to specialized agents
 - The difference between sequential and hierarchical workflows
 - How crews of agents collaborate on a shared goal
 - How tool registration works so agents can use new capabilities
 
 ## Why this matters
 
-In Panacea, the orchestrator is not random. It chooses the best agent based on capability descriptions, task context, and workflow state. That makes the system predictable and extensible.
+In Ourogen, the orchestrator is not random. It chooses the best agent based on capability descriptions, task context, and workflow state. That makes the system predictable and extensible.
 
 ## Key concepts
 
@@ -24,7 +24,7 @@ In Panacea, the orchestrator is not random. It chooses the best agent based on c
   - **Hierarchical**: a chain of command where the orchestrator delegates subtasks to specialists
 - **Tools** — functions agents can call to perform actions like searching, uploading, or executing code
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|
@@ -62,13 +62,13 @@ This is similar to a chain of command: the orchestrator stays in control and del
 
 ## Tool registration
 
-Panacea supports dynamic tool registration. If an agent needs a new capability, it can call `register_tool(...)` from `backend/agents/autonomous_agent.py`.
+Ourogen supports dynamic tool registration. If an agent needs a new capability, it can call `register_tool(...)` from `backend/agents/autonomous_agent.py`.
 
 That means the cookbook can document not only how to use existing tools, but how to add new tools to the system.
 
 ## Feedback loop
 
-User feedback is essential for improving agent selection. Panacea logs feedback from document Q&A and task results so the orchestrator can learn which agents and tools produce the best outcomes.
+User feedback is essential for improving agent selection. Ourogen logs feedback from document Q&A and task results so the orchestrator can learn which agents and tools produce the best outcomes.
 
 ## Notes for the cookbook
 

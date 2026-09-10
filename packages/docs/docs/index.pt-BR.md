@@ -1,6 +1,6 @@
 # Visão Geral
 
-**Anote AI** é uma plataforma unificada de assistente de codificação por IA e chatbot privado. Ele lê seu código, edita arquivos, executa comandos, revisa PRs e responde perguntas sobre seus documentos — disponível no seu terminal, IDE, navegador, aplicativo de desktop e telefone.
+**Ourogen** é uma plataforma unificada de assistente de codificação por IA e chatbot privado. Ele lê seu código, edita arquivos, executa comandos, revisa PRs e responde perguntas sobre seus documentos — disponível no seu terminal, IDE, navegador, aplicativo de desktop e telefone.
 
 ## Começando
 

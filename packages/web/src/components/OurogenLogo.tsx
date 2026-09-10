@@ -12,5 +12,5 @@ interface Props {
 export default function OurogenLogo({ className = "w-8 h-8" }: Props) {
   const { dark } = useTheme();
   const src = dark ? "/ourogen-icon-white.png" : "/ourogen-icon-black.png";
-  return <img src={src} alt="Ourogen" className={`${className} object-contain`} />;
+  return <img src={src} alt="Ourogen" className={`${className} object-contain mix-blend-multiply dark:mix-blend-screen`} />;
 }

@@ -15,11 +15,11 @@
 {% endif %}
 <header class="{{ class }} anote-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
-    <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo anote-header__logo" aria-label="{{ config.site_name }}" data-md-component="logo">
+    <a href="{{ nav.homepage.url | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo anote-header__logo" aria-label="{{ config.site_name }}" data-md-component="logo">
       {% include "partials/logo.html" %}
       <span class="anote-header__site-name">{{ config.site_name }}</span>
     </a>
-    <label class="md-header__button md-icon" for="__drawer">
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Open navigation" tabindex="0" role="button">
       {% set icon = config.theme.icon.menu or "material/menu" %}
       {% include ".icons/" ~ icon ~ ".svg" %}
     </label>
@@ -58,11 +58,11 @@
     {% if "material/search" in config.plugins %}
       {% set search = config.plugins["material/search"] | attr("config") %}
       {% if search.enabled %}
-        <label class="md-header__button anote-header__search-pill md-icon" for="__search">
+        <label class="md-header__button anote-header__search-pill md-icon" for="__search" aria-label="Search documentation" tabindex="0" role="button">
           {% set icon = config.theme.icon.search or "material/magnify" %}
           {% include ".icons/" ~ icon ~ ".svg" %}
           <span class="anote-header__search-label">Search...</span>
-          <span class="anote-header__search-kbd">⌘K</span>
+          <span class="anote-header__search-kbd">/</span>
         </label>
         {% include "partials/search.html" %}
       {% endif %}
@@ -95,7 +95,7 @@
       {% if not config.theme.palette is mapping %}
         {% include "partials/palette.html" %}
         <details class="anote-header__theme">
-          <summary>
+          <summary aria-label="Appearance">
             <span class="anote-header__theme-icon anote-header__theme-icon--system">{% include ".icons/material/monitor.svg" %}</span>
             <span class="anote-header__theme-icon anote-header__theme-icon--light">{% include ".icons/material/white-balance-sunny.svg" %}</span>
             <span class="anote-header__theme-icon anote-header__theme-icon--dark">{% include ".icons/material/moon-waning-crescent.svg" %}</span>
@@ -125,3 +125,19 @@
     {% endif %}
   {% endif %}
 </header>
+
+<script>
+  document.querySelectorAll('.anote-header label[role="button"]').forEach(function(trigger) {
+    trigger.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); trigger.click(); }
+    });
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      document.querySelectorAll('.anote-header details[open]').forEach(function(menu) {
+        menu.removeAttribute('open');
+        menu.querySelector('summary').focus();
+      });
+    }
+  });
+</script>

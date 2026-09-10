@@ -16,17 +16,6 @@ const SIZE_CLASSES: Record<'sm' | 'lg', string> = {
   lg: 'w-16 h-16 text-xl',
 };
 
-const PALETTE = [
-  '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981',
-  '#06B6D4', '#3B82F6', '#8B5CF6', '#EC4899',
-];
-
-function colorFor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-  return PALETTE[Math.abs(hash) % PALETTE.length];
-}
-
 export default function UserAvatar({
   name,
   email,
@@ -70,8 +59,7 @@ export default function UserAvatar({
 
   return (
     <div
-      className={`${SIZE_CLASSES[size]} rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden font-semibold text-white`}
-      style={url ? undefined : { backgroundColor: colorFor(seed) }}
+      className={`${SIZE_CLASSES[size]} rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden font-semibold text-gray-900 dark:text-white bg-gray-200 dark:bg-gray-700`}
     >
       {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : letter}
     </div>

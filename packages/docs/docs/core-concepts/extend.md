@@ -1,10 +1,10 @@
-# Extend Panacea
+# Extend Ourogen
 
-Two ways to customize how Panacea behaves in your project: **CLAW.md** for persistent instructions, and **hooks** for running your own commands around tool calls.
+Two ways to customize how Ourogen behaves in your project: **CLAW.md** for persistent instructions, and **hooks** for running your own commands around tool calls.
 
 ## CLAW.md — project memory
 
-`CLAW.md` is a markdown file Panacea reads for project context — the same idea as a README aimed at the agent instead of a human. `anote init` generates one automatically, pre-filled with your detected stack and verification commands (test/lint/build):
+`CLAW.md` is a markdown file Ourogen reads for project context — the same idea as a README aimed at the agent instead of a human. `anote init` generates one automatically, pre-filled with your detected stack and verification commands (test/lint/build):
 
 ```markdown
 # CLAW.md
@@ -34,7 +34,7 @@ Run these before considering a change complete:
 - Prefer editing existing files over creating new ones
 ```
 
-Edit it freely — add architecture notes, conventions, or things the agent keeps getting wrong. Panacea reads it at the start of every session in that directory.
+Edit it freely — add architecture notes, conventions, or things the agent keeps getting wrong. Ourogen reads it at the start of every session in that directory.
 
 ## Hooks — run your own commands around tool calls
 

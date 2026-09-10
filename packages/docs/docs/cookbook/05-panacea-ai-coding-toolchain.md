@@ -1,25 +1,25 @@
-# Panacea AI Coding Toolchain
+# Ourogen AI Coding Toolchain
 
-This recipe explains how Panacea’s AI coding experience is delivered across CLI, SDK, and VS Code.
+This recipe explains how Ourogen’s AI coding experience is delivered across CLI, SDK, and VS Code.
 
 ## What you'll learn
 
-- The different AI coding entry points in Panacea
+- The different AI coding entry points in Ourogen
 - How the CLI, SDK, and VS Code extension relate to the shared backend
 - Key product capabilities for private code assistance
 - Where to look in the repo for implementation details
 
 ## Why this matters
 
-Panacea is built as a unified product with multiple interfaces:
+Ourogen is built as a unified product with multiple interfaces:
 
 - a **CLI** that powers `anote chat`, code search, and repo review
 - a **VS Code extension** for in-editor AI assistance
-- a **SDK** for embedding Panacea into other applications
+- a **SDK** for embedding Ourogen into other applications
 
 These interfaces share a backend and agent-driven reasoning layer, which makes the product consistent across desktop, web, and code workflows.
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|
@@ -31,7 +31,7 @@ These interfaces share a backend and agent-driven reasoning layer, which makes t
 ## How it works
 
 - A coding user action starts at the CLI, SDK, or VS Code extension.
-- The request is sent to Panacea’s backend API.
+- The request is sent to Ourogen’s backend API.
 - The backend uses agent orchestration and model providers to produce code-aware answers.
 - The response is returned in the same interface, with code suggestions, explanations, or fixes.
 
@@ -39,7 +39,7 @@ These interfaces share a backend and agent-driven reasoning layer, which makes t
 
 - **CLI**: `anote chat`, repo search, code review, code generation, and embeddings-powered assistance.
 - **VS Code**: inline chat, diff previews, code actions, and streaming responses.
-- **SDK**: a client wrapper for the Panacea API, enabling custom integrations.
+- **SDK**: a client wrapper for the Ourogen API, enabling custom integrations.
 
 ## Run it locally
 
@@ -67,4 +67,4 @@ For VS Code development, open `Panacea/packages/vscode` in VS Code and launch th
 
 ## Notes for the cookbook
 
-This recipe is useful for teammates who need a high-level walkthrough of Panacea’s multi-interface AI coding product. It can also point readers to implementation files they can modify or extend.
+This recipe is useful for teammates who need a high-level walkthrough of Ourogen’s multi-interface AI coding product. It can also point readers to implementation files they can modify or extend.

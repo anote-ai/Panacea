@@ -1,6 +1,6 @@
-# Panacea Billing, API Keys & Credit Metering
+# Ourogen Billing, API Keys & Credit Metering
 
-This recipe explains how Panacea meters usage, authenticates API callers, and turns Stripe subscriptions into a spendable credit balance.
+This recipe explains how Ourogen meters usage, authenticates API callers, and turns Stripe subscriptions into a spendable credit balance.
 
 ## What you'll learn
 
@@ -12,9 +12,9 @@ This recipe explains how Panacea meters usage, authenticates API callers, and tu
 
 ## Why this matters
 
-Panacea isn't just a RAG demo — it's a metered product with real subscription tiers. Every document upload, chat completion, or evaluation call costs credits, and credits are replenished by an active Stripe subscription. This recipe walks through the full loop: how a caller proves who they are, how that identity is priced, and how money (via Stripe) turns back into usable credits.
+Ourogen isn't just a RAG demo — it's a metered product with real subscription tiers. Every document upload, chat completion, or evaluation call costs credits, and credits are replenished by an active Stripe subscription. This recipe walks through the full loop: how a caller proves who they are, how that identity is priced, and how money (via Stripe) turns back into usable credits.
 
-## Key Panacea files
+## Key Ourogen files
 
 | File | Why it matters |
 |---|---|

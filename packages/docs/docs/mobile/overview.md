@@ -1,6 +1,6 @@
 # Mobile App Overview
 
-The Anote AI mobile app is built with [Expo](https://expo.dev) and React Native.
+The Ourogen mobile app is built with [Expo](https://expo.dev) and React Native.
 
 ## Features
 

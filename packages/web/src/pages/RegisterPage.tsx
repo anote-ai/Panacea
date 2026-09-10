@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
-import { useAuth, useTheme } from "../App";
-import OurogenWordmark from "../components/OurogenWordmark";
+import { useAuth } from "../App";
+import AuthLayout from "../components/AuthLayout";
 import { API_BASE_URL } from "../constants/constants";
 
 export default function RegisterPage() {
   const { setToken } = useAuth();
-  const { dark, toggle } = useTheme();
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(() => searchParams.get("email") || "");
@@ -48,24 +47,12 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#212121]">
-      <button
-        onClick={toggle}
-        className="absolute top-4 right-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2F2F2F]"
-        aria-label="Toggle theme"
-      >
-        {dark ? "☀️" : "🌙"}
-      </button>
-      <div className="w-full max-w-sm px-8">
-        <div className="flex flex-col items-center mb-8">
-          <OurogenWordmark className="mb-4" />
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Create account</h1>
-        </div>
+    <AuthLayout title="Create your account" description="A place to think, write, code, and work with your documents.">
         <button
           type="button"
           onClick={handleGoogleRegister}
-          disabled={googleLoading}
-          className="flex items-center justify-center gap-3 w-full py-3 mb-6 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-[#3A3A3A] disabled:opacity-50 transition-colors"
+          disabled={googleLoading || loading}
+          className="flex items-center justify-center gap-3 w-full py-3 mb-6 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-[#3A3A3A] disabled:opacity-50 transition-colors"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
             <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z" />
@@ -77,39 +64,59 @@ export default function RegisterPage() {
         </button>
         <div className="flex items-center gap-3 mb-6">
           <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-          <span className="text-xs text-gray-400 dark:text-gray-500">OR</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">OR</span>
           <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
         </div>
         <form onSubmit={submit} className="space-y-4">
+          <div>
+          <label htmlFor="text" className="block mb-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">Name (optional)</label>
           <input
             type="text"
+            id="text"
+            name="name"
+            autoComplete="name"
             placeholder="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
+            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
           />
+          </div>
+          <div>
+          <label htmlFor="email" className="block mb-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">Email address</label>
           <input
             type="email"
+            id="email"
+            name="email"
+            autoComplete="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
+            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
           />
+          </div>
+          <div>
+          <label htmlFor="password" className="block mb-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
           <input
             type="password"
-            placeholder="Password (min 8 chars)"
+            id="password"
+            name="new-password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            aria-describedby="password-help"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
+            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
           />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          </div>
+          <p id="password-help" className="text-xs text-gray-600 dark:text-gray-400">Use at least 8 characters.</p>
+          {error && <p role="alert" className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors"
+            disabled={loading || googleLoading}
+            className="w-full py-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 transition-colors"
           >
             {loading ? "Creating account..." : "Create account"}
           </button>
@@ -120,7 +127,6 @@ export default function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

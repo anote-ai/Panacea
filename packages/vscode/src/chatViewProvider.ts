@@ -298,7 +298,7 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const iconUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media", "icon.png")
+      vscode.Uri.joinPath(this._extensionUri, "media", "ourogen-icon-white.png")
     );
     return String.raw`<!DOCTYPE html>
 <html lang="en">
@@ -306,7 +306,7 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src ${webview.cspSource} data:; connect-src 'none';" />
-  <title>Anote</title>
+  <title>Ourogen</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -513,15 +513,18 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
     }
     #send-btn:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
     #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .vscode-light .brand-icon, .vscode-light .wlc-icon,
+    .vscode-high-contrast-light .brand-icon, .vscode-high-contrast-light .wlc-icon { filter: invert(1); }
+    button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
   </style>
 </head>
 <body>
   <div id="header">
     <span id="logo">
-      <img src="${iconUri}" alt="Anote" class="brand-icon" />
-      <span class="brand-text">Anote</span>
+      <img src="${iconUri}" alt="Ourogen" class="brand-icon" />
+      <span class="brand-text">Ourogen</span>
     </span>
-    <span id="model-badge" title="Click to open settings">&#8212;</span>
+    <button type="button" id="model-badge" title="Click to open settings">&#8212;</button>
     <span id="token-usage" style="font-size:10px;color:var(--vscode-descriptionForeground);margin-left:auto;margin-right:2px;" title="Total tokens used this session"></span>
     <button class="icon-btn" id="clear-btn" title="Clear chat" aria-label="Clear chat">&#x2715;</button>
     <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">&#9881;</button>
@@ -529,8 +532,8 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
 
   <div id="messages">
     <div id="welcome">
-      <img src="${iconUri}" alt="Anote" class="wlc-icon" />
-      <h2>Anote AI Assistant</h2>
+      <img src="${iconUri}" alt="Ourogen" class="wlc-icon" />
+      <h2>Ourogen</h2>
       <p>Ask about your code, request changes, or start with a focused action.</p>
       <div class="chip-grid">
         <button class="quick-chip" data-action="explain">
@@ -564,7 +567,7 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
   <div id="context-area"></div>
 
   <div id="input-area">
-    <textarea id="input" placeholder="Ask Anote..." rows="1"></textarea>
+    <textarea aria-label="Message Ourogen" id="input" placeholder="Ask Ourogen..." rows="1"></textarea>
     <button id="send-btn" title="Send (Ctrl+Enter)" aria-label="Send">&gt;</button>
   </div>
 
@@ -761,7 +764,7 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
       msgDiv.className = 'msg ' + role;
       var roleDiv = document.createElement('div');
       roleDiv.className = 'msg-role';
-      roleDiv.textContent = role === 'user' ? 'You' : 'Anote';
+      roleDiv.textContent = role === 'user' ? 'You' : 'Ourogen';
       var contentDiv = document.createElement('div');
       contentDiv.className = 'msg-content';
       contentDiv.innerHTML = htmlContent;
@@ -786,7 +789,7 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
       msgDiv.className = 'msg assistant';
       var roleDiv = document.createElement('div');
       roleDiv.className = 'msg-role';
-      roleDiv.textContent = 'Anote';
+      roleDiv.textContent = 'Ourogen';
       var contentDiv = document.createElement('div');
       contentDiv.className = 'msg-content';
       streamCursor = document.createElement('span');
