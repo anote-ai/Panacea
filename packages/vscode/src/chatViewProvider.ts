@@ -349,6 +349,7 @@ export class AnnoteChatViewProvider implements vscode.WebviewViewProvider {
       letter-spacing: 0;
     }
     #model-badge {
+      font: inherit;
       font-size: 11px;
       padding: 3px 7px;
       border-radius: 999px;
