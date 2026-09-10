@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
-import AnoteWordmark from "../components/AnoteWordmark";
+import OurogenWordmark from "../components/OurogenWordmark";
 import { API_BASE_URL } from "../constants/constants";
 
 export default function RegisterPage() {
@@ -37,7 +37,7 @@ export default function RegisterPage() {
       const res = await axios.post(`${API_BASE_URL}/auth/register`, { email, password, name });
       setToken(res.data.token);
       if (res.data.isNewUser) {
-        localStorage.setItem("anote_show_onboarding", "1");
+        localStorage.setItem("ourogen_show_onboarding", "1");
       }
       nav("/app");
     } catch (err: any) {
@@ -58,7 +58,7 @@ export default function RegisterPage() {
       </button>
       <div className="w-full max-w-sm px-8">
         <div className="flex flex-col items-center mb-8">
-          <AnoteWordmark className="mb-4" />
+          <OurogenWordmark className="mb-4" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Create account</h1>
         </div>
         <button

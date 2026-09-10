@@ -7,12 +7,6 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 import CheckoutResultPage from "./pages/CheckoutResultPage";
-import LandingPage from "./landing_page/LandingPage";
-import ContactPage from "./landing_page/ContactPage";
-import PrivacyPolicyPage from "./landing_page/PrivacyPolicyPage";
-import BlogPage from "./landing_page/BlogPage";
-import CareersPage from "./landing_page/CareersPage";
-import CaseStudiesPage from "./landing_page/CaseStudiesPage";
 import { DEFAULT_MODEL, MODELS } from "./constants/models";
 import { API_BASE_URL } from "./constants/constants";
 
@@ -154,12 +148,7 @@ export default function App() {
       >
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/careers" element={<CareersPage />} />
-            <Route path="/case-studies" element={<CaseStudiesPage />} />
+            <Route path="/" element={<Navigate to="/app" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/oauth/callback" element={<OAuthCallbackPage />} />

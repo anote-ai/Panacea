@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, useTheme } from "../App";
-import AnoteWordmark from "../components/AnoteWordmark";
+import OurogenWordmark from "../components/OurogenWordmark";
 import { API_BASE_URL } from "../constants/constants";
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
@@ -67,7 +67,7 @@ export default function LoginPage() {
       </button>
       <div className="w-full max-w-sm px-8">
         <div className="flex flex-col items-center mb-8">
-          <AnoteWordmark className="mb-4" />
+          <OurogenWordmark className="mb-4" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Welcome back</h1>
         </div>
         <button
