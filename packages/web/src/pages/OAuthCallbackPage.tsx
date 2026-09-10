@@ -12,7 +12,7 @@ export default function OAuthCallbackPage() {
     if (token) {
       setToken(token);
       if (searchParams.get("isNewUser") === "1") {
-        localStorage.setItem("anote_show_onboarding", "1");
+        localStorage.setItem("ourogen_show_onboarding", "1");
       }
       nav("/app", { replace: true });
     } else {

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../App';
 import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
-import RocketLogo from '../components/RocketLogo';
+import OurogenLogo from '../components/OurogenLogo';
 import UserMenu from '../components/UserMenu';
 import { API_BASE_URL } from '../constants/constants';
 interface Folder {
@@ -306,8 +306,8 @@ export default function DocumentsPage() {
         className={`${sidebarOpen ? 'w-64' : 'w-14'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-[#F7F7F8] dark:bg-[#171717] flex flex-col border-r border-gray-200 dark:border-gray-700`}
       >
         <div className={`p-3 flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}>
-          <RocketLogo className="w-7 h-7 flex-shrink-0" />
-          {sidebarOpen && <span className="font-semibold text-sm truncate">Anote AI</span>}
+          <OurogenLogo className="w-7 h-7 flex-shrink-0" />
+          {sidebarOpen && <span className="font-semibold text-sm truncate">Ourogen</span>}
         </div>
         <div className="px-2 pb-1 space-y-0.5">
           <button

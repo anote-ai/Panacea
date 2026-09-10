@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import RocketLogo from './RocketLogo';
+import OurogenLogo from './OurogenLogo';
 
 interface Step {
   title: string;
@@ -11,12 +11,12 @@ const STEPS: Step[] = [
   {
     emoji: '💬',
     title: 'Chat with your AI assistant',
-    body: 'Ask questions, brainstorm, or get help with anything — just type a message below and Anote responds in real time.',
+    body: 'Ask questions, brainstorm, or get help with anything — just type a message below and Ourogen responds in real time.',
   },
   {
     emoji: '📄',
     title: 'Upload documents',
-    body: 'Drop in PDFs, DOCX, TXT, or Markdown files. Anote reads and indexes them so you can ask questions grounded in your own content.',
+    body: 'Drop in PDFs, DOCX, TXT, or Markdown files. Ourogen reads and indexes them so you can ask questions grounded in your own content.',
   },
   {
     emoji: '🔍',
@@ -39,7 +39,7 @@ export default function OnboardingTour({ onDone }: { onDone: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
       <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#2F2F2F] shadow-xl p-8">
         <div className="flex flex-col items-center text-center">
-          <RocketLogo className="w-10 h-10 mb-4" />
+          <OurogenLogo className="w-10 h-10 mb-4" />
           <div className="text-4xl mb-4">{current.emoji}</div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             {current.title}

@@ -1,13 +1,13 @@
-site_name: Anote Panacea Docs
-site_url: https://docs.anote.ai
+site_name: Ourogen Docs
+site_url: https://docs.ourogen.ai
 site_description: Unified AI coding assistant and chatbot platform
-site_author: Anote AI
+site_author: Ourogen
 
 repo_name: anote-ai/Panacea
 repo_url: https://github.com/anote-ai/Panacea
 
 extra:
-  homepage: https://anote.ai
+  homepage: https://ourogen.ai
   # `extra.alternate` is no longer hand-maintained here — the i18n plugin
   # below (reconfigure_material: true) populates it automatically from the
   # `languages` list, with real per-language URLs and correct hreflang tags.
@@ -21,16 +21,21 @@ theme:
   # we render our own System/Light/Dark dropdown instead (see
   # overrides/partials/header.html), wired to these same hidden radio inputs
   # via plain <label for="__palette_N"> — no custom JS needed.
+  # The named primary/accent colors below are just Material's palette-picker
+  # keys, not the real colors — docs/stylesheets/extra.css overrides the
+  # underlying CSS variables with exact hex values matching the product and
+  # landing page (pure white/black neutral grayscale, no accent color).
+  # "grey" is the closest built-in key to that, so the two states agree.
   palette:
     - media: "(prefers-color-scheme)"
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: white
-      accent: light blue
+      accent: grey
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: black
-      accent: light blue
+      accent: grey
   features:
     - navigation.tabs
     - navigation.tabs.sticky
@@ -43,8 +48,8 @@ theme:
     - content.code.annotate
   icon:
     repo: fontawesome/brands/github
-  logo: assets/rocketlogo.png
-  favicon: assets/favicon-removebg-preview.png
+  logo: assets/ourogen-icon-black.png
+  favicon: assets/ourogen-icon-black.png
 
 extra_css:
   - stylesheets/extra.css

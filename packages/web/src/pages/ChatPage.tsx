@@ -7,7 +7,7 @@ import { useAuth, useModel } from '../App';
 import DocThumbnail from '../components/DocThumbnail';
 import FileViewerModal from '../components/FileViewerModal';
 import OnboardingTour from '../components/OnboardingTour';
-import RocketLogo from '../components/RocketLogo';
+import OurogenLogo from '../components/OurogenLogo';
 import UserMenu from '../components/UserMenu';
 import { API_BASE_URL } from '../constants/constants';
 
@@ -142,7 +142,7 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ChatSearchResult[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(
-    () => localStorage.getItem('anote_show_onboarding') === '1',
+    () => localStorage.getItem('ourogen_show_onboarding') === '1',
   );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -720,7 +720,7 @@ export default function ChatPage() {
             autoResize();
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Message Anote AI..."
+          placeholder="Message Ourogen..."
           rows={1}
           className="w-full bg-transparent px-4 pt-3.5 pb-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-h-[52px] resize-none"
         />
@@ -796,7 +796,7 @@ export default function ChatPage() {
         </div>
       </div>
       <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-2">
-        Anote AI can make mistakes. Verify important information.
+        Ourogen can make mistakes. Verify important information.
       </p>
     </div>
   );
@@ -1008,9 +1008,9 @@ export default function ChatPage() {
         <div
           className={`p-3 flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}
         >
-          <RocketLogo className="w-7 h-7 flex-shrink-0" />
+          <OurogenLogo className="w-7 h-7 flex-shrink-0" />
           {sidebarOpen && (
-            <span className="font-semibold text-sm truncate">Anote AI</span>
+            <span className="font-semibold text-sm truncate">Ourogen</span>
           )}
         </div>
         <div className="px-2 pb-6 space-y-0.5">
@@ -1144,7 +1144,7 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
-              <RocketLogo className="w-16 h-16 opacity-30" />
+              <OurogenLogo className="w-16 h-16 opacity-30" />
               <p className="text-gray-600 dark:text-gray-300 text-lg">
                 How can I help you today?
               </p>
@@ -1173,7 +1173,7 @@ export default function ChatPage() {
                   >
                     {msg.role === 'assistant' && (
                       <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[#2F2F2F] flex items-center justify-center flex-shrink-0">
-                        <RocketLogo className="w-5 h-5" />
+                        <OurogenLogo className="w-5 h-5" />
                       </div>
                     )}
                     <div
@@ -1301,7 +1301,7 @@ export default function ChatPage() {
       {showOnboarding && (
         <OnboardingTour
           onDone={() => {
-            localStorage.removeItem('anote_show_onboarding');
+            localStorage.removeItem('ourogen_show_onboarding');
             setShowOnboarding(false);
           }}
         />

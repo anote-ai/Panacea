@@ -3,12 +3,9 @@
   match code.claude.com/docs' header layout: logo, language selector, a pill
   search bar, an "Ask Assistant" link, and right-aligned product nav links.
 
-  Ported from anote-ai/Documentation (the repo behind docs.anote.ai) so this
-  site follows the same style guide.
-
-  NOTE: the URLs below (chat.anote.ai, anote.ai) are best-guess placeholders
-  based on context in this conversation, not confirmed production URLs —
-  swap them for the real ones before this ships.
+  Originally ported from anote-ai/Documentation's style guide, since rebranded
+  to Ourogen: the product lives at chat.ourogen.ai, the marketing site at
+  ourogen.ai, and this docs site at docs.ourogen.ai (see mkdocs.yml).
 -#}
 {% set class = "md-header" %}
 {% if "navigation.tabs.sticky" in features %}
@@ -91,7 +88,7 @@
     </div>
 
     <nav class="anote-header__links" aria-label="Product">
-      <a href="https://chat.anote.ai/" target="_blank" rel="noopener">Panacea Developer Platform</a>
+      <a href="https://chat.ourogen.ai/" target="_blank" rel="noopener">Open Ourogen Chat</a>
     </nav>
 
     {% if config.theme.palette %}
