@@ -1,0 +1,15 @@
+<!--
+  Ourogen's mark is a solid black (light bg) or solid white (dark bg) PNG,
+  not a currentColor SVG, so a single static `theme.logo` can't read on both
+  header backgrounds. Render both variants, each wrapped in its own <span>,
+  and let CSS (see .ourogen-logo-slot--light/--dark in extra.css) show only
+  the one matching the active color scheme. The <span> wrapper (rather than
+  toggling display on the <img> itself) sidesteps Material's own `.md-logo
+  img` display rule, which otherwise wins the specificity fight.
+-->
+<span class="ourogen-logo-slot ourogen-logo-slot--light">
+  <img src="{{ 'assets/ourogen-icon-black.png' | url }}" alt="" width="28" height="28" />
+</span>
+<span class="ourogen-logo-slot ourogen-logo-slot--dark">
+  <img src="{{ 'assets/ourogen-icon-white.png' | url }}" alt="" width="28" height="28" />
+</span>

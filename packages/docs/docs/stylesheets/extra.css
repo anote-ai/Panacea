@@ -1,63 +1,61 @@
-/* Anote brand skin for Material for MkDocs.
-   Palette matches packages/web/tailwind.config.js (the actual Anote product UI) —
-   warm off-white / near-black, monochrome accent. Layout + header follow
-   code.claude.com/docs' structure (see overrides/partials/header.html for the
-   template that adds the language selector, search pill, Ask Assistant link,
-   and right-aligned product nav).
-
-   Ported from anote-ai/Documentation (docs.anote.ai) so this site follows the
-   same style guide. */
+/* Ourogen brand skin for Material for MkDocs.
+   Palette matches packages/web/tailwind.config.js and the Ourogen landing
+   page (anote-ai/ourogen) exactly — pure white/black neutral grayscale, no
+   warm tint, no color accent. Layout + header follow code.claude.com/docs'
+   structure (see overrides/partials/header.html for the template that adds
+   the language selector, search pill, Ask Assistant link, and right-aligned
+   product nav). */
 
 :root {
-  --md-primary-fg-color: #faf7f0;
+  --md-primary-fg-color: #ffffff;
   --md-primary-fg-color--light: #ffffff;
-  --md-primary-fg-color--dark: #f1efe8;
-  --md-primary-bg-color: #2c2c2a;
-  --md-primary-bg-color--light: #2c2c2a;
+  --md-primary-fg-color--dark: #f7f7f8;
+  --md-primary-bg-color: #171717;
+  --md-primary-bg-color--light: #171717;
 }
 
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #faf7f0;
+  --md-primary-fg-color: #ffffff;
   --md-primary-fg-color--light: #ffffff;
-  --md-primary-fg-color--dark: #f1efe8;
-  --md-primary-bg-color: #2c2c2a;
-  --md-primary-bg-color--light: #2c2c2a;
+  --md-primary-fg-color--dark: #f7f7f8;
+  --md-primary-bg-color: #171717;
+  --md-primary-bg-color--light: #171717;
 
-  --md-default-bg-color: #faf7f0;
-  --md-default-fg-color: #2c2c2a;
-  --md-default-fg-color--light: #888780;
-  --md-default-fg-color--lighter: #d3d1c7;
-  --md-accent-fg-color: #2c2c2a;
-  --md-accent-fg-color--transparent: rgba(44, 44, 42, 0.08);
+  --md-default-bg-color: #ffffff;
+  --md-default-fg-color: #171717;
+  --md-default-fg-color--light: #6b7280;
+  --md-default-fg-color--lighter: #e5e7eb;
+  --md-accent-fg-color: #171717;
+  --md-accent-fg-color--transparent: rgba(23, 23, 23, 0.08);
   --md-accent-bg-color: #ffffff;
-  --md-typeset-a-color: #2c2c2a;
-  --md-footer-bg-color: #26221f;
-  --md-footer-bg-color--dark: #1c1917;
-  --md-footer-fg-color: #faf7f0;
-  --md-footer-fg-color--light: #d3d1c7;
-  --md-code-bg-color: #f1efe8;
-  --md-code-fg-color: #2c2c2a;
+  --md-typeset-a-color: #171717;
+  --md-footer-bg-color: #171717;
+  --md-footer-bg-color--dark: #000000;
+  --md-footer-fg-color: #ffffff;
+  --md-footer-fg-color--light: #d1d5db;
+  --md-code-bg-color: #f7f7f8;
+  --md-code-fg-color: #171717;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #1c1917;
-  --md-primary-fg-color--light: #26221f;
-  --md-primary-fg-color--dark: #131110;
-  --md-primary-bg-color: #f1efe8;
-  --md-primary-bg-color--light: #f1efe8;
+  --md-primary-fg-color: #212121;
+  --md-primary-fg-color--light: #2f2f2f;
+  --md-primary-fg-color--dark: #171717;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffff;
 
-  --md-default-bg-color: #26221f;
-  --md-default-fg-color: #f1efe8;
-  --md-default-fg-color--light: #a6a59c;
-  --md-default-fg-color--lighter: #4a453e;
-  --md-accent-fg-color: #f1efe8;
-  --md-accent-fg-color--transparent: rgba(241, 239, 232, 0.1);
-  --md-accent-bg-color: #26221f;
-  --md-typeset-a-color: #f1efe8;
-  --md-footer-bg-color: #1c1917;
-  --md-footer-bg-color--dark: #131110;
-  --md-code-bg-color: #332f28;
-  --md-code-fg-color: #f1efe8;
+  --md-default-bg-color: #212121;
+  --md-default-fg-color: #ffffff;
+  --md-default-fg-color--light: #9ca3af;
+  --md-default-fg-color--lighter: #3a3a3a;
+  --md-accent-fg-color: #ffffff;
+  --md-accent-fg-color--transparent: rgba(255, 255, 255, 0.1);
+  --md-accent-bg-color: #212121;
+  --md-typeset-a-color: #ffffff;
+  --md-footer-bg-color: #171717;
+  --md-footer-bg-color--dark: #000000;
+  --md-code-bg-color: #2f2f2f;
+  --md-code-fg-color: #f7f7f8;
 }
 
 /* code.claude.com/docs loads a private font ("Anthropic Sans", self-hosted
@@ -255,6 +253,34 @@ body,
   align-items: center;
   gap: 0.5rem;
   margin-right: 0.25rem;
+}
+
+/* Ourogen's mark is a solid-color PNG (not currentColor SVG), so show
+   whichever of the two variants matches the active scheme — same logic as
+   the OurogenLogo/OurogenMark components in packages/web and the Ourogen
+   landing page. Toggling the <span> wrapper (not the <img> itself) avoids
+   losing a specificity fight against Material's own `.md-logo img` rule. */
+.ourogen-logo-slot {
+  display: flex;
+  align-items: center;
+}
+
+.ourogen-logo-slot img {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+}
+
+.ourogen-logo-slot--dark {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .ourogen-logo-slot--light {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .ourogen-logo-slot--dark {
+  display: flex;
 }
 
 /* Always shown right next to the logo, at every screen size — unlike the
