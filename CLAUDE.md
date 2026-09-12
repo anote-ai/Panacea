@@ -15,7 +15,7 @@
 ## Repository Structure
 
 ```
-Autonomous-Intelligence/
+Panacea/
 ├── packages/
 │   ├── backend/        # Python Flask API (shared by all frontends)
 │   ├── cli/            # TypeScript CLI tool (anote command)
@@ -145,5 +145,5 @@ Copy `packages/backend/.env.example` → `packages/backend/.env`:
 
 This monorepo consolidates:
 - `anote-ai/AI-Assisted-Coding-Tool` → `packages/cli/`, `packages/sdk/`, `packages/vscode/`
-- `anote-ai/Autonomous-Intelligence` (original) → `packages/backend/`, `packages/web/`
+- `anote-ai/Panacea` (original) → `packages/backend/`, `packages/web/`
 - `anote-ai/PrivateGPT` → `packages/desktop/`
