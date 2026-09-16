@@ -26,13 +26,13 @@ def test_build_oauth_state() -> None:
 def test_build_callback_redirect_url() -> None:
     assert (
         build_callback_redirect_url(
-            "https://chat.anote.ai",
+            "https://chat.ourogen.ai",
             "access",
             "refresh",
             "prod-1",
             "trial-1",
         )
-        == "https://chat.anote.ai?accessToken=access&refreshToken=refresh&product_hash=prod-1&free_trial_code=trial-1"
+        == "https://chat.ourogen.ai?accessToken=access&refreshToken=refresh&product_hash=prod-1&free_trial_code=trial-1"
     )
 
 
