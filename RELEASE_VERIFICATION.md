@@ -17,8 +17,8 @@ start payment sessions, or mutate production data.
 
 ```bash
 python scripts/release_smoke.py \
-  --frontend-url https://chat.anote.ai \
-  --api-url https://chat.anote.ai \
+  --frontend-url https://chat.ourogen.ai \
+  --api-url https://chat.ourogen.ai \
   --expected-sha "$EXPECTED_SHA" \
   --require-payments
 ```

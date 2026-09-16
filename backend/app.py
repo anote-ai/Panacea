@@ -165,6 +165,8 @@ config = {
     'http://localhost:8000',
     'https://chat.anote.ai', # Frontend prod URL,
     'http://localhost:5050',
+    'https://chat.ourogen.ai',
+    'https://ourogen.ai'
     'http://dashboard.localhost:3000',  # React
     'https://anote.ai', # Frontend prod URL,
     'https://privatechatbot.ai', # Frontend prod URL,
@@ -428,7 +430,7 @@ def callback():
         audience=GOOGLE_CLIENT_ID
     )
 
-    default_referrer = "https://chat.anote.ai"
+    default_referrer = os.getenv("DEFAULT_REFERRER", None)
     if not default_referrer:
         default_referrer = "http://localhost:3000"
     user_id = create_user_if_does_not_exist(id_info.get("email"), id_info.get("sub"), id_info.get("name"), id_info.get("picture"))
