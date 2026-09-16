@@ -163,7 +163,6 @@ config = {
     'http://localhost:3000',  # React
     'http://localhost:5000',
     'http://localhost:8000',
-    #'https://chat.anote.ai', # Frontend prod URL,
     'http://localhost:5050',
     'https://chat.ourogen.ai',
     'https://ourogen.ai'

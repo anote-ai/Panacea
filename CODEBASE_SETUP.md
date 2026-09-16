@@ -2,7 +2,7 @@
 
 ## What is Autonomous Intelligence?
 
-Autonomous Intelligence, also known as **Panacea**, is a multi-agent orchestration framework hosted at [chat.anote.ai](https://chat.anote.ai). It coordinates multiple AI agents to autonomously complete complex, multi-step tasks.
+Autonomous Intelligence, also known as **Panacea**, is a multi-agent orchestration framework hosted at [chat.ourogen.ai](https://chat.ourogen.ai). It coordinates multiple AI agents to autonomously complete complex, multi-step tasks.
 
 ## Architecture
 
