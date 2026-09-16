@@ -6,12 +6,12 @@ on:
       frontend_url:
         description: "Public Panacea frontend URL"
         required: true
-        default: "https://chat.anote.ai"
+        default: "https://chat.ourogen.ai"
         type: string
       api_url:
         description: "Public origin that routes Panacea API paths"
         required: true
-        default: "https://chat.anote.ai"
+        default: "https://chat.ourogen.ai"
         type: string
       expected_sha:
         description: "Expected frontend and backend commit SHA (optional)"
