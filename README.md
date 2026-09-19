@@ -37,7 +37,7 @@ Within the [Agent Registry](https://anote.ai/community/agents), we have added ma
 5. **Automation**: Emails are automatically sent to the generated list of leads. The system tracks progress, showing the number of emails sent and responses received daily.
 6. **Feedback Loop**: User feedback is incorporated to improve the lead generation process, refine email drafts, or adjust selection criteria for future tasks.
 
-![alt text](https://github.com/nv78/Autonomous-Intelligence/blob/main/materials/assets/ExampleNew.png?raw=true)
+![alt text](https://github.com/nv78/Panacea/blob/main/materials/assets/ExampleNew.png?raw=true)
 
 For a full example of this working end to end for this use case, please see [Anote's Upreach Product](https://anote.ai/upreach).
 
