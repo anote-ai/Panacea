@@ -36,6 +36,9 @@ export interface Connection {
   scopes: string;
   bot?: boolean; // Slack: the @mentionable bot is installed
   botAvailable?: boolean; // Slack: this server has the bot turned on
+  name?: string; // MCP server
+  url?: string; // MCP server
+  tools?: string[]; // MCP server
 }
 
 export interface Capabilities {
@@ -46,6 +49,8 @@ export interface Capabilities {
   hubspot_oauth?: boolean;
   salesforce_oauth?: boolean;
   pipedrive_oauth?: boolean;
+  github_oauth?: boolean;
+  notion_oauth?: boolean;
   voice?: boolean;
   avatar?: boolean;
   meeting_bot?: boolean;

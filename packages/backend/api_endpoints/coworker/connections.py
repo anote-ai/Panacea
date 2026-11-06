@@ -1,4 +1,5 @@
-"""Connect, sync, and disconnect Google, Microsoft 365 (Outlook), Slack, and CRMs (HubSpot, Salesforce, Pipedrive)."""
+"""Connect, sync, and disconnect Google, Microsoft 365 (Outlook), Slack, CRMs (HubSpot, Salesforce, Pipedrive),
+and developer tools (GitHub, Jira, Notion, MCP servers; see ``devtools_routes``)."""
 from __future__ import annotations
 
 import os
@@ -10,7 +11,17 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from api_endpoints.coworker.common import coworker_bp, error, frontend_url, store, uid
 from api_endpoints.coworker.core import refresh_knowledge
-from coworker.connectors import crm, google, hubspot, microsoft, pipedrive, salesforce, slack
+from coworker.connectors import (
+    crm,
+    devtools,
+    github,
+    google,
+    hubspot,
+    microsoft,
+    pipedrive,
+    salesforce,
+    slack,
+)
 from coworker.connectors.base import ConnectorError, decrypt_token, encrypt_token
 from middleware.auth import require_auth
 
@@ -354,10 +365,20 @@ def disconnect(provider: str) -> tuple:
     elif provider in crm.PROVIDERS:
         crm.revoke(provider, token)
         purged = 0  # nothing synced from a CRM; records stay in the user's CRM
+    elif provider in devtools.PROVIDERS:
+        if provider == "github":
+            github.revoke(token)
+        purged = devtools.purge(s, user_id, provider)
+    elif provider.startswith("mcp_"):
+        purged = 0  # nothing is synced from an MCP server
     else:
         purged = s.delete_items(user_id)
     s.delete_connection(user_id, provider)
     refresh_knowledge(user_id)
+    if provider in devtools.PROVIDERS:
+        from coworker import knowledge_pack
+
+        knowledge_pack.forget_source(s, user_id)
     s.log(user_id, "connection", f"Disconnected {provider} and deleted {purged} synced items")
     return jsonify({"disconnected": True, "purged": purged}), 200
 
@@ -374,6 +395,8 @@ def sync() -> tuple:
     if not coworker:
         return error("Set up your coworker first", 404, "not_found")
     if coworker.get("mode") != "live":
+        if devtools.connected(s, user_id):  # dev tools can be live while mail is still the demo
+            devtools.sync(s, user_id)
         knowledge = refresh_knowledge(user_id) if request.args.get("rebuild") else None
         return jsonify({"queued": False, **sync_jobs.status(s, user_id), "memory": (knowledge or {}).get("memory")}), 200
     job = sync_jobs.request(s, user_id, rebuild=bool(request.args.get("rebuild")))

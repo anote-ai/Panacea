@@ -7,6 +7,8 @@ import HeaderControls from '../coworker/HeaderControls';
 import ActivityTab from '../coworker/tabs/ActivityTab';
 import ApprovalsTab from '../coworker/tabs/ApprovalsTab';
 import CallsTab from '../coworker/tabs/CallsTab';
+import EngineerTab from '../coworker/tabs/EngineerTab';
+import KnowledgeTab from '../coworker/tabs/KnowledgeTab';
 import MemoryTab from '../coworker/tabs/MemoryTab';
 import ResponsibilitiesTab from '../coworker/tabs/ResponsibilitiesTab';
 import SettingsTab from '../coworker/tabs/SettingsTab';
@@ -27,6 +29,8 @@ export const TABS: CoworkerTab[] = [
   { id: 'approvals', label: 'Approvals', icon: '📥', component: ApprovalsTab },
   { id: 'responsibilities', label: 'Responsibilities', icon: '📌', component: ResponsibilitiesTab },
   { id: 'calls', label: 'Calls', icon: '🎙️', component: CallsTab },
+  { id: 'engineer', label: 'Engineer', icon: '🛠️', component: EngineerTab },
+  { id: 'knowledge', label: 'Knowledge', icon: '📚', component: KnowledgeTab },
   { id: 'activity', label: 'Activity', icon: '🗒️', component: ActivityTab },
   { id: 'memory', label: 'Memory', icon: '🧠', component: MemoryTab },
   { id: 'twin', label: 'Twin', icon: '🪞', component: TwinTab },

@@ -23,6 +23,8 @@ ALLOWED_SETTINGS = {
     "company_name", "company_domain", "timezone", "working_hours", "disclosure_text",
     "disclose_on_approved", "send_delay_seconds", "slack_channels", "meeting_join_policy",
     "recording_consent", "digest_email", "notify_approvals", "model", "weekly_report",
+    # AI engineer
+    "default_repo", "test_command", "engineer_min_slop_score",
 }
 
 
@@ -49,6 +51,7 @@ def get_coworker() -> tuple:
     user_id = uid()
     row = _require_coworker(user_id)
     from coworker import voice
+    from coworker.connectors import github as github_conn
     from coworker.connectors import (
         google,
         hubspot,
@@ -59,6 +62,7 @@ def get_coworker() -> tuple:
         slack,
         tavus,
     )
+    from coworker.connectors import notion as notion_conn
 
     capabilities = {
         "llm": llm_available(user_id),
@@ -68,6 +72,8 @@ def get_coworker() -> tuple:
         "hubspot_oauth": hubspot.is_configured(),
         "salesforce_oauth": salesforce.is_configured(),
         "pipedrive_oauth": pipedrive.is_configured(),
+        "github_oauth": github_conn.is_configured(),
+        "notion_oauth": notion_conn.is_configured(),
         "voice": voice.is_configured(),
         "avatar": tavus.is_configured(),
         "meeting_bot": recall.is_configured(),
@@ -92,6 +98,13 @@ def _serialize_connection(c: dict[str, Any]) -> dict[str, Any]:
         "error": c.get("error") or "", "lastSyncedAt": c.get("last_synced_at"),
         "scopes": c.get("scopes") or "",
     }
+    if c["provider"].startswith("mcp_"):
+        from coworker.connectors.base import decrypt_token
+
+        token = decrypt_token(c.get("token_enc"))
+        out["name"] = token.get("name") or c["provider"][4:]
+        out["url"] = token.get("url", "")
+        out["tools"] = [t.get("name", "") for t in token.get("tools") or []]
     if c["provider"] == "slack":
         from coworker import slackbot
         from coworker.connectors.base import decrypt_token

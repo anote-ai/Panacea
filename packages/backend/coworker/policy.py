@@ -31,6 +31,13 @@ ACTION_TYPES: dict[str, dict[str, Any]] = {
     "responsibility.create": {"label": "Take on a responsibility", "external": False},
 }
 
+# Developer tools: GitHub, Jira, Notion, MCP. Not email, so the outbound email checks
+# don't apply; they wait for approval at the default level like everything else.
+from coworker.connectors.devtools import ACTIONS as _DEV_ACTIONS  # noqa: E402
+
+ACTION_TYPES.update({k: {"label": v["label"], "external": v["external"]} for k, v in _DEV_ACTIONS.items()})
+DEV_ACTION_TYPES = frozenset(_DEV_ACTIONS)
+
 # Configuration changes always need the user's explicit yes.
 ALWAYS_APPROVE = {"responsibility.create"}
 EARNED_AUTONOMY_STREAK = 20

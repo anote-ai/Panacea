@@ -71,6 +71,9 @@ def run(store: Store, job: dict[str, Any]) -> dict[str, Any]:
     user_id = int(job["user_id"])
     try:
         counts = Workspace(store, user_id).sync()
+        from coworker.connectors import devtools
+
+        counts.update(devtools.sync(store, user_id))
         _set(store, job["id"], phase="learning", counts=counts)
         if any(counts.values()) or job.get("rebuild"):
             refresh_knowledge(user_id)

@@ -6,6 +6,7 @@ import { Card, Pill, Section, dangerBtn, ghostBtn, inputCls, primaryBtn } from '
 import TextMessagesCard from '../TextMessagesCard';
 import TelegramCard from '../TelegramCard';
 import EmailAddressCard from '../EmailAddressCard';
+import DevToolsPanel from '../DevToolsPanel';
 
 const LEVEL_HELP: Record<string, string> = {
   suggest: 'Prepare it; I send it myself',
@@ -313,6 +314,9 @@ export default function SettingsTab() {
     <div>
       <Section title="Connections" subtitle="Where your coworker reads from and acts through.">
         <ConnectionsPanel />
+      </Section>
+      <Section title="Developer tools" subtitle="What the AI engineer and code reviewer read from and act through.">
+        <DevToolsPanel />
       </Section>
 
       {autonomy && (

@@ -248,6 +248,10 @@ def undo(store: Store, user_id: int, action_id: int) -> dict[str, Any]:
                 from coworker import slackbot
 
                 done = slackbot.delete(store, user_id, undo_info)
+            elif action["type"] in policy.DEV_ACTION_TYPES:
+                from coworker.connectors import devtools
+
+                done = devtools.undo(store, user_id, undo_info)
             else:
                 done = workspace_for(user_id, store).undo(action["type"], undo_info)
         except ConnectorError as exc:
@@ -307,6 +311,15 @@ def _execute(store: Store, user_id: int, action: dict[str, Any], coworker: dict[
         provider, client = found
         return {"recorded": True, "crm": {"provider": provider, "label": client.label, **pushed},
                 **({"hubspot": pushed} if provider == "hubspot" else {})}
+    if kind in policy.DEV_ACTION_TYPES:
+        from coworker.connectors import devtools
+
+        result = devtools.execute(store, user_id, kind, payload)
+        if kind == "github.pr" and payload.get("run_id"):
+            from coworker.engineering import runs
+
+            runs.pr_opened(store, user_id, int(payload["run_id"]), result)
+        return result
     if kind == "responsibility.create":
         from coworker import responsibilities
 
