@@ -95,16 +95,8 @@ export interface ShareResult {
 
 // ── Error class ─────────────────────────────────────────────────────────────────────
 
-export class AnoteError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly body: unknown,
-  ) {
-    super(message);
-    this.name = "AnoteError";
-  }
-}
+export { AnoteError } from "./errors.js";
+import { AnoteError } from "./errors.js";
 
 // ── Client ────────────────────────────────────────────────────────────────────────────
 
@@ -217,6 +209,9 @@ export class AnoteClient {
     return res.json();
   }
 }
+
+export { CoworkerClient } from "./coworker.js";
+export type * from "./coworker.js";
 
 // Default export for convenience
 export default AnoteClient;

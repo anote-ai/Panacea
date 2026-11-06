@@ -140,6 +140,39 @@ const health = await client.health();
 | `getUsage()` | Current month usage + quota |
 | `health()` | Server liveness check (no auth needed) |
 
+## Your AI coworker
+
+`CoworkerClient` hands work to your [Ourogen AI coworker](../coworker/engineering/index.md): the AI engineer, the code reviewer, and the scorecard. It uses a personal access token from **Coworker → Settings → API tokens** (it starts with `ogn_`).
+
+```ts
+import { CoworkerClient } from "@anote-ai/sdk";
+
+const cw = new CoworkerClient({ token: process.env.OUROGEN_TOKEN!, baseUrl: "https://chat.ourogen.ai" });
+
+// Ticket → spec → task graph → code → tests → review → a PR waiting for your approval in the app
+const run = await cw.engineer.handOff({ source: "jira:ACME-142" });
+console.log(run.status, run.checks.passed, run.slop.score); // "ready" true 100
+
+// Or stop after the spec, edit it, then run
+const draft = await cw.engineer.handOff({ text: "Add CSV export\n- returns a CSV", repo: "acme/api", start: false });
+await cw.engineer.editSpec(draft.id, { constraints: ["No new dependencies"] });
+await cw.engineer.plan(draft.id);
+await cw.engineer.start(draft.id);
+
+const review = await cw.reviews.create("acme/api", 37);   // findings, escalation, slop score
+const week = await cw.scorecard(7);                         // output, quality, cost next to a hire
+```
+
+| Method | What it does |
+|---|---|
+| `engineer.handOff(opts)` | Create, plan and start a run, then wait until it leaves `running` (`waitMs`, default 10 minutes). `start: false` stops after the spec. |
+| `engineer.create / get / list / editSpec / plan / editGraph / start / wait` | Each step on its own |
+| `reviews.create(repo, number) / get / list` | AI code review of a pull request |
+| `scorecard(days)` / `scorecardCsv(days)` | Work done per unit of time |
+| `knowledgePack()` / `trial()` | Read-only |
+
+Tokens can't approve anything. Pull requests and reviews wait for you in the app. Errors are thrown as `AnoteError`, with `status` and the server's `code` in `body` (for example `402 plan_limit` when a plan's engineer runs are used up).
+
 ## Next steps
 
 - [Backend API Overview](../api/overview.md) — the REST endpoints underneath this SDK

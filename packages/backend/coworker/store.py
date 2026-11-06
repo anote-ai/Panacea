@@ -492,6 +492,16 @@ TABLES: dict[str, str] = {
         reason {text},
         created_at VARCHAR(40) NOT NULL
     """,
+    "cw_api_tokens": """
+        id {pk},
+        user_id INT NOT NULL,
+        name VARCHAR(80) NOT NULL DEFAULT '',
+        token_hash VARCHAR(64) NOT NULL UNIQUE,
+        prefix VARCHAR(12) NOT NULL DEFAULT '',
+        created_at VARCHAR(40) NOT NULL,
+        last_used_at VARCHAR(40),
+        revoked_at VARCHAR(40)
+    """,
     "cw_pilot_applications": """
         id {pk},
         name VARCHAR(255) NOT NULL DEFAULT '',

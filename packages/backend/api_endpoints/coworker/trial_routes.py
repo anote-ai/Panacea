@@ -119,3 +119,37 @@ def operator_pricing() -> tuple:
     from coworker import pricing
 
     return jsonify(pricing.analyze(store())), 200
+
+
+# -- API tokens (session only: a token can't manage tokens) ------------------------------
+
+@coworker_bp.get("/tokens")
+@require_auth
+def list_tokens() -> tuple:
+    from coworker import api_tokens
+
+    return jsonify({"tokens": api_tokens.listing(store(), uid()), "allowed": [
+        f"{m} /api/coworker{p.pattern.strip('^$')}" for m, p in api_tokens.ALLOWED]}), 200
+
+
+@coworker_bp.post("/tokens")
+@require_auth
+def create_token() -> tuple:
+    from coworker import api_tokens
+
+    try:
+        row, token = api_tokens.create(store(), uid(), str(_body().get("name", "")))
+    except ValueError as exc:
+        return error(str(exc), 409, "conflict")
+    return jsonify({"id": row["id"], "name": row["name"], "token": token,
+                    "note": "Copy it now: it won't be shown again."}), 201
+
+
+@coworker_bp.delete("/tokens/<int:token_id>")
+@require_auth
+def revoke_token(token_id: int) -> tuple:
+    from coworker import api_tokens
+
+    if not api_tokens.revoke(store(), uid(), token_id):
+        return error("No such token", 404, "not_found")
+    return jsonify({"revoked": True}), 200

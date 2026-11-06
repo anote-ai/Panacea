@@ -13,6 +13,11 @@ coworker_bp = Blueprint("coworker", __name__, url_prefix="/api/coworker")
 
 
 def uid() -> int:
+    from flask import g
+
+    token_user = g.get("coworker_token_user")
+    if token_user is not None:
+        return int(token_user)  # an API token on an allowed route (middleware.auth)
     return int(get_jwt_identity())
 
 

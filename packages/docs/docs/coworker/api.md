@@ -1,6 +1,12 @@
 # Coworker API
 
-All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <token>`), except the OAuth callbacks, the meeting-bot webhook, and pilot applications.
+All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <token>`), except the OAuth callbacks, the meeting-bot webhook, pilot applications, and the public marketplace.
+
+## API tokens
+
+For the [SDK](../sdk/typescript.md#your-ai-coworker), the CLI (`anote coworker`) and scripts, create a personal access token in **Coworker → Settings → API tokens** (or `POST /tokens` with a signed-in session). Tokens start with `ogn_`, are shown once, and are stored only as a hash. Send one as `Authorization: Bearer ogn_…`.
+
+A token works only on these routes: `GET`/`POST /engineer/runs`, `GET /engineer/runs/<id>`, `PATCH /engineer/runs/<id>/spec|graph`, `POST /engineer/runs/<id>/plan|start`, `GET`/`POST /reviews`, `GET /reviews/<id>`, `GET /scorecard`, `GET /knowledge-pack`, `GET /actions`, `GET /trial`. Anything else returns `403` with code `token_not_allowed`. **Approving, sending, billing, connections and token management need a signed-in session**, so a leaked token can't push code or spend money. `GET /tokens` lists your tokens; `DELETE /tokens/<id>` revokes one.
 
 | Area | Routes |
 |---|---|
@@ -23,6 +29,7 @@ All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <to
 | Scorecard | `GET /scorecard?days=&format=csv`, `GET /team/scorecard` (admins) ([guide](guide/scorecard.md)) |
 | Trial | `GET`/`POST /trial`, `PUT /trial/goals`, `POST /trial/decide`; operators: `GET /operator/trials`, `GET /operator/trials/<id>`, `POST /operator/trials/<id>/notes` ([guide](guide/trial.md)) |
 | Marketplace | Public: `GET /marketplace`, `GET /marketplace/ai/<slug>`; `GET /marketplace/me`, `POST /marketplace/publish`, `/unpublish`, `/payouts`, `POST /marketplace/ai/<slug>/hire`, `/rate`, `/report`, `POST /marketplace/hires/<id>/end` ([guide](engineering/marketplace.md)) |
+| API tokens | `GET`/`POST /tokens`, `DELETE /tokens/<id>` (signed-in session only) |
 | Code review | `GET`/`POST /reviews`, `GET /reviews/<id>`, `POST /reviews/<id>/findings/<finding>/dismiss` ([guide](engineering/code-review.md)) |
 
 ## Example: delegate in chat

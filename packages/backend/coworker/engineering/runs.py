@@ -107,6 +107,8 @@ def plan(store: Store, user_id: int, run_id: int) -> dict[str, Any]:
         spec = specs.validate(run.get("spec") or {})
     except ValueError as exc:
         raise RunError(str(exc)) from exc
+    if (run.get("spec") or {}).get("chat_id"):
+        spec["chat_id"] = run["spec"]["chat_id"]  # the chat that asked, to report back into
     client, files = _repo_context(store, user_id, spec["repo"])
     contents = _read_code(client, spec["repo"], files)
     contents = {p: contents[p] for p in graph.rank_files(spec, files, contents)[:MAX_CONTEXT_FILES]}
@@ -257,6 +259,10 @@ def execute(store: Store, user_id: int, run_id: int) -> dict[str, Any]:
                 if node_state["status"] == "pending":
                     node_state["status"] = "skipped"
             store.log(user_id, "engineer", f"Run stopped: {exc}", {"run_id": run_id})
+            if spec.get("chat_id"):
+                from coworker import reports
+
+                reports.post(user_id, int(spec["chat_id"]), f"I stopped work on **{spec['goal']}**: {exc}")
             return _set(store, user_id, run_id, status=status, error=str(exc), nodes=state,
                         cost_micros=_micros(meter))
         except Exception as exc:  # report it on the run; never crash the worker
@@ -350,7 +356,16 @@ def _propose_pr(store: Store, user_id: int, run: dict[str, Any], working: dict[s
                               {"repo": spec["repo"], "branch": branch, "title": title, "body": body, "files": files,
                                "run_id": run["id"], "diff": "".join(diffs.unified(f["path"], original.get(f["path"]),
                                                                                     working.get(f["path"])) for f in files)[:60000]},
-                              title=f"Open PR: {title}", reasoning=body, extra_risks=risks)
+                              title=f"Open PR: {title}", reasoning=body, extra_risks=risks, chat_id=spec.get("chat_id"))
+    if spec.get("chat_id"):
+        from coworker import reports
+
+        verdict = ("tests pass" if checks.get("passed") else "tests failed" if checks.get("passed") is False
+                   else "tests not run")
+        reports.post(user_id, int(spec["chat_id"]),
+                     f"🔀 The pull request for **{title}** is ready: {verdict}, AI review: {result['summary']} "
+                     f"Slop score {slop_report['score']}/100. Approve it to open the PR."
+                     + reports.marker({"t": "action", "id": action["id"]}))
     store.log(user_id, "engineer", f"Ready for review: {title}", {"run_id": run["id"], "action_id": action["id"]},
               action_id=action["id"])
     fresh = _get(store, user_id, run["id"])

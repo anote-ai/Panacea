@@ -38,7 +38,8 @@ class ToolContext:
 # Tools whose results carry text other people wrote. After one runs, a write in the same turn may have been
 # steered by that text, so it no longer counts as something the owner asked for directly.
 READS_UNTRUSTED = {"search_memory", "who_is", "account_status", "list_needs_reply", "read_thread", "calendar",
-                   "reply_to_emails", "my_day", "draft_reply", "meeting_brief", "join_meeting"}
+                   "reply_to_emails", "my_day", "draft_reply", "meeting_brief", "join_meeting",
+                   "engineer_task", "review_pull_request"}
 
 
 def _requested(ctx: ToolContext) -> bool:
@@ -123,6 +124,18 @@ DEFINITIONS: list[dict[str, Any]] = [
      "input_schema": _obj({"date": S}, [])},
     {"name": "remember_preference", "description": "Save a writing or working preference the user just stated (e.g. 'never use exclamation points').",
      "input_schema": _obj({"rule": S}, ["rule"])},
+    {"name": "engineer_task", "description": "Hand engineering work to the AI engineer: a ticket (source like 'jira:ACME-142', "
+     "'notion:<page id>', 'github:owner/repo#12') or a description (text). It drafts a spec, plans a task graph, and, if start "
+     "is true, writes the code, runs the tests, reviews itself, and proposes a pull request for the user's approval. "
+     "Nothing is pushed until the user approves the PR.",
+     "input_schema": _obj({"source": S, "text": S, "repo": S, "start": {"type": "boolean"}}, [])},
+    {"name": "review_pull_request", "description": "Review a GitHub pull request against the user's own standards and propose "
+     "posting the review (inline comments) for approval.",
+     "input_schema": _obj({"repo": S, "number": INT}, ["repo", "number"])},
+    {"name": "engineer_status", "description": "The AI engineer's recent runs: status, checks, PR links.",
+     "input_schema": _obj({}, [])},
+    {"name": "scorecard", "description": "Work the coworker got done over the last N days (default 7): output, quality, cost "
+     "next to a hire for the role.", "input_schema": _obj({"days": INT}, [])},
 ]
 
 
@@ -304,6 +317,39 @@ def _run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
         rows = s.query("SELECT id, type, title, created_at FROM cw_actions WHERE user_id = %s AND status = 'proposed' ORDER BY id DESC",
                        (uid,))
         return rows, f"Checked pending approvals ({len(rows)})"
+    if name == "engineer_task":
+        return _engineer_task(args, ctx)
+    if name == "review_pull_request":
+        from coworker.connectors.base import ConnectorError
+        from coworker.engineering import review
+
+        try:
+            row = review.review_pull_request(s, uid, str(args.get("repo", "")), int(args.get("number") or 0))
+        except (ConnectorError, ValueError) as exc:
+            return {"error": str(exc)}, "Couldn't review that pull request"
+        posted = s.get("cw_actions", int(row["action_id"]), uid) if row.get("action_id") else None
+        if posted:
+            if ctx.chat_id is not None:
+                s.update("cw_actions", posted["id"], uid, {"chat_id": ctx.chat_id})
+            _card(ctx, posted)
+        rv = review.serialize(row)
+        return ({"summary": rv["summary"], "escalate": rv["escalate"], "reasons": rv["reasons"],
+                 "slop_score": rv["slop"].get("score"),
+                 "findings": [{k: f[k] for k in ("severity", "title", "path", "line", "rule")} for f in rv["findings"][:10]]},
+                f"Reviewed {args.get('repo')}#{args.get('number')}")
+    if name == "engineer_status":
+        from coworker.engineering import runs
+
+        rows = [runs.serialize(r) for r in runs.runs(s, uid, limit=5)]
+        return ([{"id": r["id"], "title": r["title"], "status": r["status"], "tests_passed": r["checks"].get("passed"),
+                  "slop_score": r["slop"].get("score"), "pr": r["pr"].get("url", ""), "error": r["error"]} for r in rows],
+                f"Checked engineer runs ({len(rows)})")
+    if name == "scorecard":
+        from coworker import scorecard
+
+        card = scorecard.card(s, uid, int(args.get("days") or 7))
+        return ({k: card[k] for k in ("days", "output", "totalOutput", "humanAttentionHours", "rates", "quality", "cost",
+                                      "vsHire", "hoursSaved")}, f"Scorecard for {card['days']} days")
     if name == "remember_preference":
         coworker = s.get_coworker(uid) or {}
         profile = style.add_rule(coworker.get("style_profile") or {}, args.get("rule", ""))
@@ -329,3 +375,38 @@ def _find_event(s: Store, uid: int, query: str) -> dict[str, Any] | None:
 
 def labels() -> dict[str, str]:
     return {k: v["label"] for k, v in policy.ACTION_TYPES.items()}
+
+
+def _engineer_task(args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
+    """Draft a spec, plan it, and (when the owner asked directly) run it. The PR is always a card to approve."""
+    from coworker.connectors.base import ConnectorError
+    from coworker.engineering import runs
+
+    s, uid = ctx.store, ctx.user_id
+    try:
+        run = runs.create(s, uid, text=str(args.get("text", "")), source=str(args.get("source", "")),
+                          repo=str(args.get("repo", "")))
+        if ctx.chat_id is not None:
+            s.update("cw_eng_runs", run["id"], uid, {"spec": {**run["spec"], "chat_id": ctx.chat_id}})
+        run = runs.plan(s, uid, run["id"])
+    except (runs.RunError, ConnectorError) as exc:
+        return {"error": str(exc)}, "Couldn't start that engineering task"
+    spec = run["spec"]
+    planned = {"run_id": run["id"], "goal": spec["goal"], "acceptance_criteria": spec["acceptance_criteria"],
+               "repo": spec["repo"], "plan": [{"task": n["title"], "files": n["files"]} for n in run["graph"]]}
+    # Ticket text is someone else's words: only start on the owner's direct ask, never from a scheduled run.
+    if not args.get("start", True) or ctx.responsibility is not None or not ctx.owner_message:
+        return {**planned, "status": "planned", "note": "Planned. Tell the user to review it in Coworker → Engineer."}, \
+            f"Planned: {spec['goal']}"
+    try:
+        run = runs.start(s, uid, run["id"])
+    except (runs.RunError, ConnectorError) as exc:
+        return {**planned, "status": "planned", "error": str(exc)}, "Planned, but couldn't start"
+    if run.get("action_id"):
+        action = s.get("cw_actions", int(run["action_id"]), uid)
+        if action:
+            _card(ctx, action)
+    return ({**planned, "status": run["status"], "tests_passed": (run.get("checks") or {}).get("passed"),
+             "slop_score": (run.get("slop") or {}).get("score"), "error": run.get("error") or "",
+             "note": "The pull request is a card waiting for the user's approval; nothing has been pushed."
+             if run["status"] == "ready" else ""}, f"Engineer run: {run['status']}")

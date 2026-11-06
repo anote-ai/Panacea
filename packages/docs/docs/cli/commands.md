@@ -112,3 +112,18 @@ anote perf
 anote perf --focus "database,bundle"
 anote perf --fix
 ```
+
+## `anote coworker`
+
+Hand work to your [Ourogen AI coworker](../coworker/engineering/index.md) from the terminal.
+
+```bash
+anote coworker login --token ogn_… --url https://chat.ourogen.ai   # or set OUROGEN_TOKEN / OUROGEN_URL
+anote coworker engineer ACME-142                    # spec → plan → code → tests → review → PR (approve in the app)
+anote coworker engineer "Add CSV export" --repo acme/api --plan-only
+anote coworker review acme/api#37                   # or a GitHub PR URL
+anote coworker runs
+anote coworker scorecard --days 30 --csv
+```
+
+`login` saves the token to `~/.anote/coworker.json`, readable only by you. Create tokens in **Coworker → Settings → API tokens**. A token can't approve anything: pull requests and reviews wait for you in the app.

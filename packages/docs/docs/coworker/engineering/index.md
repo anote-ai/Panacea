@@ -18,6 +18,14 @@ The demo workspace has a fictional billing service, `anote-demo/acme-api`, with 
 
 Without a model, only the demo ticket works: other specs stop at **Needs a model**. Add an API key in **Settings → Models**, or run a free local model with Ollama.
 
+## From chat, code, or the terminal
+
+- **Chat:** "Take ACME-142 and open a PR when the tests pass." The chat shows the spec and plan, and the pull request card arrives in the same chat when it's ready. "Review #37" reviews a pull request. "How much did you get done this week?" shows the scorecard.
+- **SDK:** `new CoworkerClient({ token }).engineer.handOff({ source: "jira:ACME-142" })` ([TypeScript SDK](../../sdk/typescript.md#your-ai-coworker)).
+- **CLI:** `anote coworker engineer ACME-142`, `anote coworker review acme/api#37`, `anote coworker scorecard`.
+
+The SDK and CLI use an [API token](../api.md#api-tokens). Tokens can start work and read results, but the pull request still waits for your approval in the app.
+
 ## Each step
 
 | Step | What happens | You can |

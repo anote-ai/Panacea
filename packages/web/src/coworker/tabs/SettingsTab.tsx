@@ -7,6 +7,7 @@ import TextMessagesCard from '../TextMessagesCard';
 import TelegramCard from '../TelegramCard';
 import EmailAddressCard from '../EmailAddressCard';
 import DevToolsPanel from '../DevToolsPanel';
+import ApiTokensCard from '../ApiTokensCard';
 
 const LEVEL_HELP: Record<string, string> = {
   suggest: 'Prepare it; I send it myself',
@@ -319,6 +320,9 @@ export default function SettingsTab() {
       </Section>
       <Section title="Developer tools" subtitle="What the AI engineer and code reviewer read from and act through.">
         <DevToolsPanel />
+      </Section>
+      <Section title="API tokens" subtitle="Use your coworker from code and the terminal.">
+        <ApiTokensCard />
       </Section>
 
       {autonomy && (
