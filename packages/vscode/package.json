@@ -95,7 +95,13 @@
       {
         "command": "anote.codeLensAction",
         "title": "Anote: CodeLens Action"
-      }
+      },
+      { "command": "anote.coworker.handOff", "title": "Ourogen: Hand a Ticket to My AI Engineer", "icon": "$(rocket)" },
+      { "command": "anote.coworker.handOffSelection", "title": "Ourogen: Hand This Code to My AI Engineer" },
+      { "command": "anote.coworker.reviewPr", "title": "Ourogen: AI Review of a Pull Request" },
+      { "command": "anote.coworker.scorecard", "title": "Ourogen: Show My AI Coworker's Scorecard" },
+      { "command": "anote.coworker.signIn", "title": "Ourogen: Sign In to My AI Coworker" },
+      { "command": "anote.coworker.signOut", "title": "Ourogen: Sign Out of My AI Coworker" }
     ],
     "menus": {
       "editor/context": [
@@ -111,7 +117,8 @@
         { "command": "anote.fixSelection", "group": "2_fix" },
         { "command": "anote.refactorSelection", "group": "2_fix" },
         { "command": "anote.generateTests", "group": "3_test" },
-        { "command": "anote.addToChat", "group": "4_chat" }
+        { "command": "anote.addToChat", "group": "4_chat" },
+        { "command": "anote.coworker.handOffSelection", "when": "editorHasSelection", "group": "5_coworker" }
       ],
       "editor/title": [
         {
@@ -149,6 +156,11 @@
     "configuration": {
       "title": "Anote AI Coding Assistant",
       "properties": {
+        "anote.coworkerUrl": {
+          "type": "string",
+          "default": "https://chat.ourogen.ai",
+          "description": "Your Ourogen server, for the AI coworker commands. The token is kept in VS Code's secret storage (run “Ourogen: Sign In to My AI Coworker”)."
+        },
         "anote.apiKey": {
           "type": "string",
           "default": "",
@@ -208,7 +220,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "vscode:prepublish": "npm run build",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "npm run build && node --test dist/coworkerCore.test.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.89",
