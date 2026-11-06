@@ -127,6 +127,12 @@ nav:
       - Ways to Reach Your Coworker: coworker/guide/channels.md
       - Meetings and Your Voice: coworker/guide/meetings.md
       - FAQ: coworker/guide/faq.md
+    - AI Engineer:
+      - Overview: coworker/engineering/index.md
+      - Knowledge Packs: coworker/engineering/knowledge-packs.md
+      - AI Code Reviewer: coworker/engineering/code-review.md
+      - Code Evals: coworker/engineering/evals.md
+      - Connect GitHub, Jira, Notion, MCP: coworker/engineering/dev-tools.md
     - Team Admin: coworker/admin/team.md
     - Free Mode (No API Keys): coworker/free-mode.md
     - Operations:

@@ -109,6 +109,18 @@ The chat sidebar now has a **Today** section with the work your coworker did nex
 4. **Create my AI voice** needs `ELEVENLABS_API_KEY` (see below). Without it, calls use a browser voice.
 5. **Revoke consent and delete everything** removes the cloned voice, every file, and the consent recording.
 
+## 7. Hand off engineering work (3 minutes)
+
+The demo workspace includes a fictional engineer's GitHub history, Jira tickets and Notion docs for `anote-demo/acme-api`.
+
+1. **Coworker → Knowledge** shows what it learned about how that engineer works: skills, style rules (with the review comments that taught them), and playbooks. Edit or remove anything.
+2. **Coworker → Engineer → Try the demo ticket (ACME-142)**. Check the spec it drafted, then **Looks right, plan it**.
+3. Look at the task graph (implement, then tests and docs in parallel), then **Start the work**.
+4. Watch the tests pass in the sandbox, read the AI review and slop score, then approve **Open pull request**. (In the demo, nothing is pushed.)
+5. Under **AI code reviewer**, review PR **#37**: it finds float money, a bare `except`, a skipped test, and nested ifs. Click **Don't flag this** on one finding and review again.
+
+Docs: [AI engineer](packages/docs/docs/coworker/engineering/index.md).
+
 ---
 
 ## Turn on the real things
@@ -125,6 +137,7 @@ Add keys to `packages/backend/.env`, then `docker compose up --build` again.
 | `RECALL_API_KEY` | **Join a real meeting:** paste a Zoom, Meet, or Teams link in Calls. The bot needs a public `BACKEND_URL` (e.g. an ngrok URL) to receive live transcripts. |
 | `TAVUS_API_KEY`, `TAVUS_REPLICA_ID` | Live video avatar sessions from the Twin tab |
 | `PILOT_SLACK_WEBHOOK_URL` | Landing-page pilot applications post to Slack |
+| GitHub token, Jira API token, Notion secret | **Your real repositories, tickets and docs** for the knowledge pack and AI engineer. Paste them in **Settings → Developer tools**, or set `GITHUB_CLIENT_ID`/`NOTION_CLIENT_ID` (and secrets) for OAuth. Add `COWORKER_SANDBOX=1` to run your repo's tests. |
 
 ### Connect your real Google account
 
