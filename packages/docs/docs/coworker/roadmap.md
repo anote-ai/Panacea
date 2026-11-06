@@ -14,7 +14,7 @@ The live roadmap is [#443](https://github.com/anote-ai/Panacea/issues/443).
 | AI code reviewer (#447) | In review |
 | Code evals: quality and slop detection (#448) | In review |
 | Output metrics: work done per time (#449) | In review |
-| Pricing: Free / Pro / Enterprise (#451) | Next |
+| Pricing: Free / Pro / Enterprise (#451) | In review (behind a flag) |
 | One-month trial hire with a human-in-the-loop guarantee (#452) | In review |
 | Marketplace: public AI profiles, "Hire AI Natan" (#450) | In review |
 

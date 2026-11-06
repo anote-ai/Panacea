@@ -138,6 +138,7 @@ nav:
       - Connect GitHub, Jira, Notion, MCP: coworker/engineering/dev-tools.md
     - Team Admin: coworker/admin/team.md
     - Free Mode (No API Keys): coworker/free-mode.md
+    - Plans and Pricing: coworker/pricing.md
     - Operations:
       - Set Up: coworker/setup.md
       - Operator Runbook: coworker/operations/runbook.md

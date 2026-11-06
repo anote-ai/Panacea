@@ -108,3 +108,14 @@ def operator_note(trial_id: int) -> tuple:
         return jsonify(trial.operator_note(store(), uid(), trial_id, str(_body().get("text", "")))), 201
     except trial.TrialError as exc:
         return _fail(exc)
+
+
+@coworker_bp.get("/operator/pricing")
+@require_auth
+def operator_pricing() -> tuple:
+    """The margin analysis behind the plan lineups (operators only)."""
+    if not trial.is_operator(store(), uid()):
+        return error("Operators only", 403, "forbidden")
+    from coworker import pricing
+
+    return jsonify(pricing.analyze(store())), 200

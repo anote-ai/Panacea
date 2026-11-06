@@ -199,6 +199,12 @@ def start(store: Store, user_id: int, run_id: int) -> dict[str, Any]:
     run = _get(store, user_id, run_id)
     if run["status"] != "planned":
         raise RunError("Plan the run (and review the graph) before starting it", "conflict")
+    from coworker import billing
+
+    try:
+        billing.require(store, user_id, "engineer")
+    except billing.PlanError as exc:
+        raise RunError(str(exc), "plan_limit") from exc
     run = _set(store, user_id, run_id, status="running", error="")
     from flask import current_app, has_app_context
 

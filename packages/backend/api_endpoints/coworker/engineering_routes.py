@@ -23,7 +23,7 @@ def _need_coworker() -> tuple | None:
 
 
 def _run_error(exc: runs.RunError | ConnectorError) -> tuple:
-    status = {"not_found": 404, "conflict": 409, "needs_model": 409, "not_connected": 409}.get(exc.code, 400)
+    status = {"not_found": 404, "conflict": 409, "needs_model": 409, "not_connected": 409, "plan_limit": 402}.get(exc.code, 400)
     return error(str(exc), status, exc.code)
 
 

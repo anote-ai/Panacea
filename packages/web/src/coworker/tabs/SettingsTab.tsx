@@ -524,9 +524,10 @@ function PlanSection() {
           return (
             <Card key={p.id} className={`p-4 flex flex-col ${current ? 'ring-2 ring-black dark:ring-white' : ''}`}>
               <p className="text-sm font-medium">{p.name}</p>
-              <p className="text-xl font-semibold mt-1">${p.priceUsd}<span className="text-xs font-normal text-gray-500">/mo</span></p>
+              <p className="text-xl font-semibold mt-1">${p.priceUsd}<span className="text-xs font-normal text-gray-500">{p.perSeat ? '/seat/mo' : '/mo'}</span></p>
               <p className="text-xs text-gray-500 mt-1 flex-1">
                 {p.features.join(', ').replace(/_/g, ' ')}{p.callMinutes ? ` · ${p.callMinutes} call min` : ''}
+                {p.features.includes('engineer') ? ` · ${p.engineerRuns === null ? 'unlimited' : p.engineerRuns} engineer runs` : ''}
               </p>
               <button className={`${p.direction === 'upgrade' && !current ? primaryBtn : ghostBtn} mt-3`}
                 disabled={current || !p.available || !!busy} onClick={() => change(p.id, p.name, p.direction)}>
