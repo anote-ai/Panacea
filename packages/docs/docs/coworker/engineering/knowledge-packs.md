@@ -25,7 +25,7 @@ Rules in a known category carry a **check** the [code reviewer](code-review.md) 
 
 ## Versions
 
-**Save version** freezes the current pack as version 1, 2, 3… A saved version never changes. It's what a marketplace listing will point to, so buyers get the same AI you published.
+**Save version** freezes the current pack as version 1, 2, 3… A saved version never changes. It's what a [marketplace](marketplace.md) listing points to, so buyers get the same AI you published.
 
 ## Sources
 

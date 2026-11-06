@@ -9,6 +9,7 @@ import ApprovalsTab from '../coworker/tabs/ApprovalsTab';
 import CallsTab from '../coworker/tabs/CallsTab';
 import EngineerTab from '../coworker/tabs/EngineerTab';
 import KnowledgeTab from '../coworker/tabs/KnowledgeTab';
+import MarketplaceTab from '../coworker/tabs/MarketplaceTab';
 import MemoryTab from '../coworker/tabs/MemoryTab';
 import ResponsibilitiesTab from '../coworker/tabs/ResponsibilitiesTab';
 import ScorecardTab from '../coworker/tabs/ScorecardTab';
@@ -35,6 +36,7 @@ export const TABS: CoworkerTab[] = [
   { id: 'calls', label: 'Calls', icon: '🎙️', component: CallsTab },
   { id: 'engineer', label: 'Engineer', icon: '🛠️', component: EngineerTab },
   { id: 'knowledge', label: 'Knowledge', icon: '📚', component: KnowledgeTab },
+  { id: 'marketplace', label: 'Marketplace', icon: '🏪', component: MarketplaceTab },
   { id: 'activity', label: 'Activity', icon: '🗒️', component: ActivityTab },
   { id: 'memory', label: 'Memory', icon: '🧠', component: MemoryTab },
   { id: 'twin', label: 'Twin', icon: '🪞', component: TwinTab },

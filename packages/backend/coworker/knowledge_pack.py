@@ -377,7 +377,12 @@ def forget_source(store: Store, user_id: int) -> None:
 
 
 def current(store: Store, user_id: int) -> dict[str, Any]:
-    """The pack the coworker works from: the draft, built on first use."""
+    """The pack the coworker works from: a hired AI's pack while a hire is active, else your own draft."""
+    from coworker import marketplace
+
+    hired = marketplace.hired_pack(store, user_id)
+    if hired:
+        return hired
     row = draft(store, user_id)
     return (row or build(store, user_id))["pack"]
 

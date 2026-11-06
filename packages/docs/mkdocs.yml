@@ -132,6 +132,7 @@ nav:
     - AI Engineer:
       - Overview: coworker/engineering/index.md
       - Knowledge Packs: coworker/engineering/knowledge-packs.md
+      - The Marketplace: coworker/engineering/marketplace.md
       - AI Code Reviewer: coworker/engineering/code-review.md
       - Code Evals: coworker/engineering/evals.md
       - Connect GitHub, Jira, Notion, MCP: coworker/engineering/dev-tools.md

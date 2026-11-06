@@ -14,6 +14,7 @@ from api_endpoints.coworker import (  # noqa: F401  (route registration)
     engineering_routes,
     inbound_routes,
     mail_events,
+    marketplace_routes,
     scim_routes,
     scorecard_routes,
     slack_events,

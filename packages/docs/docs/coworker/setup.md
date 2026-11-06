@@ -44,6 +44,7 @@ Open `http://localhost:3000`, create an account, and you land in coworker onboar
 | `VOICEPRINT_BACKEND`, `VOICEPRINT_REQUIRED` | Voice match before cloning: `local` (default, needs ffmpeg) or `resemblyzer`. `VOICEPRINT_REQUIRED=0` disables the check (development only). |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET` | OAuth for the developer tools. Without them, users paste a GitHub token or Notion integration secret; Jira always uses an API token. See [Connect GitHub, Jira, Notion and MCP](engineering/dev-tools.md). |
 | `COWORKER_SANDBOX`, `COWORKER_SANDBOX_TIMEOUT` | Run the repository's tests for the AI engineer on real repositories (clones into a temp dir). Run the worker in its own container when on. |
+| `MARKETPLACE_CREATOR_SHARE` | The creator's share of each [marketplace](engineering/marketplace.md) hire (default `0.7`); the rest is Ourogen's Stripe application fee. Needs Stripe Connect enabled on the account. |
 | `COWORKER_OPERATOR_EMAILS` | Ourogen operators who see every running [trial](guide/trial.md) (verified Google or Microsoft addresses) |
 | `COWORKER_ROLE_SALARIES` | Salary benchmarks for the [scorecard](guide/scorecard.md), as JSON: `{"engineering": 180000}` |
 | `COWORKER_MCP_ALLOW_PRIVATE` | Allow `http://` and private-network MCP servers (local development only) |
