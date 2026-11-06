@@ -11,6 +11,7 @@ import EngineerTab from '../coworker/tabs/EngineerTab';
 import KnowledgeTab from '../coworker/tabs/KnowledgeTab';
 import MemoryTab from '../coworker/tabs/MemoryTab';
 import ResponsibilitiesTab from '../coworker/tabs/ResponsibilitiesTab';
+import ScorecardTab from '../coworker/tabs/ScorecardTab';
 import SettingsTab from '../coworker/tabs/SettingsTab';
 import TeamTab from '../coworker/tabs/TeamTab';
 import TodayTab from '../coworker/tabs/TodayTab';
@@ -27,6 +28,7 @@ export interface CoworkerTab {
 export const TABS: CoworkerTab[] = [
   { id: 'today', label: 'Today', icon: '☀️', component: TodayTab },
   { id: 'approvals', label: 'Approvals', icon: '📥', component: ApprovalsTab },
+  { id: 'scorecard', label: 'Scorecard', icon: '📈', component: ScorecardTab },
   { id: 'responsibilities', label: 'Responsibilities', icon: '📌', component: ResponsibilitiesTab },
   { id: 'calls', label: 'Calls', icon: '🎙️', component: CallsTab },
   { id: 'engineer', label: 'Engineer', icon: '🛠️', component: EngineerTab },

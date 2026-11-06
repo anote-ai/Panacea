@@ -25,6 +25,8 @@ ALLOWED_SETTINGS = {
     "recording_consent", "digest_email", "notify_approvals", "model", "weekly_report",
     # AI engineer
     "default_repo", "test_command", "engineer_min_slop_score",
+    # Scorecard: the role it fills, for the comparison with a hire
+    "role",
 }
 
 

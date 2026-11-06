@@ -268,6 +268,7 @@ export default function SettingsTab() {
       company_domain: s.company_domain || '', timezone: s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       start: s.working_hours?.start ?? 9, end: s.working_hours?.end ?? 17, disclosure_text: s.disclosure_text || '',
       send_delay_seconds: s.send_delay_seconds ?? (coworker.mode === 'demo' ? 0 : 20),
+      role: s.role || '',
     });
   }, [coworker?.id]);
 
@@ -280,6 +281,7 @@ export default function SettingsTab() {
         company_name: form.company_name, company_domain: form.company_domain, timezone: form.timezone,
         working_hours: { start: Number(form.start), end: Number(form.end), days: [0, 1, 2, 3, 4] },
         disclosure_text: form.disclosure_text, send_delay_seconds: Number(form.send_delay_seconds),
+        ...(form.role ? { role: form.role } : {}),
       },
     });
     await refresh();
@@ -352,6 +354,17 @@ export default function SettingsTab() {
             <input className={`${inputCls} mt-1`} placeholder={`Sent by ${coworker.ownerName.split(' ')[0] || 'your'}'s AI coworker (Ourogen) on their behalf.`}
               value={form.disclosure_text || ''} onChange={(e) => set('disclosure_text', e.target.value)} />
             <span className="text-xs text-gray-500">You can reword it. Emails I send without your approval always carry it.</span>
+          </label>
+          <label className="text-sm">Role it fills (for the scorecard)
+            <select className={`${inputCls} mt-1`} value={form.role || ''} onChange={(e) => set('role', e.target.value)}>
+              <option value="">Detect automatically</option>
+              <option value="engineering">Software engineer</option>
+              <option value="sales">SDR</option>
+              <option value="marketing">Marketer</option>
+              <option value="operations">Operations admin</option>
+              <option value="healthcare">Front-office admin</option>
+              <option value="assistant">Executive assistant</option>
+            </select>
           </label>
           <label className="text-sm">Undo window for emails (seconds)<input type="number" min={0} max={300} className={`${inputCls} mt-1`} value={form.send_delay_seconds} onChange={(e) => set('send_delay_seconds', e.target.value)} /></label>
           <label className="text-sm sm:col-span-2">Extra instructions for your coworker

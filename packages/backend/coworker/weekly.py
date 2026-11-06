@@ -92,6 +92,9 @@ def render(store: Store, user_id: int, data: dict[str, Any]) -> tuple[str, str]:
     headline = (f"I saved you about {data['hours']:g} hours this week: {data['emails']} email{'s' if data['emails'] != 1 else ''} "
                 f"sent, {data['calls']} call{'s' if data['calls'] != 1 else ''} taken.")
     lines = [f"Hi {first},", "", headline, ""]
+    from coworker import scorecard
+
+    lines += scorecard.weekly_lines(store, user_id) + [""]
     if data["acceptance"] is not None:
         trend = ""
         if data["acceptance30"] is not None and data["acceptance"] != data["acceptance30"]:
@@ -102,7 +105,8 @@ def render(store: Store, user_id: int, data: dict[str, Any]) -> tuple[str, str]:
         lines.append(f"{data['pending']} still waiting for you: {_app('/app/coworker/approvals')}")
     for s in data["suggestions"]:
         lines += ["", s["text"], f"Yes, do it: {link(user_id, s)}"]
-    lines += ["", f"Everything I did: {_app('/app/coworker/today')}",
+    lines += ["", f"Your scorecard: {_app('/app/coworker/scorecard')}",
+              f"Everything I did: {_app('/app/coworker/today')}",
               "Hours saved is an estimate from the work done. Turn this email off in Settings."]
     return headline, "\n".join(lines)
 
