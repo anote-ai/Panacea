@@ -20,6 +20,7 @@ from api_endpoints.coworker import (  # noqa: F401  (route registration)
     sms_routes,
     team,
     telegram_routes,
+    trial_routes,
     trust,
 )
 from api_endpoints.coworker.common import coworker_bp

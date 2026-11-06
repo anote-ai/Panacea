@@ -21,6 +21,7 @@ All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <to
 | Knowledge pack | `GET /knowledge-pack`, `POST /knowledge-pack/build`, `PATCH /knowledge-pack`, `GET`/`POST /knowledge-pack/versions` ([guide](engineering/knowledge-packs.md)) |
 | AI engineer | `GET`/`POST /engineer/runs`, `GET /engineer/runs/<id>`, `PATCH /engineer/runs/<id>/spec`, `POST /engineer/runs/<id>/plan`, `PATCH /engineer/runs/<id>/graph`, `POST /engineer/runs/<id>/start` ([guide](engineering/index.md)) |
 | Scorecard | `GET /scorecard?days=&format=csv`, `GET /team/scorecard` (admins) ([guide](guide/scorecard.md)) |
+| Trial | `GET`/`POST /trial`, `PUT /trial/goals`, `POST /trial/decide`; operators: `GET /operator/trials`, `GET /operator/trials/<id>`, `POST /operator/trials/<id>/notes` ([guide](guide/trial.md)) |
 | Code review | `GET`/`POST /reviews`, `GET /reviews/<id>`, `POST /reviews/<id>/findings/<finding>/dismiss` ([guide](engineering/code-review.md)) |
 
 ## Example: delegate in chat

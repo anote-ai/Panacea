@@ -32,6 +32,7 @@ JSON_COLUMNS = {
     "trigger_spec", "tools", "payload", "result", "detail", "transcript",
     "metrics", "playbook", "answers", "risk", "counts", "policies", "prefs", "conversation",
     "pack", "sources", "spec", "graph", "nodes", "findings", "checks", "slop", "pr",
+    "goals", "reports", "outcome",
 }
 
 
@@ -430,6 +431,20 @@ TABLES: dict[str, str] = {
         action_id INT,
         created_at VARCHAR(40) NOT NULL
     """,
+    "cw_trials": """
+        id {pk},
+        user_id INT NOT NULL,
+        role VARCHAR(40) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        started_at VARCHAR(40) NOT NULL,
+        ends_at VARCHAR(40) NOT NULL,
+        goals {text},
+        approver VARCHAR(255) NOT NULL DEFAULT '',
+        reports {text},
+        outcome {text},
+        created_at VARCHAR(40) NOT NULL,
+        updated_at VARCHAR(40) NOT NULL
+    """,
     "cw_pilot_applications": """
         id {pk},
         name VARCHAR(255) NOT NULL DEFAULT '',
@@ -457,6 +472,7 @@ INDEXES: list[tuple[str, str, str]] = [
     ("idx_cw_verified_user", "cw_verified_identities", "user_id"),
     ("idx_cw_eng_runs_user", "cw_eng_runs", "user_id, status"),
     ("idx_cw_reviews_user", "cw_reviews", "user_id, created_at"),
+    ("idx_cw_trials_user", "cw_trials", "user_id, status"),
 ]
 
 

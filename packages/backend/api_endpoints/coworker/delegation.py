@@ -312,6 +312,9 @@ def run_tick(user_id: int, force: bool = False, inline_sync: bool = False) -> di
     from coworker import weekly
 
     weekly.maybe_send(s, user_id)
+    from coworker import trial
+
+    trial.tick(s, user_id)
     return {"synced": synced, "results": results, "notified": notified, **due}
 
 
