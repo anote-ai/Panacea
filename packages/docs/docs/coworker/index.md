@@ -8,7 +8,14 @@ Ourogen Coworker is an AI version of you at work. It learns from your email, Sla
 - runs first sales calls by voice, qualifies the prospect, and sends the follow-up
 - joins Zoom, Meet, and Teams calls through a meeting bot
 
+- **works as an AI engineer**: turns a ticket into a spec and a task graph, writes the code, runs the tests, reviews itself, and opens a pull request once you approve ([AI engineer](engineering/index.md))
+- **reviews code** against your own standards ([AI code reviewer](engineering/code-review.md))
+
 It always identifies itself as your AI, and nothing goes out without your approval until you decide otherwise.
+
+## Create your own AI
+
+Connect GitHub, Jira and Notion, and it builds a [knowledge pack](engineering/knowledge-packs.md) from your own pull requests, review comments, tickets and docs: your skills, the standards you hold code to, and how you do recurring work. Your AI engineer and code reviewer follow it, and you can edit every line.
 
 ## Tell it in chat
 
@@ -36,7 +43,9 @@ The chat sidebar shows **Today**, the work your coworker did, next to your chats
 
 | Layer | What it does | Code |
 |---|---|---|
-| Connectors | Gmail, Calendar, Drive, Outlook, Slack, HubSpot, Salesforce, Pipedrive, or a fictional demo workspace | `coworker/connectors/` |
+| Connectors | Gmail, Calendar, Drive, Outlook, Slack, HubSpot, Salesforce, Pipedrive, GitHub, Jira, Notion, any MCP server, or a fictional demo workspace | `coworker/connectors/` |
+| Knowledge pack | Skills, style rules and playbooks learned from your own work, with evidence | `coworker/knowledge_pack.py` |
+| AI engineer | Spec → task graph → auto-prompted coding → sandboxed tests → AI review and slop checks → PR | `coworker/engineering/` |
 | Memory | People graph, timeline, decision log, recall with citations | `coworker/memory.py` |
 | Style | Learns your greeting, sign-off, length, and phrasing | `coworker/style.py` |
 | Agent | Claude tool-use loop; offline planner without a key | `coworker/brain.py`, `coworker/tools.py` |
@@ -52,6 +61,7 @@ The web app's chat stays the control plane. You delegate in chat, approve cards 
 ## Next
 
 - [Your first 10 minutes](guide/getting-started.md)
+- [AI engineer](engineering/index.md) and [knowledge packs](engineering/knowledge-packs.md)
 - [Team admin guide](admin/team.md)
 - [Operator runbook](operations/runbook.md)
 - [Roadmap](roadmap.md)

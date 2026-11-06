@@ -6,6 +6,8 @@ import { Card, Pill, Section, dangerBtn, ghostBtn, inputCls, primaryBtn } from '
 import TextMessagesCard from '../TextMessagesCard';
 import TelegramCard from '../TelegramCard';
 import EmailAddressCard from '../EmailAddressCard';
+import DevToolsPanel from '../DevToolsPanel';
+import ApiTokensCard from '../ApiTokensCard';
 
 const LEVEL_HELP: Record<string, string> = {
   suggest: 'Prepare it; I send it myself',
@@ -267,6 +269,7 @@ export default function SettingsTab() {
       company_domain: s.company_domain || '', timezone: s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       start: s.working_hours?.start ?? 9, end: s.working_hours?.end ?? 17, disclosure_text: s.disclosure_text || '',
       send_delay_seconds: s.send_delay_seconds ?? (coworker.mode === 'demo' ? 0 : 20),
+      role: s.role || '',
     });
   }, [coworker?.id]);
 
@@ -279,6 +282,7 @@ export default function SettingsTab() {
         company_name: form.company_name, company_domain: form.company_domain, timezone: form.timezone,
         working_hours: { start: Number(form.start), end: Number(form.end), days: [0, 1, 2, 3, 4] },
         disclosure_text: form.disclosure_text, send_delay_seconds: Number(form.send_delay_seconds),
+        ...(form.role ? { role: form.role } : {}),
       },
     });
     await refresh();
@@ -314,6 +318,12 @@ export default function SettingsTab() {
       <Section title="Connections" subtitle="Where your coworker reads from and acts through.">
         <ConnectionsPanel />
       </Section>
+      <Section title="Developer tools" subtitle="What the AI engineer and code reviewer read from and act through.">
+        <DevToolsPanel />
+      </Section>
+      <Section title="API tokens" subtitle="Use your coworker from code and the terminal.">
+        <ApiTokensCard />
+      </Section>
 
       {autonomy && (
         <Section title="Autonomy" subtitle="How much I can do on my own, per kind of action.">
@@ -348,6 +358,17 @@ export default function SettingsTab() {
             <input className={`${inputCls} mt-1`} placeholder={`Sent by ${coworker.ownerName.split(' ')[0] || 'your'}'s AI coworker (Ourogen) on their behalf.`}
               value={form.disclosure_text || ''} onChange={(e) => set('disclosure_text', e.target.value)} />
             <span className="text-xs text-gray-500">You can reword it. Emails I send without your approval always carry it.</span>
+          </label>
+          <label className="text-sm">Role it fills (for the scorecard)
+            <select className={`${inputCls} mt-1`} value={form.role || ''} onChange={(e) => set('role', e.target.value)}>
+              <option value="">Detect automatically</option>
+              <option value="engineering">Software engineer</option>
+              <option value="sales">SDR</option>
+              <option value="marketing">Marketer</option>
+              <option value="operations">Operations admin</option>
+              <option value="healthcare">Front-office admin</option>
+              <option value="assistant">Executive assistant</option>
+            </select>
           </label>
           <label className="text-sm">Undo window for emails (seconds)<input type="number" min={0} max={300} className={`${inputCls} mt-1`} value={form.send_delay_seconds} onChange={(e) => set('send_delay_seconds', e.target.value)} /></label>
           <label className="text-sm sm:col-span-2">Extra instructions for your coworker
@@ -507,9 +528,10 @@ function PlanSection() {
           return (
             <Card key={p.id} className={`p-4 flex flex-col ${current ? 'ring-2 ring-black dark:ring-white' : ''}`}>
               <p className="text-sm font-medium">{p.name}</p>
-              <p className="text-xl font-semibold mt-1">${p.priceUsd}<span className="text-xs font-normal text-gray-500">/mo</span></p>
+              <p className="text-xl font-semibold mt-1">${p.priceUsd}<span className="text-xs font-normal text-gray-500">{p.perSeat ? '/seat/mo' : '/mo'}</span></p>
               <p className="text-xs text-gray-500 mt-1 flex-1">
                 {p.features.join(', ').replace(/_/g, ' ')}{p.callMinutes ? ` · ${p.callMinutes} call min` : ''}
+                {p.features.includes('engineer') ? ` · ${p.engineerRuns === null ? 'unlimited' : p.engineerRuns} engineer runs` : ''}
               </p>
               <button className={`${p.direction === 'upgrade' && !current ? primaryBtn : ghostBtn} mt-3`}
                 disabled={current || !p.available || !!busy} onClick={() => change(p.id, p.name, p.direction)}>

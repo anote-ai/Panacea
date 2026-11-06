@@ -1,6 +1,12 @@
 # Coworker API
 
-All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <token>`), except the OAuth callbacks, the meeting-bot webhook, and pilot applications.
+All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <token>`), except the OAuth callbacks, the meeting-bot webhook, pilot applications, and the public marketplace.
+
+## API tokens
+
+For the [SDK](../sdk/typescript.md#your-ai-coworker), the CLI (`anote coworker`) and scripts, create a personal access token in **Coworker → Settings → API tokens** (or `POST /tokens` with a signed-in session). Tokens start with `ogn_`, are shown once, and are stored only as a hash. Send one as `Authorization: Bearer ogn_…`.
+
+A token works only on these routes: `GET`/`POST /engineer/runs`, `GET /engineer/runs/<id>`, `PATCH /engineer/runs/<id>/spec|graph`, `POST /engineer/runs/<id>/plan|start`, `GET`/`POST /reviews`, `GET /reviews/<id>`, `GET /scorecard`, `GET /knowledge-pack`, `GET /actions`, `GET /trial`. Anything else returns `403` with code `token_not_allowed`. **Approving, sending, billing, connections and token management need a signed-in session**, so a leaked token can't push code or spend money. `GET /tokens` lists your tokens; `DELETE /tokens/<id>` revokes one.
 
 | Area | Routes |
 |---|---|
@@ -17,6 +23,14 @@ All routes live under `/api/coworker` and need a JWT (`Authorization: Bearer <to
 | Twin | `GET /twin`, `POST /twin/assets`, `GET /twin/assets/<id>/file`, `DELETE /twin/assets/<id>`, `POST /twin/consent/challenge`, `POST /twin/consent`, `POST /twin/voice`, `DELETE /twin`, `POST /twin/avatar/session`, `POST /voice/tts` |
 | Billing & data | `GET /billing`, `POST /billing/checkout`, `GET /export`, `DELETE /data` |
 | Pilot | `POST /pilot/applications` (public), `GET /pilot/applications` (`PILOT_ADMIN_EMAILS` only) |
+| Developer tools | `POST /connections/github/start`, `POST /connections/github/token`, `POST /connections/notion/start`, `POST /connections/notion/token`, `POST /connections/jira/token`, `POST /connections/mcp`, `GET /mcp/<server>/tools`, `POST /mcp/<server>/call` ([guide](engineering/dev-tools.md)) |
+| Knowledge pack | `GET /knowledge-pack`, `POST /knowledge-pack/build`, `PATCH /knowledge-pack`, `GET`/`POST /knowledge-pack/versions` ([guide](engineering/knowledge-packs.md)) |
+| AI engineer | `GET`/`POST /engineer/runs`, `GET /engineer/runs/<id>`, `PATCH /engineer/runs/<id>/spec`, `POST /engineer/runs/<id>/plan`, `PATCH /engineer/runs/<id>/graph`, `POST /engineer/runs/<id>/start` ([guide](engineering/index.md)) |
+| Scorecard | `GET /scorecard?days=&format=csv`, `GET /team/scorecard` (admins) ([guide](guide/scorecard.md)) |
+| Trial | `GET`/`POST /trial`, `PUT /trial/goals`, `POST /trial/decide`; operators: `GET /operator/trials`, `GET /operator/trials/<id>`, `POST /operator/trials/<id>/notes` ([guide](guide/trial.md)) |
+| Marketplace | Public: `GET /marketplace`, `GET /marketplace/ai/<slug>`; `GET /marketplace/me`, `POST /marketplace/publish`, `/unpublish`, `/payouts`, `POST /marketplace/ai/<slug>/hire`, `/rate`, `/report`, `POST /marketplace/hires/<id>/end` ([guide](engineering/marketplace.md)) |
+| API tokens | `GET`/`POST /tokens`, `DELETE /tokens/<id>` (signed-in session only) |
+| Code review | `GET`/`POST /reviews`, `GET /reviews/<id>`, `POST /reviews/<id>/findings/<finding>/dismiss` ([guide](engineering/code-review.md)) |
 
 ## Example: delegate in chat
 
@@ -58,3 +72,23 @@ curl http://localhost:5000/api/coworker/sync/status -H "Authorization: Bearer $T
 ```
 
 Phases go `queued`, `syncing`, `learning`, then `done` or `error`.
+
+## Example: hand off a ticket to the AI engineer
+
+```bash
+# 1. Draft a spec from a Jira ticket (or send {"text": "..."} from chat)
+curl -X POST $API/api/coworker/engineer/runs -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"source": "jira:ACME-142"}'
+# {"id": 7, "status": "spec", "spec": {"goal": "Annual billing: ...", "acceptance_criteria": [...]}, ...}
+
+# 2. Confirm it and build the task graph
+curl -X POST $API/api/coworker/engineer/runs/7/plan -H "Authorization: Bearer $TOKEN"
+# {"status": "planned", "layers": [["impl"], ["docs", "test"]], ...}
+
+# 3. Run it: code, tests, review, slop checks, then a github.pr action to approve
+curl -X POST $API/api/coworker/engineer/runs/7/start -H "Authorization: Bearer $TOKEN"
+# {"status": "ready", "checks": {"passed": true}, "slop": {"score": 100}, "actionId": 42, ...}
+
+# 4. Approve the pull request
+curl -X POST $API/api/coworker/actions/42/approve -H "Authorization: Bearer $TOKEN"
+```

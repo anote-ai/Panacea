@@ -7,11 +7,16 @@ import HeaderControls from '../coworker/HeaderControls';
 import ActivityTab from '../coworker/tabs/ActivityTab';
 import ApprovalsTab from '../coworker/tabs/ApprovalsTab';
 import CallsTab from '../coworker/tabs/CallsTab';
+import EngineerTab from '../coworker/tabs/EngineerTab';
+import KnowledgeTab from '../coworker/tabs/KnowledgeTab';
+import MarketplaceTab from '../coworker/tabs/MarketplaceTab';
 import MemoryTab from '../coworker/tabs/MemoryTab';
 import ResponsibilitiesTab from '../coworker/tabs/ResponsibilitiesTab';
+import ScorecardTab from '../coworker/tabs/ScorecardTab';
 import SettingsTab from '../coworker/tabs/SettingsTab';
 import TeamTab from '../coworker/tabs/TeamTab';
 import TodayTab from '../coworker/tabs/TodayTab';
+import TrialTab from '../coworker/tabs/TrialTab';
 import TwinTab from '../coworker/tabs/TwinTab';
 import { Pill } from '../coworker/ui';
 
@@ -25,8 +30,13 @@ export interface CoworkerTab {
 export const TABS: CoworkerTab[] = [
   { id: 'today', label: 'Today', icon: '☀️', component: TodayTab },
   { id: 'approvals', label: 'Approvals', icon: '📥', component: ApprovalsTab },
+  { id: 'scorecard', label: 'Scorecard', icon: '📈', component: ScorecardTab },
+  { id: 'trial', label: 'Trial', icon: '🗓️', component: TrialTab },
   { id: 'responsibilities', label: 'Responsibilities', icon: '📌', component: ResponsibilitiesTab },
   { id: 'calls', label: 'Calls', icon: '🎙️', component: CallsTab },
+  { id: 'engineer', label: 'Engineer', icon: '🛠️', component: EngineerTab },
+  { id: 'knowledge', label: 'Knowledge', icon: '📚', component: KnowledgeTab },
+  { id: 'marketplace', label: 'Marketplace', icon: '🏪', component: MarketplaceTab },
   { id: 'activity', label: 'Activity', icon: '🗒️', component: ActivityTab },
   { id: 'memory', label: 'Memory', icon: '🧠', component: MemoryTab },
   { id: 'twin', label: 'Twin', icon: '🪞', component: TwinTab },

@@ -273,7 +273,12 @@ def _fulfill_checkout_session(session_id: str, obj: dict, already_claimed: bool)
                 return
         metadata = obj.get("metadata") or {}
         try:
-            if metadata.get("kind") == "coworker_plan":
+            if metadata.get("kind") == "marketplace_hire":
+                from coworker.marketplace import apply_checkout as apply_hire
+                from coworker.store import get_store
+
+                apply_hire(get_store(), metadata, obj)
+            elif metadata.get("kind") == "coworker_plan":
                 from coworker.billing import apply_checkout
                 from coworker.store import get_store
 
@@ -318,6 +323,13 @@ def _handle_webhook_event(event: dict) -> None:
             cnx.close()
 
     elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
+        if (obj.get("metadata") or {}).get("kind") == "marketplace_hire":
+            if event_type == "customer.subscription.deleted":
+                from coworker.marketplace import apply_subscription_ended
+                from coworker.store import get_store
+
+                apply_subscription_ended(get_store(), obj)
+            return
         if (obj.get("metadata") or {}).get("kind") == "coworker_plan":
             from coworker.billing import apply_subscription_event
             from coworker.store import get_store

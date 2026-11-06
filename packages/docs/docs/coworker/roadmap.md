@@ -2,7 +2,23 @@
 
 The live roadmap is [GitHub issue #425](https://github.com/anote-ai/Panacea/issues/425). Shipped items are linked to their pull requests there.
 
-## Now: reach it anywhere, let it run on its own
+## Now: Hire an AI (v3)
+
+The live roadmap is [#443](https://github.com/anote-ai/Panacea/issues/443).
+
+| Item | Status |
+|---|---|
+| Connectors: GitHub, Jira, Notion, MCP (#445) | In review |
+| Knowledge packs: build your AI from your code, skills and past tasks (#444) | In review |
+| AI engineer: spec → task graph → auto-prompted coding (#446) | In review |
+| AI code reviewer (#447) | In review |
+| Code evals: quality and slop detection (#448) | In review |
+| Output metrics: work done per time (#449) | In review |
+| Pricing: Free / Pro / Enterprise (#451) | In review (behind a flag) |
+| One-month trial hire with a human-in-the-loop guarantee (#452) | In review |
+| Marketplace: public AI profiles, "Hire AI Natan" (#450) | In review |
+
+## Shipped in v2: reach it anywhere, let it run on its own
 
 | Item | Status |
 |---|---|

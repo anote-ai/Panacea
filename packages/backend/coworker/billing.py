@@ -3,6 +3,12 @@
 Prices are starting hypotheses to validate with pilot users, not
 published prices. Plan gating is enforced only when
 ``COWORKER_ENFORCE_PLANS=1`` so the pilot and local testing stay open.
+
+Two plan lineups exist. The current one (Free, Coworker, Coworker + Calls,
+Team) is offered by default. ``COWORKER_PRICING_V3=1`` offers the "hire an AI"
+lineup instead: Free (starter), Pro ($50/month), and Enterprise (per seat,
+about a tenth of an engineer). Existing subscribers keep their plan either way.
+See ``coworker/pricing.py`` for the margin analysis behind the caps.
 """
 from __future__ import annotations
 
@@ -22,7 +28,22 @@ PLANS: dict[str, dict[str, Any]] = {
                        "call_minutes": 600, "price_env": "STRIPE_PRICE_COWORKER_CALLS"},
     "team": {"name": "Team", "price_usd": 1000, "features": ["email", "slack", "calendar", "memory", "calls", "twin", "admin", "sso"],
              "call_minutes": 2000, "price_env": "STRIPE_PRICE_COWORKER_TEAM"},
+    # "Hire an AI" lineup (COWORKER_PRICING_V3=1)
+    "pro": {"name": "Pro", "price_usd": 50, "features": ["email", "slack", "calendar", "memory", "engineer"],
+            "call_minutes": 0, "price_env": "STRIPE_PRICE_COWORKER_PRO"},
+    "enterprise": {"name": "Enterprise", "price_usd": int(os.environ.get("COWORKER_ENTERPRISE_SEAT_USD", "1650")),
+                   "features": ["email", "slack", "calendar", "memory", "calls", "twin", "admin", "sso", "engineer"],
+                   "call_minutes": 2000, "price_env": "STRIPE_PRICE_COWORKER_ENTERPRISE", "per_seat": True},
 }
+
+# Engineer runs per month (None = unlimited). Pro's 12 keeps a heavy user near a 60% margin at ~$1.50 a run
+# (see `python -m coworker.pricing`); revisit with measured run costs.
+ENGINEER_RUNS = {"free": 3, "pilot": None, "coworker": 10, "coworker_calls": 20, "team": None, "pro": 12, "enterprise": None}
+# Free includes a taste of the engineer.
+PLANS["free"]["features"] = [*PLANS["free"]["features"], "engineer"]
+for _plan in ("pilot", "coworker", "coworker_calls", "team"):
+    PLANS[_plan]["features"] = [*PLANS[_plan]["features"], "engineer"]
+SEAT_PLANS = ("team", "enterprise")
 
 # Rough variable cost per unit, used for the internal margin view. Override per deployment.
 COST_PER_CALL_MINUTE = float(os.environ.get("COWORKER_COST_PER_CALL_MINUTE", "0.15"))
@@ -51,13 +72,14 @@ def plan_of(coworker: dict[str, Any]) -> str:
 def effective_plan(store: Store, user_id: int) -> str:
     """The user's own plan, or Team when their organization's owner pays for Team."""
     own = plan_of(store.get_coworker(user_id) or {})
-    if own == "team":
+    if own in SEAT_PLANS:
         return own
     from coworker import orgs
 
     org = orgs.org_for(store, user_id)
-    if org and plan_of(store.get_coworker(int(org["owner_user_id"])) or {}) == "team":
-        return "team"
+    payer = plan_of(store.get_coworker(int(org["owner_user_id"])) or {}) if org else ""
+    if payer in SEAT_PLANS:
+        return payer
     return own
 
 
@@ -69,11 +91,12 @@ def sync_seats(store: Store, org: dict[str, Any]) -> int | None:
     """
     from coworker import orgs
 
-    if os.environ.get("COWORKER_TEAM_PER_SEAT") != "1" or not os.environ.get("STRIPE_SECRET_KEY"):
+    if not os.environ.get("STRIPE_SECRET_KEY"):
         return None
     payer = store.get_coworker(int(org["owner_user_id"])) or {}
     sub_id = billing_state(payer).get("subscription_id")
-    if plan_of(payer) != "team" or not sub_id:
+    per_seat = plan_of(payer) == "enterprise" or (plan_of(payer) == "team" and os.environ.get("COWORKER_TEAM_PER_SEAT") == "1")
+    if not per_seat or not sub_id:
         return None
     count = max(1, orgs.seats(store, int(org["id"])))
     stripe = _stripe()
@@ -92,6 +115,13 @@ def require(store: Store, user_id: int, feature: str) -> None:
     plan = PLANS[effective_plan(store, user_id)]
     if feature not in plan["features"]:
         raise PlanError(f"{plan['name']} doesn't include {feature.replace('_', ' ')}. Upgrade to Coworker + Calls.")
+    if feature == "engineer":
+        cap = ENGINEER_RUNS.get(effective_plan(store, user_id))
+        if cap is not None:
+            row = store.one("SELECT COUNT(*) AS n FROM cw_eng_runs WHERE user_id = %s AND created_at >= %s "
+                            "AND status NOT IN ('spec', 'planned')", (user_id, month_start()))
+            if int((row or {}).get("n") or 0) >= cap:
+                raise PlanError(f"You've used all {cap} engineer runs this month on {plan['name']}.")
     if feature == "calls":
         used = store.usage_since(user_id, month_start()).get("call_seconds", 0) // 60
         if used >= plan["call_minutes"]:
@@ -124,8 +154,9 @@ def summary(store: Store, user_id: int) -> dict[str, Any]:
         "plans": [
             {"id": k, "name": v["name"], "priceUsd": v["price_usd"], "features": v["features"], "callMinutes": v["call_minutes"],
              "available": k == "free" or bool(v["price_env"] and os.environ.get(v["price_env"])),
-             "direction": direction(plan_id, k) if k in ORDER else "same"}
-            for k, v in PLANS.items()
+             "direction": direction(plan_id, k) if k in offered() else "same",
+             "engineerRuns": ENGINEER_RUNS.get(k), "perSeat": bool(v.get("per_seat"))}
+            for k, v in PLANS.items() if k in offered() or k == plan_id
         ],
         "subscription": {k: v for k, v in billing_state(coworker).items() if k in ("cancel_at_period_end", "current_period_end")},
         "hasBillingAccount": bool(billing_state(coworker).get("customer_id")),
@@ -149,6 +180,12 @@ def apply_checkout(store: Store, metadata: dict[str, Any], session: dict[str, An
 # -- changing plans --------------------------------------------------------------
 
 ORDER = ["free", "coworker", "coworker_calls", "team"]
+ORDER_V3 = ["free", "pro", "enterprise"]
+
+
+def offered() -> list[str]:
+    """The plans new customers can pick."""
+    return ORDER_V3 if os.environ.get("COWORKER_PRICING_V3") == "1" else ORDER
 
 
 def _stripe() -> Any:
@@ -177,8 +214,10 @@ def plan_for_price(price_id: str) -> str | None:
 
 
 def direction(current: str, target: str) -> str:
-    cur = ORDER.index(current) if current in ORDER else 0
-    return "upgrade" if ORDER.index(target) > cur else "downgrade" if ORDER.index(target) < cur else "same"
+    cur, new = PLANS.get(current, {}).get("price_usd", 0), PLANS[target]["price_usd"]
+    if current == target:
+        return "same"
+    return "upgrade" if new > cur else "downgrade" if new < cur else "same"
 
 
 def change_plan(store: Store, user_id: int, target: str) -> dict[str, Any]:
@@ -190,8 +229,8 @@ def change_plan(store: Store, user_id: int, target: str) -> dict[str, Any]:
     * ``free``: cancel at the end of the paid period; the plan drops to Free
       when Stripe says the subscription ended.
     """
-    if target not in ORDER:
-        raise PlanError("Pick Free, Coworker, Coworker + Calls, or Team.")
+    if target not in offered():
+        raise PlanError("Pick " + ", ".join(PLANS[p]["name"] for p in offered()) + ".")
     coworker = store.get_coworker(user_id) or {}
     current = plan_of(coworker)
     state = billing_state(coworker)

@@ -213,6 +213,54 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
                        f"for your approval (autonomy: *{spec['autonomy']}*). Change the schedule anytime in **Coworker → Responsibilities**.")
         return
 
+    # 0a. Engineering: review a PR, hand off a ticket, check on the engineer, the scorecard
+    rv = re.search(r"\breview\b.{0,40}?(?P<repo>[\w.-]+/[\w.-]+)?\s*#(?P<num>\d+)", m, re.I)
+    if rv:
+        from coworker.engineering.spec import default_repo
+
+        repo = rv.group("repo") or default_repo(s, uid)
+        out = yield from _call(ctx, "review_pull_request", {"repo": repo, "number": int(rv.group("num"))})
+        if out.get("error"):
+            yield ("text", out["error"])
+            return
+        lines = [f"**{repo}#{rv.group('num')}**: {out['summary']} Slop score {out['slop_score']}/100."]
+        lines += [f"- **{f['severity']}** {f['title']} ({f['path']}{':' + str(f['line']) if f['line'] else ''})"
+                  + (f" · {f['rule']}" if f["rule"] else "") for f in out["findings"]]
+        if out["escalate"]:
+            lines.append(f"\nThis needs a human look: {'; '.join(out['reasons'])}.")
+        lines.append("\nThe review with inline comments is below. Approve it to post it on GitHub.")
+        yield ("text", "\n".join(lines))
+        return
+    ticket = re.search(r"\b(?P<key>[A-Z][A-Z0-9]+-\d+)\b", m)
+    if (ticket and re.search(r"\b(take|work on|implement|build|fix|ship|do|pick up|handle|code|tackle|start)\b", low)) \
+            or re.search(r"\bopen an? (?:pr|pull request)\b", low):
+        args = {"source": f"jira:{ticket.group('key')}"} if ticket else {"text": m}
+        out = yield from _call(ctx, "engineer_task", args)
+        if out.get("error") and "run_id" not in out:
+            yield ("text", out["error"])
+            return
+        plan = "\n".join(f"{i}. {t['task']} ({', '.join(t['files'])})" for i, t in enumerate(out["plan"], 1))
+        criteria = "\n".join(f"- {c}" for c in out["acceptance_criteria"])
+        head = f"**{out['goal']}** in `{out['repo']}`\n\nAcceptance criteria:\n{criteria}\n\nPlan:\n{plan}\n\n"
+        if out["status"] == "ready":
+            tests = "tests pass" if out.get("tests_passed") else "tests failed" if out.get("tests_passed") is False else "tests not run"
+            yield ("text", head + f"Done: {tests}, slop score {out.get('slop_score')}/100. The pull request is below; "
+                                  "nothing is pushed until you approve it.")
+        elif out["status"] == "running":
+            yield ("text", head + "I'm working on it. I'll post the pull request here when the tests pass.")
+        else:
+            yield ("text", head + (out.get("error") or out.get("note") or f"Status: {out['status']}."))
+        return
+    if re.search(r"\b(scorecard|how much (?:did|have) you (?:get |gotten )?done|work (?:you )?(?:did|done) this (?:week|month))\b", low):
+        days = 30 if "month" in low else 7
+        c = yield from _call(ctx, "scorecard", {"days": days})
+        o = c["output"]
+        yield ("text", f"**Last {days} days:** {c['totalOutput']} pieces of work, about {c['humanAttentionHours']:g} hours of "
+                       f"your attention. PRs: {o['prsOpened']} opened, {o['prsMerged']} merged, {o['prsReviewed']} reviewed. "
+                       f"Emails: {o['emails']}. Cost ${c['cost']['totalUsd']:,.2f} vs about ${c['vsHire']['hireCostUsd']:,.0f} "
+                       f"for a {c['vsHire']['roleLabel'].lower()} (benchmark). Full scorecard: **Coworker → Scorecard**.")
+        return
+
     if re.search(r"\b(join|attend|take|sit in on|go to|cover)\b.{0,40}\b(meeting|call|zoom|meet|teams|standup|qbr|demo)\b", low) \
             or re.search(r"https://\S*(zoom\.us|meet\.google|teams\.microsoft)", low):
         url = (re.search(r"https://\S+", m) or [""])[0]

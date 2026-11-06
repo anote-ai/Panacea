@@ -62,7 +62,15 @@ Email, Slack, and call content is wrapped in `<untrusted_content>` before any mo
 - **Download my data** exports everything stored. **Delete my coworker** removes it all.
 - Customer data is not used to train models.
 
-## 8. At work
+## 8. Code and developer tools
+
+- Pull requests, reviews, comments, tickets, Notion pages and MCP tool calls are actions: each waits for your approval unless you change its autonomy. A PR always waits when tests fail, the reviewer escalates (auth, payments or security code, a high-severity finding), or the slop score is below your minimum.
+- The AI engineer never pushes to an existing branch: each PR is a new `ourogen/…` branch, and undo closes the PR and deletes the branch.
+- Tests for real repositories run only with `COWORKER_SANDBOX=1`, in a temp directory with a stripped environment and a timeout. Tokens never appear in logs or errors.
+- MCP servers must be public `https://` URLs, so a pasted URL can't reach the server's private network.
+- Knowledge packs remove secrets and other people's contact details before anything is stored, and disconnecting a tool removes what came from it.
+
+## 9. At work
 
 On a work account (a company email domain), the coworker asks you to confirm that you own the company or your employer allows it. Until you do, it reads and drafts but sends nothing (`governance.needs_employer_ok`).
 

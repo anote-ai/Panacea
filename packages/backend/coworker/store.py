@@ -31,6 +31,8 @@ JSON_COLUMNS = {
     "autonomy", "settings", "onboarding", "style_profile", "recipients", "meta",
     "trigger_spec", "tools", "payload", "result", "detail", "transcript",
     "metrics", "playbook", "answers", "risk", "counts", "policies", "prefs", "conversation",
+    "pack", "sources", "spec", "graph", "nodes", "findings", "checks", "slop", "pr",
+    "goals", "reports", "outcome", "consent",
 }
 
 
@@ -384,6 +386,122 @@ TABLES: dict[str, str] = {
         sent_at VARCHAR(40) NOT NULL,
         UNIQUE (user_id, kind, slot)
     """,
+    "cw_knowledge_packs": """
+        id {pk},
+        user_id INT NOT NULL,
+        version INT NOT NULL DEFAULT 0,
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        pack {text},
+        sources {text},
+        created_at VARCHAR(40) NOT NULL,
+        updated_at VARCHAR(40) NOT NULL,
+        UNIQUE (user_id, version)
+    """,
+    "cw_eng_runs": """
+        id {pk},
+        user_id INT NOT NULL,
+        title VARCHAR(500) NOT NULL DEFAULT '',
+        status VARCHAR(30) NOT NULL DEFAULT 'spec',
+        source VARCHAR(255) NOT NULL DEFAULT '',
+        repo VARCHAR(255) NOT NULL DEFAULT '',
+        spec {text},
+        graph {text},
+        nodes {text},
+        checks {text},
+        slop {text},
+        pr {text},
+        review_id INT,
+        action_id INT,
+        error {text},
+        cost_micros INT NOT NULL DEFAULT 0,
+        created_at VARCHAR(40) NOT NULL,
+        updated_at VARCHAR(40) NOT NULL
+    """,
+    "cw_reviews": """
+        id {pk},
+        user_id INT NOT NULL,
+        repo VARCHAR(255) NOT NULL DEFAULT '',
+        number INT NOT NULL DEFAULT 0,
+        source VARCHAR(20) NOT NULL DEFAULT 'pr',
+        run_id INT,
+        status VARCHAR(20) NOT NULL DEFAULT 'done',
+        findings {text},
+        checks {text},
+        escalate INT NOT NULL DEFAULT 0,
+        action_id INT,
+        created_at VARCHAR(40) NOT NULL
+    """,
+    "cw_trials": """
+        id {pk},
+        user_id INT NOT NULL,
+        role VARCHAR(40) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        started_at VARCHAR(40) NOT NULL,
+        ends_at VARCHAR(40) NOT NULL,
+        goals {text},
+        approver VARCHAR(255) NOT NULL DEFAULT '',
+        reports {text},
+        outcome {text},
+        created_at VARCHAR(40) NOT NULL,
+        updated_at VARCHAR(40) NOT NULL
+    """,
+    "cw_listings": """
+        id {pk},
+        user_id INT NOT NULL UNIQUE,
+        slug VARCHAR(80) NOT NULL UNIQUE,
+        title VARCHAR(120) NOT NULL,
+        headline VARCHAR(300) NOT NULL DEFAULT '',
+        role VARCHAR(40) NOT NULL,
+        pack_version INT NOT NULL,
+        pack {text},
+        price_usd INT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'published',
+        consent {text},
+        created_at VARCHAR(40) NOT NULL,
+        updated_at VARCHAR(40) NOT NULL
+    """,
+    "cw_hires": """
+        id {pk},
+        buyer_id INT NOT NULL,
+        listing_id INT NOT NULL,
+        creator_id INT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        paid INT NOT NULL DEFAULT 0,
+        price_usd INT NOT NULL,
+        creator_share VARCHAR(10) NOT NULL DEFAULT '0.7',
+        pack_version INT NOT NULL,
+        subscription_id VARCHAR(255) NOT NULL DEFAULT '',
+        started_at VARCHAR(40),
+        ended_at VARCHAR(40),
+        created_at VARCHAR(40) NOT NULL,
+        updated_at VARCHAR(40) NOT NULL
+    """,
+    "cw_listing_reviews": """
+        id {pk},
+        listing_id INT NOT NULL,
+        buyer_id INT NOT NULL,
+        rating INT NOT NULL,
+        text {text},
+        created_at VARCHAR(40) NOT NULL,
+        UNIQUE (listing_id, buyer_id)
+    """,
+    "cw_listing_reports": """
+        id {pk},
+        listing_id INT NOT NULL,
+        reporter_id INT NOT NULL,
+        reason {text},
+        created_at VARCHAR(40) NOT NULL
+    """,
+    "cw_api_tokens": """
+        id {pk},
+        user_id INT NOT NULL,
+        name VARCHAR(80) NOT NULL DEFAULT '',
+        token_hash VARCHAR(64) NOT NULL UNIQUE,
+        prefix VARCHAR(12) NOT NULL DEFAULT '',
+        created_at VARCHAR(40) NOT NULL,
+        last_used_at VARCHAR(40),
+        revoked_at VARCHAR(40)
+    """,
     "cw_pilot_applications": """
         id {pk},
         name VARCHAR(255) NOT NULL DEFAULT '',
@@ -409,6 +527,11 @@ INDEXES: list[tuple[str, str, str]] = [
     ("idx_cw_telegram_chat", "cw_telegram", "chat_id"),
     ("idx_cw_telegram_link", "cw_telegram", "link_hash"),
     ("idx_cw_verified_user", "cw_verified_identities", "user_id"),
+    ("idx_cw_eng_runs_user", "cw_eng_runs", "user_id, status"),
+    ("idx_cw_reviews_user", "cw_reviews", "user_id, created_at"),
+    ("idx_cw_trials_user", "cw_trials", "user_id, status"),
+    ("idx_cw_hires_buyer", "cw_hires", "buyer_id, status"),
+    ("idx_cw_hires_listing", "cw_hires", "listing_id, status"),
 ]
 
 

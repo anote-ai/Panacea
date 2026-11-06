@@ -10,11 +10,13 @@ import {
   providerSamples,
 } from "./config";
 import { AnoteCodeLensProvider, type CodeLensAction } from "./codeLens";
+import { registerCoworker } from "./coworker";
 
 let chatProvider: AnnoteChatViewProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   const agent = new AnoteAgent(context);
+  registerCoworker(context);
 
   // Status bar item — shows active tool during long agentic tasks
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);

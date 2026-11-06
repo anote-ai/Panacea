@@ -126,6 +126,12 @@ def call_injection(store: Store) -> dict[str, Any]:
 SUITES = {"triage": triage, "call_guardrails": call_guardrails, "recall": recall, "injection": injection,
           "injection_detection": injection_detection, "benign": benign, "call_injection": call_injection}
 
+# The AI engineer, code reviewer and slop checks (evals/code.py).
+from coworker.evals import code as _code  # noqa: E402
+
+SUITES.update(_code.SUITES)
+THRESHOLDS.update(_code.THRESHOLDS)
+
 
 def run_all() -> dict[str, Any]:
     results = {}
@@ -137,7 +143,8 @@ def run_all() -> dict[str, Any]:
 
 HISTORY = os.path.join(os.path.dirname(__file__), "history.jsonl")
 AGENT_FILES = ("brain.py", "drafting.py", "meetings.py", "llm.py", "tools.py", "security.py", "policy.py", "memory.py",
-               "responsibilities.py")
+               "responsibilities.py", "knowledge_pack.py", "engineering/runs.py", "engineering/graph.py",
+               "engineering/spec.py", "engineering/review.py", "engineering/slop.py")
 
 
 def agent_version() -> str:
@@ -187,7 +194,7 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     else:
         for name, r in results.items():
             mark = "PASS" if r["passed"] else "FAIL"
-            print(f"{mark}  {name:16s} {r['score']:.0%}  ({r['n']} cases, threshold {THRESHOLDS[name]:.0%})")
+            print(f"{mark}  {name:19s} {r['score']:.0%}  ({r['n']} cases, threshold {THRESHOLDS[name]:.0%})")
             for miss in r["misses"]:
                 print(f"      miss: {miss}")
     raise SystemExit(0 if all(r["passed"] for r in results.values()) else 1)

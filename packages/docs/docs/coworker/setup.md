@@ -42,6 +42,14 @@ Open `http://localhost:3000`, create an account, and you land in coworker onboar
 | `COWORKER_MODEL`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `COWORKER_EXTRA_MODELS` | Model choice. Users pick a model in **Settings → Model**: Claude (default `claude-opus-5-5`), OpenAI, Gemini, or a local Ollama model. A model is offered when the server has a key for it or the user added their own. `COWORKER_EXTRA_MODELS=openai:gpt-5,google:gemini-3-pro` adds ids. |
 | `STRIPE_PRICE_COWORKER`, `STRIPE_PRICE_COWORKER_CALLS`, `STRIPE_PRICE_COWORKER_TEAM` | Plan changes in **Settings → Plan & usage**. The first purchase goes through Checkout. Later upgrades and downgrades swap the subscription price, prorated. Moving to Free cancels at period end. Changes made in Stripe's billing portal sync back through the webhook. |
 | `VOICEPRINT_BACKEND`, `VOICEPRINT_REQUIRED` | Voice match before cloning: `local` (default, needs ffmpeg) or `resemblyzer`. `VOICEPRINT_REQUIRED=0` disables the check (development only). |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET` | OAuth for the developer tools. Without them, users paste a GitHub token or Notion integration secret; Jira always uses an API token. See [Connect GitHub, Jira, Notion and MCP](engineering/dev-tools.md). |
+| `COWORKER_SANDBOX`, `COWORKER_SANDBOX_TIMEOUT` | Run the repository's tests for the AI engineer on real repositories (clones into a temp dir). Run the worker in its own container when on. |
+| `COWORKER_PRICING_V3`, `STRIPE_PRICE_COWORKER_PRO`, `STRIPE_PRICE_COWORKER_ENTERPRISE`, `COWORKER_ENTERPRISE_SEAT_USD` | The "hire an AI" plan lineup (Free / Pro / Enterprise). Read [Plans and pricing](pricing.md) before turning it on. |
+| `COWORKER_COST_PER_ENGINEER_RUN`, `COWORKER_TARGET_MARGIN` | Assumptions for the margin analysis (`python -m coworker.pricing`) |
+| `MARKETPLACE_CREATOR_SHARE` | The creator's share of each [marketplace](engineering/marketplace.md) hire (default `0.7`); the rest is Ourogen's Stripe application fee. Needs Stripe Connect enabled on the account. |
+| `COWORKER_OPERATOR_EMAILS` | Ourogen operators who see every running [trial](guide/trial.md) (verified Google or Microsoft addresses) |
+| `COWORKER_ROLE_SALARIES` | Salary benchmarks for the [scorecard](guide/scorecard.md), as JSON: `{"engineering": 180000}` |
+| `COWORKER_MCP_ALLOW_PRIVATE` | Allow `http://` and private-network MCP servers (local development only) |
 | `COWORKER_SYNC_MODE` | `thread` (default) syncs on a background thread in the web process; `worker` leaves sync to `coworker-worker` |
 
 ### Google
@@ -75,7 +83,7 @@ cd packages/backend
 python -m coworker.evals.run
 ```
 
-Seven suites, 249 cases, every write mocked:
+Twelve suites, every write mocked. The coworker suites:
 
 | Suite | Checks | Threshold |
 |---|---|---|
@@ -86,6 +94,8 @@ Seven suites, 249 cases, every write mocked:
 | `injection_detection` | Attacks are also flagged as suspicious | 85% |
 | `benign` | Normal mail that looks similar isn't flagged | 90% |
 | `call_injection` | Spoken attacks never produce a commitment | 100% |
+
+And the AI engineer suites (`engineer_tasks`, `reviewer_recall`, `reviewer_precision`, `slop_flags`, `pack_lift`), described in [Code evals](engineering/evals.md).
 
 CI runs them on every push and blocks merges on a regression. Results are uploaded as the `coworker-eval-results` artifact.
 

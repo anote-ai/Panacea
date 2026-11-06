@@ -123,12 +123,22 @@ nav:
     - User Guide:
       - Your First 10 Minutes: coworker/guide/getting-started.md
       - Approvals and Autonomy: coworker/guide/approvals.md
+      - The Scorecard: coworker/guide/scorecard.md
+      - The One-Month Trial: coworker/guide/trial.md
       - Scheduled Tasks: coworker/guide/scheduled-tasks.md
       - Ways to Reach Your Coworker: coworker/guide/channels.md
       - Meetings and Your Voice: coworker/guide/meetings.md
       - FAQ: coworker/guide/faq.md
+    - AI Engineer:
+      - Overview: coworker/engineering/index.md
+      - Knowledge Packs: coworker/engineering/knowledge-packs.md
+      - The Marketplace: coworker/engineering/marketplace.md
+      - AI Code Reviewer: coworker/engineering/code-review.md
+      - Code Evals: coworker/engineering/evals.md
+      - Connect GitHub, Jira, Notion, MCP: coworker/engineering/dev-tools.md
     - Team Admin: coworker/admin/team.md
     - Free Mode (No API Keys): coworker/free-mode.md
+    - Plans and Pricing: coworker/pricing.md
     - Operations:
       - Set Up: coworker/setup.md
       - Operator Runbook: coworker/operations/runbook.md

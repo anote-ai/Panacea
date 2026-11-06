@@ -78,6 +78,14 @@ def action_done(action: dict[str, Any], result: dict[str, Any]) -> str:
     if kind == "crm.update":
         where = (result.get("crm") or {}).get("label") or ("HubSpot" if "hubspot" in result else "your CRM notes")
         return f"✅ Logged the call with {p.get('company', '')} in {where}."
+    if kind == "github.pr":
+        return f"✅ Opened the pull request **{p.get('title', '')}**: {result.get('url', '')}"
+    if kind == "github.review":
+        return f"✅ Posted the review on {p.get('repo', '')}#{p.get('number', '')}: {result.get('url', '')}"
+    if kind in ("github.comment", "github.issue", "jira.issue", "jira.comment", "notion.page") and result.get("url"):
+        return f"✅ Done: {action.get('title', '')} ({result['url']})"
+    if kind == "mcp.call":
+        return f"✅ Ran {p.get('tool', '')} on {p.get('server', '')}:\n\n{_quote(str(result.get('output', '')), 800)}"
     return f"✅ Done: {action.get('title', '')}"
 
 

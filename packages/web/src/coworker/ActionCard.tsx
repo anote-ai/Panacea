@@ -10,6 +10,14 @@ const ICON: Record<string, string> = {
   'calendar.create': '📅',
   'crm.update': '🗂️',
   'responsibility.create': '📌',
+  'github.pr': '🔀',
+  'github.review': '🔍',
+  'github.comment': '💬',
+  'github.issue': '🐞',
+  'jira.issue': '🎫',
+  'jira.comment': '🎫',
+  'notion.page': '📝',
+  'mcp.call': '🧩',
 };
 
 const STATUS: Record<string, { text: string; cls: string }> = {
@@ -110,7 +118,11 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
           ? 'Approve & send'
           : action.type === 'calendar.create'
             ? 'Send invite'
-            : 'Approve';
+            : action.type === 'github.pr'
+              ? 'Open pull request'
+              : action.type === 'github.review'
+                ? 'Post review'
+                : 'Approve';
 
   return (
     <div className="my-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#262626] shadow-sm overflow-hidden not-prose">
@@ -203,6 +215,47 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
               <Field label="Account">{p.company}</Field>
               <Field label="Update">{p.summary}</Field>
             </>
+          )}
+          {action.type === 'github.pr' && (
+            <>
+              <Field label="Repo">{p.repo} · <span className="font-mono text-xs">{p.branch}</span></Field>
+              <Field label="Files">{(p.files || []).map((f: any) => f.path).join(', ')}</Field>
+              {p.diff && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-gray-500 dark:text-gray-400">Show the diff</summary>
+                  <pre className="mt-2 max-h-80 overflow-auto rounded-lg bg-[#F7F7F8] dark:bg-[#2F2F2F] p-3 font-mono whitespace-pre">{p.diff}</pre>
+                </details>
+              )}
+            </>
+          )}
+          {action.type === 'github.review' && (
+            <>
+              <Field label="PR">{p.repo}#{p.number}</Field>
+              <Field label="Review">{p.body}</Field>
+              <Field label="Inline">{(p.comments || []).length} comment(s)</Field>
+            </>
+          )}
+          {(action.type === 'github.comment' || action.type === 'jira.comment') && (
+            <>
+              <Field label="On">{p.repo ? `${p.repo}#${p.number}` : p.key}</Field>
+              <Field label="Comment">{p.body}</Field>
+            </>
+          )}
+          {(action.type === 'github.issue' || action.type === 'jira.issue') && (
+            <>
+              <Field label="Where">{p.repo || p.project}</Field>
+              <Field label="Title">{p.title || p.summary}</Field>
+            </>
+          )}
+          {action.type === 'notion.page' && <Field label="Page">{p.title}</Field>}
+          {action.type === 'mcp.call' && (
+            <>
+              <Field label="Tool">{p.server} → {p.tool}</Field>
+              <Field label="Input"><code className="text-xs">{JSON.stringify(p.arguments || {})}</code></Field>
+            </>
+          )}
+          {action.result?.url && (
+            <Field label="Link"><a className="underline" href={action.result.url} target="_blank" rel="noreferrer">{action.result.url}</a></Field>
           )}
 
           {action.reasoning && (
