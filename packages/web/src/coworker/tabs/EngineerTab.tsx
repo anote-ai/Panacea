@@ -217,7 +217,7 @@ export default function EngineerTab() {
   const [pr, setPr] = useState({ repo: '', number: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [settings, setSettings] = useState<Record<string, any>>({});
+  const [settings, setSettings] = useState<Record<string, any>>({ default_repo: '', test_command: '', engineer_min_slop_score: 70 });
   const demo = coworker?.mode === 'demo';
 
   const load = async () => {

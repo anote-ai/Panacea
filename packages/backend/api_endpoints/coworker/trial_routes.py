@@ -29,7 +29,8 @@ def _view(row: dict[str, Any]) -> dict[str, Any]:
 def get_trial() -> tuple:
     row = trial.current(store(), uid())
     return jsonify({"trial": _view(row) if row else None, "defaults": trial.DEFAULT_GOALS,
-                    "metrics": trial.METRICS, "guarantee": trial.GUARANTEE}), 200
+                    "metrics": trial.METRICS, "guarantee": trial.GUARANTEE,
+                    "operator": trial.is_operator(store(), uid())}), 200
 
 
 @coworker_bp.post("/trial")

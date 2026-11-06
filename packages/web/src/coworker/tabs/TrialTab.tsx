@@ -27,15 +27,15 @@ function Goals({ goals, metrics }: { goals: any[]; metrics: Record<string, any> 
   );
 }
 
-function OperatorView() {
+function OperatorView({ enabled }: { enabled: boolean }) {
   const { token } = useAuth();
   const api = coworkerApi(token);
   const [trials, setTrials] = useState<any[] | null>(null);
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [msg, setMsg] = useState('');
   useEffect(() => {
-    api.get('/operator/trials').then((d) => setTrials(d.trials)).catch(() => setTrials(null));
-  }, []);
+    if (enabled) api.get('/operator/trials').then((d) => setTrials(d.trials)).catch(() => setTrials(null));
+  }, [enabled]);
   if (!trials) return null;
   const send = async (id: number) => {
     try {
@@ -189,7 +189,7 @@ export default function TrialTab() {
         </>
       )}
       {msg && <p className="text-sm text-gray-600 dark:text-gray-300">{msg}</p>}
-      <OperatorView />
+      <OperatorView enabled={Boolean(data.operator)} />
     </div>
   );
 }

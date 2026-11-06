@@ -149,7 +149,7 @@ def suppressed(finding: dict[str, Any], repo: str, suppressions: list[dict[str, 
 
 def review_changes(changes: list[dict[str, Any]], *, pack: dict[str, Any] | None, repo: str = "",
                    suppressions: list[dict[str, Any]] | None = None, user_id: int | None = None,
-                   use_model: bool = True) -> dict[str, Any]:
+                   use_model: bool = True, slop_report: dict[str, Any] | None = None) -> dict[str, Any]:
     findings = static_findings(changes, pack)
     unsure = False
     if use_model:
@@ -170,7 +170,7 @@ def review_changes(changes: list[dict[str, Any]], *, pack: dict[str, Any] | None
     summary = ("No problems found." if not findings else
                f"{len(findings)} finding(s): {counts['high']} high, {counts['medium']} medium, {counts['low']} low.")
     return {"findings": findings, "summary": summary, "escalate": bool(reasons), "reasons": reasons,
-            "slop": slop.report(changes)}
+            "slop": slop_report or slop.report(changes)}
 
 
 # -- persistence and GitHub ------------------------------------------------------------

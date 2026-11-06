@@ -24,6 +24,9 @@ PY_IMPORT = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))")
 PY_DEF = re.compile(r"^\s*def\s+([a-zA-Z_]\w*)\s*\(")
 WORD = re.compile(r"[a-z]+")
 
+# Test tooling a test file may import without it being listed anywhere we can see.
+TEST_LIBRARIES = {"pytest", "hypothesis", "mock", "freezegun", "responses", "factory", "faker", "pytest_mock"}
+
 WEIGHTS = {"skipped_test": 25, "weakened_test": 20, "huge_diff": 15, "unknown_import": 15, "duplicated_block": 8,
            "dead_code": 6, "todo_left": 5, "debug_left": 5, "bare_except": 5, "restating_comment": 3}
 MESSAGES = {
@@ -83,6 +86,8 @@ def report(changes: list[dict[str, Any]], *, criteria: int = 0, known_modules: s
                 flag("restating_comment", path, line, m.group(2))
             if path.endswith(".py") and (im := PY_IMPORT.match(text)):
                 module = (im.group(1) or im.group(2) or "").split(".")[0]
+                if test_file and module in TEST_LIBRARIES:
+                    continue
                 if module and not module.startswith("_") and module not in known and module.lower() not in reqs:
                     flag("unknown_import", path, line, module)
             if path.endswith(".py") and not test_file and (d := PY_DEF.match(text)):

@@ -271,14 +271,15 @@ def execute(store: Store, user_id: int, run_id: int) -> dict[str, Any]:
                         cost_micros=_micros(meter))
         changes = [diffs.from_contents(p, original.get(p), working[p]) for p in sorted(working)
                    if working[p] != original.get(p)]
-        result = review.review_changes(changes, pack=pack, repo=spec["repo"],
-                                       suppressions=review.suppressions_for(store, user_id), user_id=user_id)
-        review_row = review.save(store, user_id, result, repo=spec["repo"], source="run", run_id=run_id)
         known = {p.split("/")[0].removesuffix(".py") for p in tree} | {p.split("/")[0] for p in working}
         requirements = client.read_file(spec["repo"], "requirements.txt") or ""
         slop_report = slop.report(changes, criteria=len(spec["acceptance_criteria"]), known_modules=known,
                                   requirements=requirements,
                                   existing_code="\n".join(c or "" for c in working.values()))
+        result = review.review_changes(changes, pack=pack, repo=spec["repo"],
+                                       suppressions=review.suppressions_for(store, user_id), user_id=user_id,
+                                       slop_report=slop_report)
+        review_row = review.save(store, user_id, result, repo=spec["repo"], source="run", run_id=run_id)
         cost = _micros(meter)
     run = _set(store, user_id, run_id, nodes=state, checks=checks, slop=slop_report, review_id=review_row["id"],
                cost_micros=cost)
@@ -356,7 +357,10 @@ def _propose_pr(store: Store, user_id: int, run: dict[str, Any], working: dict[s
                               {"repo": spec["repo"], "branch": branch, "title": title, "body": body, "files": files,
                                "run_id": run["id"], "diff": "".join(diffs.unified(f["path"], original.get(f["path"]),
                                                                                     working.get(f["path"])) for f in files)[:60000]},
-                              title=f"Open PR: {title}", reasoning=body, extra_risks=risks, chat_id=spec.get("chat_id"))
+                              title=f"Open PR: {title}",
+                              reasoning=(f"From {key or 'your request'}: {checks_line[2:].lower()}, AI review: "
+                                         f"{result['summary'].rstrip('.').lower()}, slop score {slop_report['score']}/100."),
+                              extra_risks=risks, chat_id=spec.get("chat_id"))
     if spec.get("chat_id"):
         from coworker import reports
 

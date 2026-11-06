@@ -141,7 +141,7 @@ def test_routes(client, auth_headers, monkeypatch):
     h = auth_headers
     client.post("/api/coworker", json={"mode": "demo"}, headers=h)
     empty = client.get("/api/coworker/trial", headers=h).get_json()
-    assert empty["trial"] is None and "engineering" in empty["defaults"]
+    assert empty["trial"] is None and "engineering" in empty["defaults"] and empty["operator"] is False
     assert client.post("/api/coworker/trial", json={"role": "x"}, headers=h).status_code == 400
     created = client.post("/api/coworker/trial", json={"role": "sales"}, headers=h)
     assert created.status_code == 201 and created.get_json()["trial"]["progress"]["day"] == 0

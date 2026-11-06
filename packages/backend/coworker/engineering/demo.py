@@ -34,11 +34,26 @@ def annual_quote(seat_count: int) -> Decimal:
     """Yearly price: ten months of the monthly quote, so two months are free."""
     return (monthly_quote(seat_count) * ANNUAL_MONTHS_BILLED).quantize(Decimal("0.01"))
 '''}],
-    "test": [{"path": "tests/test_annual.py", "content": '''from decimal import Decimal
+    "test": [{"path": "tests/test_pricing.py", "content": '''from decimal import Decimal
 
 import pytest
 
-from app.pricing import annual_quote, monthly_quote
+from app.pricing import annual_quote, monthly_quote, volume_discount
+
+
+def test_small_team_pays_list_price():
+    assert monthly_quote(10) == Decimal("400.00")
+
+
+def test_volume_discount_tiers():
+    assert volume_discount(49) == Decimal("0")
+    assert volume_discount(50) == Decimal("0.10")
+    assert volume_discount(100) == Decimal("0.20")
+
+
+def test_zero_seats_is_rejected():
+    with pytest.raises(ValueError):
+        monthly_quote(0)
 
 
 def test_annual_is_ten_months():
