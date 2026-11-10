@@ -5,6 +5,11 @@ terraform/*.tfstate.*
 terraform/*.tfvars
 terraform/.terraform.lock.hcl
 terraform/crash.log
+terraform/docs/.terraform/
+terraform/docs/*.tfstate
+terraform/docs/*.tfstate.*
+terraform/docs/*.tfvars
+terraform/docs/.terraform.lock.hcl
 
 # Node
 node_modules/

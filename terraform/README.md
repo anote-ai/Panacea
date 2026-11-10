@@ -10,6 +10,9 @@ This stack deliberately uses the account's **default VPC** to keep the first
 deploy simple. For a hardened production setup, swap `network.tf` for a real
 VPC module with private subnets + NAT for ECS/RDS.
 
+> **Docs site:** `docs.ourogen.ai` is provisioned separately, with its own state, in
+> [`docs/`](docs/README.md). Applying it does not touch anything in this stack.
+
 ## One-time setup
 
 1. Create an S3 bucket for Terraform state and uncomment/fill in the `backend "s3"`
