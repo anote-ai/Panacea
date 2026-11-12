@@ -8,8 +8,8 @@ import hmac
 import os
 import re
 
-from flask import Blueprint, jsonify, request
 from database.db import get_connection
+from flask import Blueprint, jsonify, request
 from services.streaming import stream_llm_response
 
 demo_bp = Blueprint("company_demos", __name__, url_prefix="/api/demos")
