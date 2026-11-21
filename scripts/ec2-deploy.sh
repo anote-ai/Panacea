@@ -11,6 +11,9 @@
 # - Makes the backend run the image this deploy just pushed. The host's
 #   docker-compose.yml may name a fixed tag instead of ${IMAGE_URI}; the new
 #   image is tagged as whatever the compose file names, so either works.
+# - Runs the new image's production config check before touching anything,
+#   so an unsafe config can't replace a running backend with one that won't
+#   start.
 # - Fails (with container status and backend logs) unless the backend is
 #   live (/health) AND its database is usable (/health/db).
 set -euo pipefail
@@ -34,6 +37,17 @@ echo "==> Pulling $IMAGE_URI"
 aws ecr get-login-password --region "$AWS_REGION" \
   | docker login --username AWS --password-stdin "$ECR_REGISTRY" >/dev/null
 docker pull "$IMAGE_URI"
+
+# The backend refuses to start in production with an unsafe config (see
+# packages/backend/coworker/config.py). Run that check with the NEW image
+# against the real .env first: on failure, stop here and leave the running
+# backend (and every tag) untouched. Messages name settings, never values.
+echo "==> Checking production config with the new image"
+if ! docker run --rm --env-file .env -e APP_ENV=production --entrypoint python "$IMAGE_URI" -m coworker.config; then
+  echo "CONFIG_CHECK_FAILED: the new backend would refuse to start with this configuration."
+  echo "Fix the settings named above in Secrets Manager ($SECRET_ID); the running backend was left as it is."
+  exit 1
+fi
 
 BACKEND_IMAGE=$(docker compose config --format json 2>/dev/null \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["services"]["backend"].get("image",""))' 2>/dev/null || true)
