@@ -109,6 +109,8 @@ jobs:
           AWS_REGION: ${{ env.AWS_REGION }}
           INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
           APP_DIR: ${{ env.APP_DIR }}
+          # Host port the backend container listens on (docker compose on EC2).
+          HEALTH_PORT: ${{ vars.BACKEND_HEALTH_PORT || '5000' }}
         run: |
           if [ -z "$IMAGE_URI" ]; then
             echo "ERROR: IMAGE_URI is empty — the build-and-push-backend job did not produce an output."
@@ -138,6 +140,8 @@ jobs:
             'cd /home/ssm-user/app',
             'docker compose down --remove-orphans',
             'IMAGE_URI=$IMAGE_URI docker compose up -d',
+            'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do curl -fsS http://localhost:$HEALTH_PORT/health && break; sleep 5; done',
+            'curl -fsS http://localhost:$HEALTH_PORT/health || { echo BACKEND_UNHEALTHY; docker compose ps; docker compose logs --tail 200; exit 1; }',
             'docker image prune -f'
           ]" \
           --region us-east-1 \
@@ -146,9 +150,22 @@ jobs:
 
           echo "SSM Command ID: $COMMAND_ID"
 
+          # The waiter exits non-zero on failure; don't stop here — fetch the
+          # invocation so the host's output (incl. container logs) is printed.
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" || true
+
+          INVOCATION=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --output json)
+          STATUS=$(echo "$INVOCATION" | python3 -c 'import sys,json;print(json.load(sys.stdin)["Status"])')
+          echo "::group::EC2 stdout"; echo "$INVOCATION" | python3 -c 'import sys,json;print(json.load(sys.stdin)["StandardOutputContent"])'; echo "::endgroup::"
+          echo "::group::EC2 stderr"; echo "$INVOCATION" | python3 -c 'import sys,json;print(json.load(sys.stdin)["StandardErrorContent"])'; echo "::endgroup::"
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::EC2 deploy finished with status $STATUS — backend did not become healthy. See EC2 stdout above for container logs."
+            exit 1
+          fi
+          echo "Backend is healthy on the instance."
 
   # Frontend is independent of the backend: no `needs`, so it starts immediately
   # and runs in parallel with the backend build/deploy.
@@ -207,7 +224,7 @@ jobs:
           for attempt in {1..6}; do
             python3 scripts/release_smoke.py \
               --frontend-url https://chat.ourogen.ai/ \
-              --api-url https://chat.ourogen.ai \
+              --api-url https://api.ourogen.ai \
               --expected-sha "$EXPECTED_SHA" \
               --require-payments && exit 0
             if [[ "$attempt" -lt 6 ]]; then

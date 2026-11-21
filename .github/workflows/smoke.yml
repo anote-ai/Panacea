@@ -11,7 +11,7 @@ on:
       api_url:
         description: "Public origin that routes Panacea API paths"
         required: true
-        default: "https://chat.ourogen.ai"
+        default: "https://api.ourogen.ai"
         type: string
       expected_sha:
         description: "Expected frontend and backend commit SHA (optional)"
