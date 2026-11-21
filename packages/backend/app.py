@@ -59,6 +59,37 @@ def create_app(config: dict[str, object] | None = None) -> Flask:
     def health() -> tuple[Response, int]:
         return jsonify({"status": "ok", **get_build_metadata()}), 200
 
+    @app.get("/health/db")
+    def health_db() -> tuple[Response, int]:
+        """Readiness of the database: reachable, and the users table exists.
+
+        /health stays a pure liveness check (the load balancer uses it), so
+        a database outage doesn't pull the API out of rotation. This endpoint
+        is what deploys and release checks use to catch a broken database.
+        Only the error class and MySQL errno are returned (e.g. 2003 = can't
+        connect, 1045 = access denied, 1049 = unknown database, 1146 = table
+        missing); the full error goes to the logs.
+        """
+        try:
+            from database.db import get_connection
+
+            cnx = get_connection()
+            try:
+                cursor = cnx.cursor()
+                cursor.execute("SELECT 1 FROM users LIMIT 1")
+                cursor.fetchall()
+                cursor.close()
+            finally:
+                cnx.close()
+        except Exception as exc:
+            app.logger.exception("Database health check failed")
+            return jsonify({
+                "database": "unavailable",
+                "error": type(exc).__name__,
+                "errno": getattr(exc, "errno", None),
+            }), 503
+        return jsonify({"database": "ok"}), 200
+
     @app.get("/version")
     @app.get("/api/version")
     def version() -> tuple[Response, int]:

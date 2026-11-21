@@ -34,13 +34,14 @@ def _url(base: str, path: str) -> str:
     return urljoin(f"{base.rstrip('/')}/", path.lstrip("/"))
 
 
-def fetch(url: str, timeout: float) -> Response:
+def fetch(url: str, timeout: float, method: str = "GET", json_body: Any = None) -> Response:
     """Fetch a public URL with normal browser-grade TLS verification."""
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "PanaceaReleaseSmoke/1.0"},
-        method="GET",
-    )
+    headers = {"User-Agent": "PanaceaReleaseSmoke/1.0"}
+    data = None
+    if json_body is not None:
+        data = json.dumps(json_body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return Response(
@@ -121,6 +122,25 @@ def _json_check(
     return check, payload
 
 
+# A syntactically valid login for an address that can never exist (.invalid
+# is reserved). A healthy API answers 401; 503 means the user lookup itself
+# failed, i.e. nobody can sign in. Nothing is created.
+_PROBE_LOGIN = {"email": "release-smoke@example.invalid", "password": "not-a-real-password"}
+
+
+def _login_rejects_unknown_user(api_url: str, timeout: float) -> Check:
+    name = "auth-login"
+    url = _url(api_url, "/auth/login")
+    try:
+        response = fetch(url, timeout, method="POST", json_body=_PROBE_LOGIN)
+    except (OSError, ssl.SSLError, urllib.error.URLError) as exc:
+        return Check(name, False, f"{url}: {type(exc).__name__}: {exc}")
+    if response.status == 401:
+        return Check(name, True, f"{url}: unknown user rejected with HTTP 401")
+    hint = " (the API cannot reach its database, so nobody can sign in)" if response.status == 503 else ""
+    return Check(name, False, f"{url}: expected HTTP 401 for an unknown user, got {response.status}{hint}")
+
+
 def run_checks(
     frontend_url: str,
     api_url: str,
@@ -139,11 +159,11 @@ def run_checks(
         expected_status=200,
         expected_type="text/html",
     )
-    if frontend_check.ok and frontend is not None and b"Panacea" not in frontend.body:
+    if frontend_check.ok and frontend is not None and b"Ourogen" not in frontend.body:
         frontend_check = Check(
             "frontend",
             False,
-            f"{_url(frontend_url, '/')}: HTML does not identify Panacea",
+            f"{_url(frontend_url, '/')}: HTML does not identify Ourogen",
         )
     checks.append(frontend_check)
 
@@ -159,6 +179,15 @@ def run_checks(
     if health_check.ok and health is not None and health.get("status") != "ok":
         health_check = Check("api-health", False, "API health payload does not report status=ok")
     checks.append(health_check)
+
+    # /health only proves the process is up; this proves the database is
+    # reachable and has its tables (sign-in depends on it).
+    db_check, db = _json_check("api-database", api_url, "/health/db", timeout)
+    if db_check.ok and db is not None and db.get("database") != "ok":
+        db_check = Check("api-database", False, f"database not ok: {db}")
+    checks.append(db_check)
+
+    checks.append(_login_rejects_unknown_user(api_url, timeout))
 
     api_build_check, api_build = _json_check(
         "api-build-metadata",

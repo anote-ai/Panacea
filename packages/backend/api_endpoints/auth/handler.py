@@ -51,6 +51,7 @@ def register() -> tuple:
         token = create_access_token(identity=str(user_id))
         return jsonify({"token": token, "userId": user_id, "isNewUser": True}), 201
     except Exception:
+        current_app.logger.exception("Auth database operation failed")
         return jsonify({"error": "Authentication service unavailable"}), 503
 
 
@@ -74,6 +75,7 @@ def login() -> tuple:
         token = create_access_token(identity=str(user["id"]))
         return jsonify({"token": token, "userId": user["id"]}), 200
     except Exception:
+        current_app.logger.exception("Auth database operation failed")
         return jsonify({"error": "Authentication service unavailable"}), 503
 
 
@@ -203,6 +205,7 @@ def google_oauth_callback():
             user_id = user["id"]
         cnx.close()
     except Exception:
+        current_app.logger.exception("Google sign-in: user lookup/creation failed")
         return redirect(f"{frontend_url}/login?error=service_unavailable")
 
     token = create_access_token(identity=str(user_id))
