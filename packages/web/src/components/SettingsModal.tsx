@@ -87,7 +87,7 @@ function extractError(err: unknown, fallback: string): string {
 
 function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
+    <div className="px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#212121]">
       <p className="text-xs text-gray-400 dark:text-gray-500">{label}</p>
       <p className="text-sm font-medium text-gray-900 dark:text-white">{value}</p>
     </div>
@@ -109,7 +109,7 @@ function PlanCard({
   const isUpgrading = upgradingPlan === plan.plan;
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
+    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#212121]">
       <div>
         <p className="text-sm text-gray-900 dark:text-white capitalize">{plan.plan}</p>
         <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -402,7 +402,7 @@ export default function SettingsModal({ open, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Section nav */}
-        <div className="w-48 flex-shrink-0 bg-[#F7F7F8] dark:bg-[#242424] border-r border-gray-200 dark:border-gray-700 p-3">
+        <div className="w-48 flex-shrink-0 bg-[#F7F7F8] dark:bg-[#212121] border-r border-gray-200 dark:border-gray-700 p-3">
           <h2 className="text-sm font-semibold px-2 mb-3 text-gray-900 dark:text-white">
             Settings
           </h2>
@@ -501,7 +501,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') saveName(); }}
-                      className="flex-1 bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                      className="flex-1 bg-[#F7F7F8] dark:bg-[#212121] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
                       placeholder="Your name"
                     />
                     <button
@@ -577,7 +577,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                   <select
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full max-w-xs bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                    className="w-full max-w-xs bg-[#F7F7F8] dark:bg-[#212121] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
                   >
                     {MODELS.map((m) => (
                       <option key={m} value={m}>
@@ -604,7 +604,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                         const isOpen = !!openProviders[p.id];
                         return (
                           <div key={p.id}>
-                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#1a1a1a]">
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F7F8] dark:bg-[#212121]">
                               <span className="text-sm text-gray-700 dark:text-gray-300">
                                 {p.label}
                               </span>
@@ -649,7 +649,7 @@ export default function SettingsModal({ open, onClose }: Props) {
                                       if (e.key === 'Enter') saveProviderKey(p.id);
                                     }}
                                     placeholder={isSet ? 'Replace key…' : 'Enter API key…'}
-                                    className="flex-1 bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                                    className="flex-1 bg-[#F7F7F8] dark:bg-[#212121] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
                                   />
                                   <button
                                     type="button"

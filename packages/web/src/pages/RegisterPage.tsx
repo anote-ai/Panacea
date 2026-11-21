@@ -52,7 +52,7 @@ export default function RegisterPage() {
           type="button"
           onClick={handleGoogleRegister}
           disabled={googleLoading || loading}
-          className="flex items-center justify-center gap-3 w-full py-3 mb-6 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-[#3A3A3A] disabled:opacity-50 transition-colors"
+          className="flex items-center justify-center gap-3 w-full py-3 mb-6 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2F2F2F] text-gray-900 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-[#3F3F3F] disabled:opacity-50 transition-colors"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
             <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z" />

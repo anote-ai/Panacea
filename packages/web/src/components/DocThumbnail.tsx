@@ -47,7 +47,7 @@ export default function DocThumbnail({ docId, token, size = 'md' }: Props) {
 
   return (
     <div
-      className={`${SIZE_CLASSES[size]} rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden bg-white dark:bg-[#1a1a1a] flex-shrink-0`}
+      className={`${SIZE_CLASSES[size]} rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden bg-white dark:bg-[#212121] flex-shrink-0`}
     >
       {url && !failed ? (
         <img src={url} alt="" className="w-full h-full object-cover" />

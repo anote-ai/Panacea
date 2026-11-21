@@ -20,7 +20,7 @@
 export interface AnoteClientOptions {
   /** API key starting with `ant-`. Generate one at your Anote instance → Settings → API Keys. */
   apiKey: string;
-  /** Base URL of your Anote server. Defaults to `https://api.anote.ai`. */
+  /** Base URL of your Anote server. Defaults to `https://api.ourogen.ai`. */
   baseUrl?: string;
 }
 
@@ -115,7 +115,7 @@ export class AnoteClient {
   constructor(options: AnoteClientOptions) {
     if (!options.apiKey) throw new Error("apiKey is required");
     this.apiKey = options.apiKey;
-    this.baseUrl = (options.baseUrl ?? "https://api.anote.ai").replace(/\/$/, "") + "/api/v1";
+    this.baseUrl = (options.baseUrl ?? "https://api.ourogen.ai").replace(/\/$/, "") + "/api/v1";
   }
 
   // ── Core HTTP ───────────────────────────────────────────────────────────────────

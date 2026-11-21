@@ -889,7 +889,7 @@ export default function ChatPage() {
                   <div
                     key={d.id}
                     onClick={() => setViewingDoc(d)}
-                    className="group relative flex flex-col rounded-lg p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#3a3a3a] transition-colors"
+                    className="group relative flex flex-col rounded-lg p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#3F3F3F] transition-colors"
                   >
                     <button
                       onClick={(e) => {
@@ -942,7 +942,7 @@ export default function ChatPage() {
                 }
               }}
               placeholder="Search chats by title or content..."
-              className="w-full bg-[#F7F7F8] dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none"
+              className="w-full bg-[#F7F7F8] dark:bg-[#212121] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none"
             />
             <div className="mt-2 max-h-80 overflow-y-auto space-y-0.5">
               {searchQuery.trim() === '' ? (
@@ -962,7 +962,7 @@ export default function ChatPage() {
                       className={`px-3 py-2 rounded-lg text-sm cursor-pointer truncate transition-colors ${
                         s.id === sessionId
                           ? 'bg-gray-200 dark:bg-[#3F3F3F]'
-                          : 'hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
+                          : 'hover:bg-gray-100 dark:hover:bg-[#3F3F3F]'
                       }`}
                     >
                       {s.title || 'New chat'}
@@ -985,7 +985,7 @@ export default function ChatPage() {
                     className={`px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
                       r.id === sessionId
                         ? 'bg-gray-200 dark:bg-[#3F3F3F]'
-                        : 'hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
+                        : 'hover:bg-gray-100 dark:hover:bg-[#3F3F3F]'
                     }`}
                   >
                     <p className="truncate font-medium">{r.title}</p>

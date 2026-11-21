@@ -304,7 +304,7 @@ export default function DocumentsPage() {
       {/* Rubber band selection rectangle */}
       {rubberBand && (
         <div
-          className="fixed z-40 border border-blue-400 bg-blue-400/10 pointer-events-none"
+          className="fixed z-40 border border-gray-500 bg-gray-500/10 pointer-events-none"
           style={getRubberBandStyle()}
         />
       )}
@@ -421,7 +421,7 @@ export default function DocumentsPage() {
                     if (e.key === 'Escape') setRenamingId(null);
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-600 rounded px-1 text-sm focus:outline-none"
+                  className="flex-1 bg-white dark:bg-[#212121] border border-gray-300 dark:border-gray-600 rounded px-1 text-sm focus:outline-none"
                 />
               ) : (
                 <span className="flex items-center gap-2 truncate">
@@ -505,7 +505,7 @@ export default function DocumentsPage() {
                   if (e.key === 'Escape') setCreatingFolder(false);
                 }}
                 placeholder="Folder name..."
-                className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm focus:outline-none"
+                className="w-full bg-white dark:bg-[#212121] border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm focus:outline-none"
               />
             </div>
           ) : (
@@ -581,8 +581,8 @@ export default function DocumentsPage() {
 
         {/* Bulk action toolbar */}
         {selectedDocs.size > 0 && (
-          <div className="flex items-center gap-3 px-6 py-2 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
-            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+          <div className="flex items-center gap-3 px-6 py-2 bg-[#F7F7F8] dark:bg-[#2F2F2F] border-b border-gray-200 dark:border-gray-700">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
               {selectedDocs.size} selected
             </span>
             <div className="flex items-center gap-1">
@@ -590,7 +590,7 @@ export default function DocumentsPage() {
                 aria-label="Move selected documents to folder"
                 value={bulkMoveFolder}
                 onChange={(e) => setBulkMoveFolder(e.target.value)}
-                className="text-xs bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none"
+                className="text-xs bg-white dark:bg-[#212121] border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none"
               >
                 <option value="">Move to...</option>
                 <option value="root">Unfiled</option>
@@ -609,7 +609,7 @@ export default function DocumentsPage() {
                         : parseInt(bulkMoveFolder),
                     )
                   }
-                  className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  className="text-xs px-2 py-1 rounded bg-black text-white dark:bg-white dark:text-black hover:opacity-85 transition-opacity"
                 >
                   Move
                 </button>
@@ -685,8 +685,8 @@ export default function DocumentsPage() {
                     onMouseDown={(e) => e.stopPropagation()}
                     className={`group relative flex flex-col rounded-xl p-2 transition-colors cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400 dark:ring-blue-500'
-                        : 'bg-[#F7F7F8] dark:bg-[#2F2F2F] hover:bg-gray-100 dark:hover:bg-[#3a3a3a]'
+                        ? 'bg-gray-100 dark:bg-[#3F3F3F] ring-2 ring-black dark:ring-white'
+                        : 'bg-[#F7F7F8] dark:bg-[#2F2F2F] hover:bg-gray-100 dark:hover:bg-[#3F3F3F]'
                     }`}
                   >
                     <button
@@ -704,13 +704,13 @@ export default function DocumentsPage() {
                       }}
                       className={`absolute top-3 left-3 z-10 w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-opacity ${
                         isSelected
-                          ? 'opacity-100 bg-blue-500 border-blue-500'
+                          ? 'opacity-100 bg-black border-black dark:bg-white dark:border-white'
                           : 'opacity-0 group-hover:opacity-100 bg-white/90 dark:bg-black/50 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                       }`}
                     >
                       {isSelected && (
                         <svg
-                          className="w-3 h-3 text-white"
+                          className="w-3 h-3 text-white dark:text-black"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -790,7 +790,7 @@ export default function DocumentsPage() {
                     </p>
                     {doc.chat_id && (
                       <span
-                        className="mt-1 mx-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 truncate text-[10px]"
+                        className="mt-1 mx-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-[#3F3F3F] text-gray-700 dark:text-gray-200 truncate text-[10px]"
                         title={`Attached to chat: ${doc.chat_name || 'Untitled chat'}`}
                       >
                         <svg
@@ -819,7 +819,7 @@ export default function DocumentsPage() {
                         );
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="mt-1 w-full text-[10px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 focus:outline-none text-gray-600 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="mt-1 w-full text-[10px] bg-white dark:bg-[#212121] border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 focus:outline-none text-gray-600 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Move to folder"
                     >
                       <option value="">Unfiled</option>
