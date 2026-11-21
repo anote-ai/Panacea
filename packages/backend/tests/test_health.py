@@ -47,3 +47,39 @@ def test_root(client, monkeypatch):
     assert data["name"] == "Anote AI Backend"
     assert data["version"] == "1.0.0"
     assert data["commit"] == "root-sha"
+
+
+def test_health_db_ok(client):
+    from unittest.mock import MagicMock, patch
+
+    cnx = MagicMock()
+    with patch("database.db.get_connection", return_value=cnx):
+        resp = client.get("/health/db")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"database": "ok"}
+    executed = cnx.cursor.return_value.execute.call_args.args[0]
+    assert "FROM users" in executed
+    cnx.close.assert_called_once()
+
+
+def test_health_db_reports_errno_without_details(client):
+    from unittest.mock import patch
+
+    from mysql.connector.errors import ProgrammingError
+
+    err = ProgrammingError(msg="Table 'anote.users' doesn't exist", errno=1146)
+    with patch("database.db.get_connection", side_effect=err):
+        resp = client.get("/health/db")
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data == {"database": "unavailable", "error": "ProgrammingError", "errno": 1146}
+    # Connection details / raw messages must not leak to the public endpoint.
+    assert "anote.users" not in resp.get_data(as_text=True)
+
+
+def test_health_stays_ok_when_database_is_down(client):
+    from unittest.mock import patch
+
+    with patch("database.db.get_connection", side_effect=RuntimeError("down")):
+        assert client.get("/health").status_code == 200
+        assert client.get("/health/db").status_code == 503

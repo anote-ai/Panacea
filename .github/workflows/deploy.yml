@@ -102,70 +102,67 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - uses: actions/checkout@v4
+
       - name: Deploy to EC2 via SSM Session Manager
         env:
           IMAGE_URI: ${{ needs.build-and-push-backend.outputs.image_uri }}
           ECR_REGISTRY: ${{ needs.build-and-push-backend.outputs.ecr_registry }}
           AWS_REGION: ${{ env.AWS_REGION }}
           INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
-          APP_DIR: ${{ env.APP_DIR }}
           # Host port the backend container listens on (docker compose on EC2).
           HEALTH_PORT: ${{ vars.BACKEND_HEALTH_PORT || '5000' }}
         run: |
-          if [ -z "$IMAGE_URI" ]; then
-            echo "ERROR: IMAGE_URI is empty — the build-and-push-backend job did not produce an output."
-            echo "Check the Quality Gate and build-and-push-backend job logs above."
-            exit 1
-          fi
-
-          if [ -z "$ECR_REGISTRY" ]; then
-            echo "ERROR: ECR_REGISTRY is empty — the build-and-push-backend job did not produce an output."
-            exit 1
-          fi
-
-          if [ -z "$INSTANCE_ID" ]; then
-            echo "ERROR: INSTANCE_ID is empty — check that the INSTANCE_ID secret is set."
-            exit 1
-          fi
-
           echo "Deploying image: $IMAGE_URI"
 
-          COMMAND_ID=$(aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters commands="[
-            'aws secretsmanager get-secret-value --secret-id panacea/prod --region us-east-1 --query SecretString --output text | python3 -c \"import sys,json; d=json.load(sys.stdin); [print(f\\\"{k}={v}\\\") for k,v in d.items()]\" > /home/ssm-user/app/.env',
-            'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 548848854899.dkr.ecr.us-east-1.amazonaws.com',
-            'docker pull $IMAGE_URI',
-            'cd /home/ssm-user/app',
-            'docker compose down --remove-orphans',
-            'IMAGE_URI=$IMAGE_URI docker compose up -d',
-            'for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do curl -fsS http://localhost:$HEALTH_PORT/health && break; sleep 5; done',
-            'curl -fsS http://localhost:$HEALTH_PORT/health || { echo BACKEND_UNHEALTHY; docker compose ps; docker compose logs --tail 200; exit 1; }',
-            'docker image prune -f'
-          ]" \
-          --region us-east-1 \
-          --query "Command.CommandId" \
-          --output text)
+          # scripts/ec2-deploy.sh does the host-side work (see its header).
+          # Ship it base64-encoded inside JSON built by Python, so no shell
+          # quoting survives into the SSM document.
+          python3 - > ssm-params.json <<'PY'
+          import base64, json, os, shlex
+          script = base64.b64encode(open("scripts/ec2-deploy.sh", "rb").read()).decode()
+          env = " ".join(
+              f"{k}={shlex.quote(os.environ[k])}"
+              for k in ("IMAGE_URI", "ECR_REGISTRY", "AWS_REGION", "HEALTH_PORT")
+          )
+          print(json.dumps({
+              "commands": [
+                  f"echo {script} | base64 -d > /tmp/ourogen-deploy.sh",
+                  f"{env} bash /tmp/ourogen-deploy.sh",
+              ],
+              "executionTimeout": ["900"],
+          }))
+          PY
 
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file://ssm-params.json \
+            --region "$AWS_REGION" \
+            --query "Command.CommandId" \
+            --output text)
           echo "SSM Command ID: $COMMAND_ID"
 
-          # The waiter exits non-zero on failure; don't stop here — fetch the
-          # invocation so the host's output (incl. container logs) is printed.
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" || true
+          # Poll until the host finishes (the built-in waiter gives up after
+          # ~100s, shorter than an image pull + health checks can take).
+          STATUS=Pending
+          for _ in $(seq 1 90); do
+            sleep 10
+            STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" --region "$AWS_REGION" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in Pending|InProgress|Delayed) continue ;; *) break ;; esac
+          done
 
           INVOCATION=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --output json)
-          STATUS=$(echo "$INVOCATION" | python3 -c 'import sys,json;print(json.load(sys.stdin)["Status"])')
+            --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --region "$AWS_REGION" --output json)
           echo "::group::EC2 stdout"; echo "$INVOCATION" | python3 -c 'import sys,json;print(json.load(sys.stdin)["StandardOutputContent"])'; echo "::endgroup::"
           echo "::group::EC2 stderr"; echo "$INVOCATION" | python3 -c 'import sys,json;print(json.load(sys.stdin)["StandardErrorContent"])'; echo "::endgroup::"
           if [ "$STATUS" != "Success" ]; then
-            echo "::error::EC2 deploy finished with status $STATUS — backend did not become healthy. See EC2 stdout above for container logs."
+            echo "::error::EC2 deploy finished with status $STATUS. See EC2 stdout above for the failing check and backend logs."
             exit 1
           fi
-          echo "Backend is healthy on the instance."
+          echo "Backend is healthy and its database is usable."
 
   # Frontend is independent of the backend: no `needs`, so it starts immediately
   # and runs in parallel with the backend build/deploy.

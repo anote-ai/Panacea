@@ -21,6 +21,18 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_POST(self) -> None:  # noqa: N802
+        length = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(length)
+        status, content_type, body = self.routes.get(
+            "POST " + self.path,
+            (404, "application/json", b'{"error":"not found"}'),
+        )
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.end_headers()
+        self.wfile.write(body)
+
     def log_message(self, format: str, *args: object) -> None:
         return
 
@@ -33,7 +45,7 @@ class ReleaseSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         _Handler.routes = {
-            "/": (200, "text/html", b"<title>Panacea</title>"),
+            "/": (200, "text/html", b"<title>Ourogen | Chat</title>"),
             "/build.json": (
                 200,
                 "application/json",
@@ -49,6 +61,8 @@ class ReleaseSmokeTests(unittest.TestCase):
                 "application/json",
                 _json({"service": "anote-backend", "version": "1.0.0", "commit": "abc123"}),
             ),
+            "/health/db": (200, "application/json", _json({"database": "ok"})),
+            "POST /auth/login": (401, "application/json", _json({"error": "Invalid credentials"})),
             "/auth/me": (401, "application/json", _json({"msg": "missing token"})),
             "/api/documents": (401, "application/json", _json({"error": "unauthorized"})),
             "/api/user/usage": (401, "application/json", _json({"msg": "missing token"})),
@@ -115,6 +129,36 @@ class ReleaseSmokeTests(unittest.TestCase):
         health = next(check for check in checks if check.name == "api-health")
         self.assertFalse(health.ok)
         self.assertIn("expected application/json", health.detail)
+
+    def _with_routes(self, overrides: dict[str, tuple[int, str, bytes]]):
+        saved = dict(_Handler.routes)
+        _Handler.routes.update(overrides)
+        self.addCleanup(lambda: (_Handler.routes.clear(), _Handler.routes.update(saved)))
+
+    def test_broken_database_fails_db_and_login_checks(self) -> None:
+        self._with_routes({
+            "/health/db": (
+                503,
+                "application/json",
+                _json({"database": "unavailable", "error": "ProgrammingError", "errno": 1146}),
+            ),
+            "POST /auth/login": (
+                503,
+                "application/json",
+                _json({"error": "Authentication service unavailable"}),
+            ),
+        })
+        checks = {c.name: c for c in run_checks(self.base_url, self.base_url)}
+        self.assertFalse(checks["api-database"].ok)
+        self.assertFalse(checks["auth-login"].ok)
+        self.assertIn("nobody can sign in", checks["auth-login"].detail)
+        # Liveness alone still passes — which is exactly why these checks exist.
+        self.assertTrue(checks["api-health"].ok)
+
+    def test_healthy_api_passes_db_and_login_checks(self) -> None:
+        checks = {c.name: c for c in run_checks(self.base_url, self.base_url)}
+        self.assertTrue(checks["api-database"].ok, checks["api-database"].detail)
+        self.assertTrue(checks["auth-login"].ok, checks["auth-login"].detail)
 
 
 if __name__ == "__main__":

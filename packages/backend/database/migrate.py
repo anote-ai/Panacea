@@ -11,10 +11,17 @@ knowing it. _apply_migration tolerates exactly that: a statement that
 fails because its effect already exists is treated as a no-op rather
 than aborting the whole run.
 
+Before any migration, the base schema (schema.sql) is applied. Every
+statement in it is CREATE TABLE IF NOT EXISTS / INSERT IGNORE, so this is a
+no-op on an existing database and creates the tables on an empty one (e.g. a
+MySQL container whose data directory was reset, or a managed database that
+never ran docker-entrypoint-initdb.d).
+
 Run manually with `python -m database.migrate`, or automatically on
-container start (see entrypoint.sh) — a MySQL named lock keeps concurrent
-callers (e.g. multiple ECS tasks starting during a rolling deploy) from
-applying the same migration twice at once.
+container start (the Dockerfile's ENTRYPOINT runs it before gunicorn) — a
+MySQL named lock keeps concurrent callers (e.g. multiple workers or tasks
+starting during a rolling deploy) from applying the same migration twice at
+once.
 """
 from __future__ import annotations
 
@@ -26,6 +33,7 @@ from mysql.connector.errors import Error as MySQLError
 from database.db import get_connection
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), "migrations")
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 LOCK_NAME = "anote_schema_migrations"
 LOCK_TIMEOUT_SECONDS = 60
 
@@ -38,6 +46,36 @@ _ALREADY_APPLIED_ERRNOS = {
     1022,  # duplicate key (index)
     1826,  # duplicate foreign key constraint name
 }
+
+
+def _schema_statements(sql: str) -> list[str]:
+    """Statements from schema.sql to run against the configured database.
+
+    schema.sql starts with `CREATE DATABASE IF NOT EXISTS anote; USE anote;`
+    for MySQL's initdb path. The connection already targets DB_NAME (which
+    may not be "anote"), so those two are skipped here.
+    """
+    statements = []
+    for statement in filter(None, (s.strip() for s in _strip_sql_comments(sql).split(";"))):
+        head = statement.split(None, 2)
+        if head and head[0].upper() == "USE":
+            continue
+        if len(head) >= 2 and head[0].upper() == "CREATE" and head[1].upper() == "DATABASE":
+            continue
+        statements.append(statement)
+    return statements
+
+
+def _ensure_base_schema(cnx) -> None:
+    with open(SCHEMA_PATH, encoding="utf-8") as f:
+        statements = _schema_statements(f.read())
+    cursor = cnx.cursor()
+    try:
+        for statement in statements:
+            cursor.execute(statement)
+    finally:
+        cursor.close()
+    print(f"[migrate] base schema ensured ({len(statements)} statements)")
 
 
 def _ensure_migrations_table(cnx) -> None:
@@ -108,6 +146,7 @@ def run_migrations() -> None:
                 f"{LOCK_TIMEOUT_SECONDS}s; another migration may be stuck."
             )
         try:
+            _ensure_base_schema(cnx)
             _ensure_migrations_table(cnx)
             applied = _applied_versions(cnx)
             pending = _pending_migrations(applied)
@@ -122,6 +161,9 @@ def run_migrations() -> None:
             try:
                 release_cursor = cnx.cursor()
                 release_cursor.execute("SELECT RELEASE_LOCK(%s)", (LOCK_NAME,))
+                # Read the result: closing a cursor with an unread row raises
+                # "Unread result found" and leaves the lock held.
+                release_cursor.fetchone()
                 release_cursor.close()
             except MySQLError as exc:
                 print(f"[migrate] failed to release lock '{LOCK_NAME}': {exc}")

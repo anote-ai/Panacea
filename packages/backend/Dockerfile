@@ -26,4 +26,7 @@ EXPOSE 5000
 # Migrations + gunicorn are inlined here (rather than a separate entrypoint.sh)
 # so the startup command lives in the image's own metadata — immune to a
 # docker-compose bind mount shadowing /app with an incomplete host directory.
-ENTRYPOINT ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 \"app:create_app()\""]
+# Migrations create any missing tables (base schema + database/migrations).
+# A failure is logged loudly but doesn't block gunicorn: a database problem
+# should show up in /health/db and the logs, not take the whole API down.
+ENTRYPOINT ["sh", "-c", "python -m database.migrate || echo '[migrate] FAILED - see error above; /health/db will report the database as unavailable' >&2; exec gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 \"app:create_app()\""]

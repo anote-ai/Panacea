@@ -152,3 +152,41 @@ def test_run_migrations_raises_when_lock_not_acquired():
     with patch("database.migrate.get_connection", return_value=cnx):
         with pytest.raises(RuntimeError, match="Could not acquire migration lock"):
             migrate.run_migrations()
+
+
+def test_schema_statements_skip_create_database_and_use():
+    sql = (
+        "-- header comment; with a semicolon\n"
+        "CREATE DATABASE IF NOT EXISTS anote;\n"
+        "USE anote;\n"
+        "CREATE TABLE IF NOT EXISTS users (id INT);\n"
+        "INSERT IGNORE INTO schema_migrations (version) VALUES ('0001.sql');\n"
+    )
+    statements = migrate._schema_statements(sql)
+    assert statements == [
+        "CREATE TABLE IF NOT EXISTS users (id INT)",
+        "INSERT IGNORE INTO schema_migrations (version) VALUES ('0001.sql')",
+    ]
+
+
+def test_real_schema_is_idempotent_statements_only():
+    with open(migrate.SCHEMA_PATH, encoding="utf-8") as f:
+        statements = migrate._schema_statements(f.read())
+    assert statements, "schema.sql produced no statements"
+    for statement in statements:
+        upper = statement.upper()
+        assert upper.startswith("CREATE TABLE IF NOT EXISTS") or upper.startswith("INSERT IGNORE"), statement
+    assert any("EXISTS USERS" in s.upper() for s in statements)
+
+
+def test_ensure_base_schema_executes_every_statement():
+    cursor = MagicMock()
+    cnx = MagicMock()
+    cnx.cursor.return_value = cursor
+    with open(migrate.SCHEMA_PATH, encoding="utf-8") as f:
+        expected = migrate._schema_statements(f.read())
+
+    migrate._ensure_base_schema(cnx)
+
+    assert [c.args[0] for c in cursor.execute.call_args_list] == expected
+    cursor.close.assert_called_once()
