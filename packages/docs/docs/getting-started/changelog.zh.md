@@ -2,8 +2,8 @@
 
 Panacea 目前尚未发布手动维护的更新日志文件 — 真实的发布信息来源于：
 
-- **[GitHub 发布](https://github.com/anote-ai/Panacea/releases)** — CLI、VS Code 扩展和其他软件包的标记发布
-- **[提交历史](https://github.com/anote-ai/Panacea/commits/main)** — 每个更改，按顺序排列
+- **[GitHub 发布](https://github.com/anote-ai/Ourogen-Product/releases)** — CLI、VS Code 扩展和其他软件包的标记发布
+- **[提交历史](https://github.com/anote-ai/Ourogen-Product/commits/main)** — 每个更改，按顺序排列
 
 ## 为您的项目生成一个
 

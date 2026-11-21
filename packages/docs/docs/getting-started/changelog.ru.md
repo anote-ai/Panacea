@@ -2,8 +2,8 @@
 
 Panacea еще не публикует вручную поддерживаемый файл журнала изменений — источником правды о том, что было выпущено, является:
 
-- **[Релизы на GitHub](https://github.com/anote-ai/Panacea/releases)** — помеченные релизы для CLI, расширения VS Code и других пакетов
-- **[История коммитов](https://github.com/anote-ai/Panacea/commits/main)** — каждое изменение, в порядке
+- **[Релизы на GitHub](https://github.com/anote-ai/Ourogen-Product/releases)** — помеченные релизы для CLI, расширения VS Code и других пакетов
+- **[История коммитов](https://github.com/anote-ai/Ourogen-Product/commits/main)** — каждое изменение, в порядке
 
 ## Сгенерируйте один для вашего проекта
 

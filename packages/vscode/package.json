@@ -25,7 +25,8 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/anote-ai/AI-Assisted-Coding-Tool"
+    "url": "git+https://github.com/anote-ai/Ourogen-Product.git",
+    "directory": "packages/vscode"
   },
   "activationEvents": [
     "onStartupFinished"

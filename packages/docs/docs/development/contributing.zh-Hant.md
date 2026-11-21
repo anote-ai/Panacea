@@ -3,7 +3,7 @@
 ## 設定
 
 ```bash
-git clone https://github.com/anote-ai/Panacea
+git clone https://github.com/anote-ai/Ourogen-Product
 cd Panacea
 
 # 安裝 Node.js 套件

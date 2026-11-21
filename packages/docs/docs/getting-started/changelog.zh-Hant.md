@@ -2,8 +2,8 @@
 
 Panacea 尚未發布手動維護的變更紀錄檔案 — 真正的資訊來源為：
 
-- **[GitHub 版本](https://github.com/anote-ai/Panacea/releases)** — CLI、VS Code 擴展及其他套件的標記版本
-- **[提交歷史](https://github.com/anote-ai/Panacea/commits/main)** — 每一個變更，按順序排列
+- **[GitHub 版本](https://github.com/anote-ai/Ourogen-Product/releases)** — CLI、VS Code 擴展及其他套件的標記版本
+- **[提交歷史](https://github.com/anote-ai/Ourogen-Product/commits/main)** — 每一個變更，按順序排列
 
 ## 為你的專案生成一個
 

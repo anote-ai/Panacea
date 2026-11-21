@@ -43,7 +43,7 @@ Anote работает на нескольких платформах: CLI, VS C
     Интерфейс чата в браузере в стиле ChatGPT с загрузкой документов и поддержкой вопросов и ответов на основе RAG. Самостоятельно разместите его с помощью Docker Compose:
 
     ```bash
-    git clone https://github.com/anote-ai/Panacea
+    git clone https://github.com/anote-ai/Ourogen-Product
     cd Panacea
     cp packages/backend/.env.example packages/backend/.env
     # Отредактируйте .env с вашими API ключами
@@ -58,7 +58,7 @@ Anote работает на нескольких платформах: CLI, VS C
 
     Частное приложение на Electron с возможностью работы в оффлайне. Все данные остаются на вашем компьютере, и оно работает с локальными моделями Ollama, когда вы не хотите обращаться к размещенному провайдеру.
 
-    Скачайте последнюю версию с [GitHub Releases](https://github.com/anote-ai/Panacea/releases) — доступно для **macOS** (DMG), **Windows** (установщик) и **Linux** (AppImage/DEB/RPM).
+    Скачайте последнюю версию с [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases) — доступно для **macOS** (DMG), **Windows** (установщик) и **Linux** (AppImage/DEB/RPM).
 
     [Обзор настольного приложения →](desktop/overview.md)
 

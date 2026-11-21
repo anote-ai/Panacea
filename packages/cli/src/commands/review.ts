@@ -88,7 +88,7 @@ async function postGitHubReview(token: string, owner: string, repo: string, prNu
   for (const c of review.comments) counts[c.severity] = (counts[c.severity] ?? 0) + 1;
 
   const countLine = Object.entries(counts).map(([k, n]) => `${SEVERITY_EMOJI[k] ?? "•"} ${n} ${k}`).join("   ");
-  const body = ["## AI Code Review", "", review.summary, "", countLine ? `**Findings:** ${countLine}` : "_No issues found._", "", "_Posted by [Anote](https://github.com/anote-ai/AI-Assisted-Coding-Tool)_"].join("\n");
+  const body = ["## AI Code Review", "", review.summary, "", countLine ? `**Findings:** ${countLine}` : "_No issues found._", "", "_Posted by [Anote](https://github.com/anote-ai/Ourogen-Product)_"].join("\n");
   const githubComments = review.comments.filter((c) => c.line > 0).map((c) => ({ path: c.file, line: c.line, side: "RIGHT", body: `**${SEVERITY_EMOJI[c.severity] ?? "•"} ${c.severity.toUpperCase()}: ${c.title}**\n\n${c.body}` }));
 
   const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews`, {

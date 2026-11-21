@@ -43,7 +43,7 @@ Anoteは、CLI、VS Code、ウェブ、デスクトップ、モバイルのい�
     ドキュメントのアップロードとRAGバックのQ&Aを備えたChatGPTスタイルのブラウザチャットインターフェースです。Docker Composeで自己ホストできます：
 
     ```bash
-    git clone https://github.com/anote-ai/Panacea
+    git clone https://github.com/anote-ai/Ourogen-Product
     cd Panacea
     cp packages/backend/.env.example packages/backend/.env
     # APIキーで.envを編集
@@ -58,7 +58,7 @@ Anoteは、CLI、VS Code、ウェブ、デスクトップ、モバイルのい�
 
     プライベートでオフライン対応のElectronアプリです。すべてのデータはあなたのマシンに保存され、ホストされたプロバイダーに呼び出したくないときはローカルのOllamaモデルと連携します。
 
-    [GitHub Releases](https://github.com/anote-ai/Panacea/releases) から最新のリリースをダウンロード — **macOS** (DMG)、**Windows** (インストーラー)、および **Linux** (AppImage/DEB/RPM) 用に利用可能です。
+    [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases) から最新のリリースをダウンロード — **macOS** (DMG)、**Windows** (インストーラー)、および **Linux** (AppImage/DEB/RPM) 用に利用可能です。
 
     [デスクトップアプリの概要 →](desktop/overview.md)
 

@@ -51,7 +51,7 @@ All frontends (web, mobile, desktop) follow a ChatGPT-style design:
 - **Rocket logo**: white body + light gray accent in dark mode; black body + dark gray accent in light mode
 - Toggle button in header/toolbar
 - Grays are true neutral: each Tailwind config maps `gray` → `colors.neutral` (the default gray is blue-tinted). Don't add accent hues; red/green only for error/success states
-- Dark-mode surfaces: page `#212121`, raised `#2F2F2F`, hover `#3F3F3F`, sidebar `#171717`. The marketing site (anote-ai/Ourogen) uses the same tokens
+- Dark-mode surfaces: page `#212121`, raised `#2F2F2F`, hover `#3F3F3F`, sidebar `#171717`. The marketing site (anote-ai/Ourogen-Landing-Page) uses the same tokens
 - `index.html` applies the theme before first paint; keep it in sync with the theme logic in `App.tsx`
 
 ## Development

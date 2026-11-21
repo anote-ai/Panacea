@@ -9,10 +9,11 @@
     "coding-assistant",
     "cli"
   ],
-  "homepage": "https://github.com/anote-ai/AI-Assisted-Coding-Tool",
+  "homepage": "https://github.com/anote-ai/Ourogen-Product/tree/main/packages/cli",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anote-ai/AI-Assisted-Coding-Tool.git"
+    "url": "git+https://github.com/anote-ai/Ourogen-Product.git",
+    "directory": "packages/cli"
   },
   "license": "MIT",
   "type": "module",

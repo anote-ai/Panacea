@@ -3,7 +3,7 @@
 ## Configuração
 
 ```bash
-git clone https://github.com/anote-ai/Panacea
+git clone https://github.com/anote-ai/Ourogen-Product
 cd Panacea
 
 # Instalar pacotes do Node.js

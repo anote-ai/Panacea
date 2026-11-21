@@ -2,8 +2,8 @@
 
 Ourogen doesn't publish a hand-maintained changelog file yet — the source of truth for what's shipped is:
 
-- **[GitHub Releases](https://github.com/anote-ai/Panacea/releases)** — tagged releases for the CLI, VS Code extension, and other packages
-- **[Commit history](https://github.com/anote-ai/Panacea/commits/main)** — every change, in order
+- **[GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases)** — tagged releases for the CLI, VS Code extension, and other packages
+- **[Commit history](https://github.com/anote-ai/Ourogen-Product/commits/main)** — every change, in order
 
 ## Generate one for your own project
 

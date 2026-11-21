@@ -43,7 +43,7 @@ Anote läuft auf mehreren Oberflächen: der CLI, VS Code, dem Web, Desktop und m
     Eine ChatGPT-ähnliche Browser-Chatoberfläche mit Dokumenten-Upload und RAG-unterstütztem Q&A. Selbst gehostet mit Docker Compose:
 
     ```bash
-    git clone https://github.com/anote-ai/Panacea
+    git clone https://github.com/anote-ai/Ourogen-Product
     cd Panacea
     cp packages/backend/.env.example packages/backend/.env
     # Bearbeiten Sie .env mit Ihren API-Schlüsseln
@@ -58,7 +58,7 @@ Anote läuft auf mehreren Oberflächen: der CLI, VS Code, dem Web, Desktop und m
 
     Eine private, offline-fähige Electron-App. Alle Daten bleiben auf Ihrem Gerät, und sie funktioniert mit lokalen Ollama-Modellen, wenn Sie nicht zu einem gehosteten Anbieter aufrufen möchten.
 
-    Laden Sie die neueste Version von [GitHub Releases](https://github.com/anote-ai/Panacea/releases) herunter – verfügbar für **macOS** (DMG), **Windows** (Installer) und **Linux** (AppImage/DEB/RPM).
+    Laden Sie die neueste Version von [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases) herunter – verfügbar für **macOS** (DMG), **Windows** (Installer) und **Linux** (AppImage/DEB/RPM).
 
     [Übersicht über die Desktop-App →](desktop/overview.md)
 
