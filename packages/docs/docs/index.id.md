@@ -43,7 +43,7 @@ Anote berjalan di beberapa platform: CLI, VS Code, web, desktop, dan mobile. Pil
     Antarmuka obrolan browser gaya ChatGPT dengan unggahan dokumen dan Q&A berbasis RAG. Hosting sendiri dengan Docker Compose:
 
     ```bash
-    git clone https://github.com/anote-ai/Panacea
+    git clone https://github.com/anote-ai/Ourogen-Product
     cd Panacea
     cp packages/backend/.env.example packages/backend/.env
     # Edit .env dengan kunci API Anda
@@ -58,7 +58,7 @@ Anote berjalan di beberapa platform: CLI, VS Code, web, desktop, dan mobile. Pil
 
     Aplikasi Electron pribadi yang dapat bekerja secara offline. Semua data tetap di mesin Anda, dan ini bekerja dengan model Ollama lokal ketika Anda tidak ingin menghubungi penyedia yang dihosting.
 
-    Unduh rilis terbaru dari [GitHub Releases](https://github.com/anote-ai/Panacea/releases) — tersedia untuk **macOS** (DMG), **Windows** (installer), dan **Linux** (AppImage/DEB/RPM).
+    Unduh rilis terbaru dari [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases) — tersedia untuk **macOS** (DMG), **Windows** (installer), dan **Linux** (AppImage/DEB/RPM).
 
     [Ikhtisar Aplikasi Desktop →](desktop/overview.md)
 

@@ -2,8 +2,8 @@
 
 Panacea aún no publica un archivo de registro de cambios mantenido a mano; la fuente de verdad sobre lo que se ha enviado es:
 
-- **[Lanzamientos de GitHub](https://github.com/anote-ai/Panacea/releases)** — lanzamientos etiquetados para el CLI, la extensión de VS Code y otros paquetes
-- **[Historial de commits](https://github.com/anote-ai/Panacea/commits/main)** — cada cambio, en orden
+- **[Lanzamientos de GitHub](https://github.com/anote-ai/Ourogen-Product/releases)** — lanzamientos etiquetados para el CLI, la extensión de VS Code y otros paquetes
+- **[Historial de commits](https://github.com/anote-ai/Ourogen-Product/commits/main)** — cada cambio, en orden
 
 ## Genera uno para tu propio proyecto
 

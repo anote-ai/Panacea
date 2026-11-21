@@ -22,8 +22,8 @@ Autonomous Intelligence, also known as **Panacea**, is a multi-agent orchestrati
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/anote-ai/Autonomous-Intelligence.git
-cd Autonomous-Intelligence
+git clone https://github.com/anote-ai/Ourogen-Product.git
+cd Ourogen-Product
 
 # 2. Create your local env file and fill in values
 cp .env.example .env

@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "TypeScript/JavaScript SDK for the Anote AI Coding Tool REST API",
   "keywords": ["anote", "ai", "coding-assistant", "sdk", "anthropic"],
-  "homepage": "https://github.com/anote-ai/AI-Assisted-Coding-Tool",
+  "homepage": "https://github.com/anote-ai/Ourogen-Product/tree/main/packages/sdk",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anote-ai/AI-Assisted-Coding-Tool.git"
+    "url": "git+https://github.com/anote-ai/Ourogen-Product.git",
+    "directory": "packages/sdk"
   },
   "license": "MIT",
   "type": "module",

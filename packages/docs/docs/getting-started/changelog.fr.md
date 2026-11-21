@@ -2,8 +2,8 @@
 
 Panacea ne publie pas encore de fichier de journal des modifications maintenu à la main — la source de vérité pour ce qui a été expédié est :
 
-- **[Versions GitHub](https://github.com/anote-ai/Panacea/releases)** — versions taguées pour le CLI, l'extension VS Code et d'autres packages
-- **[Historique des commits](https://github.com/anote-ai/Panacea/commits/main)** — chaque changement, dans l'ordre
+- **[Versions GitHub](https://github.com/anote-ai/Ourogen-Product/releases)** — versions taguées pour le CLI, l'extension VS Code et d'autres packages
+- **[Historique des commits](https://github.com/anote-ai/Ourogen-Product/commits/main)** — chaque changement, dans l'ordre
 
 ## Générer un pour votre propre projet
 

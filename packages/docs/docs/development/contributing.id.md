@@ -3,7 +3,7 @@
 ## Pengaturan
 
 ```bash
-git clone https://github.com/anote-ai/Panacea
+git clone https://github.com/anote-ai/Ourogen-Product
 cd Panacea
 
 # Instal paket Node.js

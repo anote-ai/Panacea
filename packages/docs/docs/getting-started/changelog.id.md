@@ -2,8 +2,8 @@
 
 Panacea belum menerbitkan file catatan perubahan yang dikelola secara manual — sumber kebenaran untuk apa yang telah dirilis adalah:
 
-- **[Rilis GitHub](https://github.com/anote-ai/Panacea/releases)** — rilis yang ditandai untuk CLI, ekstensi VS Code, dan paket lainnya
-- **[Riwayat komit](https://github.com/anote-ai/Panacea/commits/main)** — setiap perubahan, dalam urutan
+- **[Rilis GitHub](https://github.com/anote-ai/Ourogen-Product/releases)** — rilis yang ditandai untuk CLI, ekstensi VS Code, dan paket lainnya
+- **[Riwayat komit](https://github.com/anote-ai/Ourogen-Product/commits/main)** — setiap perubahan, dalam urutan
 
 ## Buat satu untuk proyek Anda sendiri
 

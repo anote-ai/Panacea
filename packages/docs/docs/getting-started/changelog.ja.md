@@ -2,8 +2,8 @@
 
 Panacea はまだ手動で管理された変更履歴ファイルを公開していません — 出荷された内容の真実の源は次の通りです：
 
-- **[GitHub リリース](https://github.com/anote-ai/Panacea/releases)** — CLI、VS Code 拡張機能、およびその他のパッケージのタグ付きリリース
-- **[コミット履歴](https://github.com/anote-ai/Panacea/commits/main)** — すべての変更を順番に
+- **[GitHub リリース](https://github.com/anote-ai/Ourogen-Product/releases)** — CLI、VS Code 拡張機能、およびその他のパッケージのタグ付きリリース
+- **[コミット履歴](https://github.com/anote-ai/Ourogen-Product/commits/main)** — すべての変更を順番に
 
 ## 自分のプロジェクトのために生成する
 

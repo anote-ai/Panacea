@@ -19,7 +19,7 @@ code --install-extension anote-ai.anote-ai-coding
 ## Веб-приложение (самостоятельный хостинг)
 
 ```bash
-git clone https://github.com/anote-ai/Panacea
+git clone https://github.com/anote-ai/Ourogen-Product
 cd Panacea
 cp packages/backend/.env.example packages/backend/.env
 # Отредактируйте .env с вашими API ключами
@@ -30,7 +30,7 @@ docker compose up
 
 ## Десктопное приложение
 
-Скачайте последнюю версию с [GitHub Releases](https://github.com/anote-ai/Panacea/releases).
+Скачайте последнюю версию с [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases).
 
 Доступно для: **macOS** (DMG), **Windows** (установщик), **Linux** (AppImage/DEB/RPM).
 

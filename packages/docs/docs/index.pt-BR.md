@@ -43,7 +43,7 @@ Anote funciona em várias superfícies: o CLI, VS Code, a web, desktop e mobile.
     Uma interface de chat no navegador estilo ChatGPT com upload de documentos e Q&A suportado por RAG. Auto-hospede com Docker Compose:
 
     ```bash
-    git clone https://github.com/anote-ai/Panacea
+    git clone https://github.com/anote-ai/Ourogen-Product
     cd Panacea
     cp packages/backend/.env.example packages/backend/.env
     # Edite .env com suas chaves de API
@@ -58,7 +58,7 @@ Anote funciona em várias superfícies: o CLI, VS Code, a web, desktop e mobile.
 
     Um aplicativo Electron privado, capaz de funcionar offline. Todos os dados permanecem na sua máquina, e ele funciona com modelos locais do Ollama quando você não deseja chamar um provedor hospedado.
 
-    Baixe a versão mais recente do [GitHub Releases](https://github.com/anote-ai/Panacea/releases) — disponível para **macOS** (DMG), **Windows** (instalador) e **Linux** (AppImage/DEB/RPM).
+    Baixe a versão mais recente do [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases) — disponível para **macOS** (DMG), **Windows** (instalador) e **Linux** (AppImage/DEB/RPM).
 
     [Visão geral do Aplicativo Desktop →](desktop/overview.md)
 

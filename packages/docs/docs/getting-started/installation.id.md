@@ -19,7 +19,7 @@ code --install-extension anote-ai.anote-ai-coding
 ## Aplikasi Web (Di-host sendiri)
 
 ```bash
-git clone https://github.com/anote-ai/Panacea
+git clone https://github.com/anote-ai/Ourogen-Product
 cd Panacea
 cp packages/backend/.env.example packages/backend/.env
 # Edit .env dengan kunci API Anda
@@ -30,7 +30,7 @@ Frontend: http://localhost:3000 · Backend: http://localhost:5000
 
 ## Aplikasi Desktop
 
-Unduh rilis terbaru dari [GitHub Releases](https://github.com/anote-ai/Panacea/releases).
+Unduh rilis terbaru dari [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases).
 
 Tersedia untuk: **macOS** (DMG), **Windows** (installer), **Linux** (AppImage/DEB/RPM).
 

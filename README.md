@@ -1,6 +1,27 @@
-# Autonomous Intelligence
+# Ourogen
 
-Autonomous Intelligence is an open-source research project by [Anote](https://anote.ai/) that enables collaborative multi-agent AI systems. The framework provides the infrastructure to create, deploy, and coordinate specialized AI agents that can operate both independently and together in dynamic environments. Agents communicate through defined pathways while an orchestrator manages task distribution, ensuring efficient execution and seamless collaboration. This architecture allows the system to adapt to changing conditions, automatically selecting the best agents, tools, and workflows to tackle complex problems. To learn more, see the video demo below:
+Ourogen is an AI assistant for chat, questions about your documents, and coding help. This
+monorepo contains every part of it:
+
+| Package | What it is | Status |
+|---|---|---|
+| `packages/web` | Web chat app at [chat.ourogen.ai](https://chat.ourogen.ai) | Live |
+| `packages/backend` | Flask API shared by the clients (`api.ourogen.ai`) | Live |
+| `packages/cli` | Repo-aware coding CLI — `npm install -g @anote-ai/anote` | Published on npm |
+| `packages/vscode` | VS Code extension (`Anote.anote-ai-coding`) | Marketplace |
+| `packages/desktop` | Electron desktop app with a bundled local backend | Early access |
+| `packages/mobile` | Expo mobile app | In development |
+| `packages/sdk`, `packages/sdk-py` | TypeScript and Python API clients | In development |
+| `packages/docs` | MkDocs documentation | — |
+
+The marketing site at [ourogen.ai](https://ourogen.ai) lives in a separate repo,
+`anote-ai/Ourogen-Landing-Page`.
+
+## Background
+
+Ourogen grew out of Autonomous Intelligence, an open-source research project by
+[Anote](https://anote.ai/) on collaborative multi-agent AI systems: specialized agents that work
+independently and together while an orchestrator manages task distribution.
 
 [![Watch the video](https://img.youtube.com/vi/Nf-pc4xyTBI/0.jpg)](https://www.youtube.com/watch?v=Nf-pc4xyTBI)
 
@@ -37,26 +58,26 @@ Within the [Agent Registry](https://anote.ai/community/agents), we have added ma
 5. **Automation**: Emails are automatically sent to the generated list of leads. The system tracks progress, showing the number of emails sent and responses received daily.
 6. **Feedback Loop**: User feedback is incorporated to improve the lead generation process, refine email drafts, or adjust selection criteria for future tasks.
 
-![alt text](https://github.com/nv78/Autonomous-Intelligence/blob/main/materials/assets/ExampleNew.png?raw=true)
+![alt text](materials/assets/ExampleNew.png)
 
 For a full example of this working end to end for this use case, please see [Anote's Upreach Product](https://anote.ai/upreach).
 
-### Set Up
+## Set Up
 
 The preferred local startup path is now:
 
 ```bash
-cp backend/.env.example backend/.env
+cp packages/backend/.env.example .env   # docker compose reads ./.env
 docker compose up --build
 ```
 
-That starts the frontend, backend, MySQL, Redis, and Tika together.
+That starts the web app (http://localhost:3000), backend (http://localhost:5000), MySQL, Redis, and Tika together. Add an `ANTHROPIC_API_KEY` (or another provider key) to `.env` to get chat responses.
 
 If Docker is installed but not running, start Docker Desktop first or `docker compose up` will fail before the app boots.
 
 For native local development and testing instructions, see [`CODEBASE_SETUP.md`](CODEBASE_SETUP.md).
 
-### Publishing
+## Publishing
 
 #### VS Code Extension
 
@@ -79,9 +100,9 @@ npm login          # enter your npm credentials
 npm publish --access public      # builds automatically via prepublishOnly
 ```
 
-#### Troubleshooting
+## Troubleshooting
 
-If cloning the private repository fails, authenticate GitHub CLI first:
+If cloning fails, authenticate the GitHub CLI first:
 
 ```bash
 brew install gh

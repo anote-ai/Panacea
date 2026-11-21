@@ -43,7 +43,7 @@ Anote 可以在多个平台上运行：CLI、VS Code、网页、桌面和移动�
     类似 ChatGPT 的浏览器聊天界面，支持文档上传和基于 RAG 的问答。使用 Docker Compose 自托管：
 
     ```bash
-    git clone https://github.com/anote-ai/Panacea
+    git clone https://github.com/anote-ai/Ourogen-Product
     cd Panacea
     cp packages/backend/.env.example packages/backend/.env
     # 使用您的 API 密钥编辑 .env
@@ -58,7 +58,7 @@ Anote 可以在多个平台上运行：CLI、VS Code、网页、桌面和移动�
 
     一个私人、离线可用的 Electron 应用程序。所有数据保留在您的机器上，当您不想调用托管提供商时，它可以与本地 Ollama 模型一起使用。
 
-    从 [GitHub Releases](https://github.com/anote-ai/Panacea/releases) 下载最新版本——适用于 **macOS**（DMG）、**Windows**（安装程序）和 **Linux**（AppImage/DEB/RPM）。
+    从 [GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases) 下载最新版本——适用于 **macOS**（DMG）、**Windows**（安装程序）和 **Linux**（AppImage/DEB/RPM）。
 
     [桌面应用程序概述 →](desktop/overview.md)
 

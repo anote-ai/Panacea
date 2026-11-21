@@ -2,8 +2,8 @@
 
 Panacea veröffentlicht noch keine manuell gepflegte Änderungsprotokolldatei — die Quelle der Wahrheit für das, was veröffentlicht wurde, ist:
 
-- **[GitHub Releases](https://github.com/anote-ai/Panacea/releases)** — getaggte Veröffentlichungen für die CLI, die VS Code-Erweiterung und andere Pakete
-- **[Commit-Historie](https://github.com/anote-ai/Panacea/commits/main)** — jede Änderung, in chronologischer Reihenfolge
+- **[GitHub Releases](https://github.com/anote-ai/Ourogen-Product/releases)** — getaggte Veröffentlichungen für die CLI, die VS Code-Erweiterung und andere Pakete
+- **[Commit-Historie](https://github.com/anote-ai/Ourogen-Product/commits/main)** — jede Änderung, in chronologischer Reihenfolge
 
 ## Erstellen Sie eines für Ihr eigenes Projekt
 
