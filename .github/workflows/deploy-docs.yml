@@ -1,0 +1,109 @@
+name: Deploy Docs
+
+# Builds the MkDocs site (packages/docs) and publishes it to docs.ourogen.ai
+# (S3 bucket ourogen-docs behind CloudFront EK3EHTUQSOFMW, set up by hand in
+# the AWS console — see packages/docs/README.md). Kept separate from
+# deploy.yml so docs-only changes don't rebuild the backend, and backend
+# changes don't redeploy the docs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/docs/**"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
+jobs:
+  deploy-docs:
+    name: Deploy Docs to S3/CloudFront
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      S3_BUCKET: ${{ vars.S3_BUCKET_DOCS }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DOCS }}
+    steps:
+      - name: Check docs deployment configuration
+        id: config
+        run: |
+          missing=()
+          for name in AWS_REGION AWS_ROLE_ARN S3_BUCKET CLOUDFRONT_DISTRIBUTION_ID; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            # Skip (don't fail) until the repo variables S3_BUCKET_DOCS and
+            # CLOUDFRONT_DISTRIBUTION_ID_DOCS are set.
+            echo "::warning::Docs deploy skipped — missing configuration: ${missing[*]}"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.config.outputs.ready == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: packages/docs/requirements.txt
+
+      - name: Build docs
+        if: steps.config.outputs.ready == 'true'
+        working-directory: packages/docs
+        run: |
+          pip install -r requirements.txt
+          mkdocs build --strict
+
+      - name: Configure AWS credentials via OIDC
+        if: steps.config.outputs.ready == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        if: steps.config.outputs.ready == 'true'
+        working-directory: packages/docs
+        run: |
+          # Static assets: cache for a day at the edge/browser.
+          aws s3 sync site/ "s3://$S3_BUCKET" --delete \
+            --cache-control "public, max-age=86400" \
+            --exclude "*.html" --exclude "sitemap.xml*" --exclude "search/*"
+          # HTML, sitemap, and search index: always revalidate so edits show up immediately.
+          aws s3 sync site/ "s3://$S3_BUCKET" --delete \
+            --exclude "*" --include "*.html" --include "sitemap.xml*" --include "search/*" \
+            --cache-control "no-cache"
+
+      - name: Invalidate CloudFront
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
+
+      - name: Verify docs.ourogen.ai
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          # The home page and a nested page (exercises the index.html rewrite
+          # CloudFront Function) must both return 200.
+          for attempt in 1 2 3 4 5 6; do
+            home=$(curl -s -o /dev/null -w '%{http_code}' https://docs.ourogen.ai/)
+            nested=$(curl -s -o /dev/null -w '%{http_code}' https://docs.ourogen.ai/getting-started/installation/)
+            echo "home=$home nested=$nested"
+            [[ "$home" == 200 && "$nested" == 200 ]] && exit 0
+            sleep 10
+          done
+          echo "::error::docs.ourogen.ai is not serving the site (home=$home, nested=$nested)"
+          exit 1
