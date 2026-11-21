@@ -3,14 +3,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # Production only. Staging deploys from develop in deploy-staging.yml; this workflow's
+  # backend jobs always target the production host, so it must never run for staging.
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        default: production
-        type: choice
-        options: [production, staging]
 
 permissions:
   id-token: write
@@ -169,7 +164,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend to S3/CloudFront
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -211,7 +206,6 @@ jobs:
     name: Verify Production Release
     runs-on: ubuntu-latest
     needs: [deploy-to-ec2, deploy-frontend]
-    if: ${{ github.event_name == 'push' || github.event.inputs.environment == 'production' }}
     steps:
       - uses: actions/checkout@v4
       - name: Verify production release

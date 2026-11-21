@@ -161,9 +161,7 @@ def run_migrations() -> None:
             try:
                 release_cursor = cnx.cursor()
                 release_cursor.execute("SELECT RELEASE_LOCK(%s)", (LOCK_NAME,))
-                # Read the result: closing a cursor with an unread row raises
-                # "Unread result found" and leaves the lock held.
-                release_cursor.fetchone()
+                release_cursor.fetchall()  # read the result, or close() raises "Unread result found"
                 release_cursor.close()
             except MySQLError as exc:
                 print(f"[migrate] failed to release lock '{LOCK_NAME}': {exc}")
