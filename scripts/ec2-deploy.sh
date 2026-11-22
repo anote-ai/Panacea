@@ -30,36 +30,6 @@ export IMAGE_URI
 
 cd "$APP_HOME"
 
-# Capture only the exception class and stack locations from a recent Google
-# connection failure before replacing the backend container. Never print the
-# request, OAuth code, access token, or exception message into Actions logs.
-echo "==> Recent Google connection failure (redacted)"
-python3 - <<'PY'
-import re
-import subprocess
-
-result = subprocess.run(
-    ["docker", "compose", "logs", "--since", "4h", "--tail", "5000", "--no-color", "backend"],
-    capture_output=True, text=True, check=False,
-)
-lines = result.stdout.splitlines()
-starts = [i for i, line in enumerate(lines)
-          if "Exception on /api/coworker/connections/google/finish" in line]
-if not starts:
-    print("No recent Google finish exception in the backend container logs.")
-else:
-    print(f"Found {len(starts)} Google finish exception(s); latest stack:")
-    for line in lines[starts[-1]:starts[-1] + 100]:
-        frame = re.search(r'File "([^"]+)", line (\d+), in ([\w<>]+)', line)
-        if frame:
-            print(f"  {frame.group(1).rsplit('/', 1)[-1]}:{frame.group(2)} {frame.group(3)}")
-        stripped = line.split(" | ", 1)[-1].strip()
-        failure = re.match(r'([\w.]+(?:Error|Exception|InvalidToken))(?::|$)', stripped)
-        if failure:
-            print(f"  exception: {failure.group(1)}")
-            break
-PY
-
 echo "==> Writing .env from Secrets Manager ($SECRET_ID)"
 aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --region "$AWS_REGION" \
   --query SecretString --output text \
