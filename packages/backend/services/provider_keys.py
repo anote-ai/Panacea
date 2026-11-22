@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import os
 
@@ -17,13 +18,33 @@ def _derived_key() -> str:
     return base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest()).decode()
 
 
+def _configured_fernet(key: str) -> Fernet:
+    """Accept Fernet keys and the random URL-safe secrets in PILOT_LAUNCH.md.
+
+    Fernet.generate_key() encodes 32 bytes; secrets.token_urlsafe(48) encodes
+    48 bytes and must be reduced deterministically to a Fernet key. Keep the
+    configured secret unchanged so subsequent releases decrypt saved tokens.
+    """
+    try:
+        return Fernet(key.encode())
+    except ValueError:
+        pass
+    try:
+        raw = base64.urlsafe_b64decode(key + "=" * (-len(key) % 4))
+    except (ValueError, binascii.Error) as exc:
+        raise ValueError("PROVIDER_KEY_ENCRYPTION_KEY must be a URL-safe random key") from exc
+    if len(raw) < 32 or base64.urlsafe_b64encode(raw).decode().rstrip("=") != key.rstrip("="):
+        raise ValueError("PROVIDER_KEY_ENCRYPTION_KEY must contain at least 32 random bytes")
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(raw).digest()))
+
+
 def _fernet() -> MultiFernet:
     """Encrypt with the configured key; still decrypt values written with the
     JWT-derived fallback key, so setting PROVIDER_KEY_ENCRYPTION_KEY later
     doesn't strand keys that were stored before it existed."""
     keys = [k for k in (os.environ.get("PROVIDER_KEY_ENCRYPTION_KEY", ""), _derived_key()) if k]
     unique = list(dict.fromkeys(keys))
-    return MultiFernet([Fernet(k.encode()) for k in unique])
+    return MultiFernet([_configured_fernet(k) for k in unique])
 
 
 def encrypt_key(plaintext: str) -> str:
