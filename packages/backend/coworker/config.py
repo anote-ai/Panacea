@@ -35,6 +35,13 @@ def check(env: Mapping[str, Any]) -> tuple[list[str], list[str]]:
         errors.append("JWT_SECRET_KEY must be a random value of at least 32 characters.")
     if not env.get("PROVIDER_KEY_ENCRYPTION_KEY"):
         errors.append("PROVIDER_KEY_ENCRYPTION_KEY is required: it encrypts users' OAuth and API keys at rest.")
+    else:
+        from services.provider_keys import _configured_fernet
+
+        try:
+            _configured_fernet(str(env["PROVIDER_KEY_ENCRYPTION_KEY"]))
+        except ValueError:
+            errors.append("PROVIDER_KEY_ENCRYPTION_KEY must be a Fernet key or a URL-safe random secret of at least 32 bytes.")
     if str(env.get("COWORKER_DB_URL") or "").startswith("sqlite"):
         errors.append("COWORKER_DB_URL must not point at SQLite in production.")
     for key in ("BACKEND_URL", "FRONTEND_URL"):

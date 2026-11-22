@@ -1,6 +1,8 @@
 """Production launch: S3 twin storage, config enforcement, key rotation."""
 from __future__ import annotations
 
+import secrets
+
 import boto3
 import pytest
 from moto import mock_aws
@@ -92,7 +94,7 @@ def test_asset_route_serves_from_blobstore(client, auth_headers, tmp_path, monke
 SAFE = {
     "APP_ENV": "production",
     "JWT_SECRET_KEY": "x" * 40,
-    "PROVIDER_KEY_ENCRYPTION_KEY": "k",
+    "PROVIDER_KEY_ENCRYPTION_KEY": secrets.token_urlsafe(48),
     "BACKEND_URL": "https://chat.ourogen.ai",
     "FRONTEND_URL": "https://chat.ourogen.ai",
     "TWIN_S3_BUCKET": "b",
@@ -102,6 +104,8 @@ SAFE = {
 
 def test_config_check_safe_and_unsafe():
     assert config.check(SAFE) == ([], [])
+    errors, _ = config.check({**SAFE, "PROVIDER_KEY_ENCRYPTION_KEY": "k"})
+    assert any("PROVIDER_KEY_ENCRYPTION_KEY" in e for e in errors)
     assert config.check({**SAFE, "GOOGLE_CLIENT_ID": "g", "BACKEND_URL": "https://api.ourogen.ai",
                          "GOOGLE_COWORKER_REDIRECT_URI": ""}) == ([], [])
     _, warnings = config.check({**SAFE, "GOOGLE_CLIENT_ID": "g", "BACKEND_URL": "https://api.ourogen.ai",
@@ -152,6 +156,16 @@ def test_provider_keys_decrypt_after_setting_dedicated_key(monkeypatch):
     monkeypatch.delenv("PROVIDER_KEY_ENCRYPTION_KEY")
     with pytest.raises(Exception):
         provider_keys._fernet().decrypt(new_token)  # new values use the dedicated key
+
+
+def test_provider_keys_accept_documented_urlsafe_secret(monkeypatch):
+    from services import provider_keys
+
+    monkeypatch.setenv("JWT_SECRET_KEY", "jwt-secret-for-test")
+    monkeypatch.setenv("PROVIDER_KEY_ENCRYPTION_KEY", secrets.token_urlsafe(48))
+    encrypted = provider_keys.encrypt_key("a Google OAuth refresh token")
+    assert provider_keys.decrypt_key(encrypted) == "a Google OAuth refresh token"
+    assert config.check({**SAFE, "PROVIDER_KEY_ENCRYPTION_KEY": secrets.token_urlsafe(48)}) == ([], [])
 
 
 def test_config_gmail_push_needs_pinned_service_account():
