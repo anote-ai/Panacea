@@ -323,14 +323,18 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
             draft = yield from _call(ctx, "draft_reply", {"thread_id": thread["thread_id"],
                                                           "instruction": ""})
             body = draft["body"]
+            slot_text = ""
             if not draft.get("slots"):
                 slot_text, _ = drafting.slot_lines(s, uid)
                 name = drafting.first_name(thread["author_name"] if thread["direction"] == "inbound" else who)
-                body = drafting._wrap(s, uid, name, f"Would any of these work for a quick call?\n{slot_text}")
+                offer = f"Would any of these work for a quick call?\n{slot_text}" if slot_text else "What times work for a quick call?"
+                body = drafting._wrap(s, uid, name, offer)
             yield from _call(ctx, "send_email", {"to": draft["to"], "subject": draft["subject"], "body": body,
                                                  "thread_id": thread["thread_id"]})
-            yield ("text", f"I drafted a reply to {thread['author_name'] if thread['direction'] == 'inbound' else who} offering open times "
-                           "from your calendar. Approve it below and I'll send it.")
+            detail = ("offering open times from your calendar" if draft.get("slots") or slot_text else
+                      "asking for their availability because I couldn't verify your calendar")
+            yield ("text", f"I drafted a reply to {thread['author_name'] if thread['direction'] == 'inbound' else who} "
+                           f"{detail}. Approve it below and I'll send it.")
         else:
             slots = yield from _call(ctx, "find_free_slots", {})
             if isinstance(slots, dict) and slots.get("error"):

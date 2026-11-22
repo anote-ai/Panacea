@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from coworker import brain, sync_jobs, tools
+from coworker import brain, drafting, sync_jobs, tools
 from coworker.connectors.base import ConnectorError
 from coworker.connectors.google import GoogleConnector, _calendar_time
 from coworker.store import Store, iso, utcnow
@@ -53,6 +53,7 @@ def test_missing_or_failed_connection_does_not_claim_clear_calendar(live_store):
     assert "connected calendar" in events["error"] and "Couldn't check" in summary
     slots, summary = tools.run("find_free_slots", {}, ctx)
     assert "connected calendar" in slots["error"] and "Couldn't check" in summary
+    assert drafting.slot_lines(live_store, 1) == ("", [])
     with patch("coworker.brain.llm.available", return_value=False):
         reply = list(brain.run_turn(live_store, 1, None, "What's on my calendar this week?"))
     assert "connected calendar" in "".join(value for kind, value in reply if kind == "text")
