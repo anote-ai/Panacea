@@ -89,9 +89,11 @@ def check_google() -> dict[str, str]:
         return _result("Google OAuth", "skipped", "not configured (demo workspace only)")
     if not (cid and secret):
         return _result("Google OAuth", "fail", "set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
-    redirect = os.environ.get("GOOGLE_COWORKER_REDIRECT_URI", "")
+    from coworker.connectors import google
+
+    redirect = google.redirect_uri()
     if os.environ.get("APP_ENV") == "production" and not redirect.startswith("https://"):
-        return _result("Google OAuth", "fail", "GOOGLE_COWORKER_REDIRECT_URI must be https in production")
+        return _result("Google OAuth", "fail", f"Google coworker redirect must be public HTTPS, got {redirect}")
     from coworker import mail_push
 
     push = "real-time Gmail on" if mail_push.gmail_enabled() else "Gmail polled every minute (set GMAIL_PUBSUB_TOPIC for real time)"

@@ -34,8 +34,8 @@ It prints `OK: safe to start in production` or the exact settings to fix, and ex
    - It has a **`coworker-worker`** service: `python -m coworker.worker --interval 60`, with the same image and environment as the backend. See `docker-compose.yml` in this repo. Without the worker, the coworker only works while the user has the web app open.
    - Its environment passes through every variable in steps 2–7 below.
    - It has `restart: unless-stopped` and the `python -m coworker.ops --check` health check, so a crashed worker comes back on its own.
-   - To confirm it's running, check `curl https://chat.ourogen.ai/health`. `"worker": "ok"` means it ticked in the last 3 minutes. `stale` also raises an alert to `ALERT_SLACK_WEBHOOK_URL` and Sentry, and shows a banner in the app.
-3. Set `BACKEND_URL=https://chat.ourogen.ai` and `FRONTEND_URL=https://chat.ourogen.ai`. Meeting bots and Slack push events to `BACKEND_URL`, so it must be public and use HTTPS.
+   - To confirm it's running, check `curl https://api.ourogen.ai/health`. `"worker": "ok"` means it ticked in the last 3 minutes. `stale` also raises an alert to `ALERT_SLACK_WEBHOOK_URL` and Sentry, and shows a banner in the app.
+3. Set `BACKEND_URL=https://api.ourogen.ai` and `FRONTEND_URL=https://chat.ourogen.ai`. Google and Microsoft OAuth callbacks, meeting bots, and Slack push events use `BACKEND_URL`, so it must be the public HTTPS API host.
 4. Set `ANTHROPIC_API_KEY`. Without it, the coworker falls back to a scripted planner.
 5. Set `PROVIDER_KEY_ENCRYPTION_KEY`. It encrypts OAuth tokens at rest. Generate it once and never change it, or every connection breaks.
 6. When everything below is set, run this on the host:
@@ -49,10 +49,12 @@ It prints `OK: safe to start in production` or the exact settings to fix, and ex
 ## 2. Google (Gmail, Calendar, Drive)
 
 1. In Google Cloud Console, enable the Gmail, Calendar, and Drive APIs.
-2. On the OAuth client, add this authorized redirect URI:
-   `https://chat.ourogen.ai/api/coworker/connections/google/callback`
+2. On the **same Web application OAuth client** identified by `GOOGLE_CLIENT_ID`, add both authorized redirect URIs:
+   - `https://api.ourogen.ai/callback` (Google sign-in)
+   - `https://api.ourogen.ai/api/coworker/connections/google/callback` (Coworker Gmail/Calendar/Drive connection)
+   These belong in **Authorized redirect URIs**, not Authorized JavaScript origins. The scheme, host, path, and trailing slash must match the authorization request exactly. The web app lives at `chat.ourogen.ai`, but Google returns to the API at `api.ourogen.ai`.
 3. On the **OAuth consent screen**, leave the app in **Testing** and add the pilot user's Google address as a **test user**. Up to 100 test users can connect without Google's verification.
-4. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_COWORKER_REDIRECT_URI` (the URI above).
+4. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI=https://api.ourogen.ai/callback`. The Coworker redirect defaults to `BACKEND_URL` plus `/api/coworker/connections/google/callback`; if `GOOGLE_COWORKER_REDIRECT_URI` is explicitly set in Secrets Manager, make it the second URI above. `python -m coworker.vendor_check` prints the effective Coworker redirect so you can compare it with Google Cloud Console.
 
 > **Testing-mode caveat:** while the app is in Testing, Google expires refresh tokens after **7 days**. The coworker then stops reading and sending. It emails and pushes the user a **Reconnect Google** link, and Settings shows a Reconnect button. Reconnecting takes one click.
 >
@@ -63,8 +65,8 @@ It prints `OK: safe to start in production` or the exact settings to fix, and ex
 1. In the Azure portal, go to **Microsoft Entra ID → App registrations → New registration**.
    - Supported account types: **any organizational directory and personal Microsoft accounts**.
    - Redirect URIs: platform **Web**, both of these:
-     - `https://chat.ourogen.ai/api/coworker/connections/microsoft/callback` (connecting Outlook)
-     - `https://chat.ourogen.ai/auth/microsoft/callback` ("Continue with Microsoft" sign-in)
+     - `https://api.ourogen.ai/api/coworker/connections/microsoft/callback` (connecting Outlook)
+     - `https://api.ourogen.ai/auth/microsoft/callback` ("Continue with Microsoft" sign-in)
 2. Under **Certificates & secrets**, create a client secret.
 3. Under **API permissions**, add these Microsoft Graph **delegated** permissions:
    - `User.Read`

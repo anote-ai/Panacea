@@ -57,7 +57,7 @@ def is_configured() -> bool:
 
 def redirect_uri() -> str:
     default = f"{os.environ.get('BACKEND_URL', 'http://localhost:5000').rstrip('/')}/api/coworker/connections/google/callback"
-    return os.environ.get("GOOGLE_COWORKER_REDIRECT_URI", default)
+    return os.environ.get("GOOGLE_COWORKER_REDIRECT_URI") or default
 
 
 def scopes_for(level: str) -> list[str]:

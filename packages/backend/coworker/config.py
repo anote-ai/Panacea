@@ -19,6 +19,7 @@ import logging
 import os
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 log = logging.getLogger("coworker.config")
 
@@ -40,8 +41,14 @@ def check(env: Mapping[str, Any]) -> tuple[list[str], list[str]]:
         value = str(env.get(key) or "")
         if not value.startswith("https://"):
             warnings.append(f"{key} should be the public https:// URL (OAuth redirects and webhooks use it).")
-    if env.get("GOOGLE_CLIENT_ID") and not str(env.get("GOOGLE_COWORKER_REDIRECT_URI") or "").startswith("https://"):
-        warnings.append("GOOGLE_COWORKER_REDIRECT_URI should be https:// in production.")
+    if env.get("GOOGLE_CLIENT_ID"):
+        backend_url = str(env.get("BACKEND_URL") or "http://localhost:5000").rstrip("/")
+        google_redirect = str(env.get("GOOGLE_COWORKER_REDIRECT_URI") or
+                              f"{backend_url}/api/coworker/connections/google/callback")
+        if not google_redirect.startswith("https://"):
+            warnings.append("GOOGLE_COWORKER_REDIRECT_URI (or its BACKEND_URL fallback) should be https:// in production.")
+        elif urlsplit(google_redirect).netloc != urlsplit(backend_url).netloc:
+            warnings.append("Google Coworker callback host differs from BACKEND_URL; check its routing and Google Cloud authorized redirect URI.")
     if env.get("MICROSOFT_CLIENT_ID") and not str(env.get("MICROSOFT_REDIRECT_URI") or "").startswith("https://"):
         warnings.append("MICROSOFT_REDIRECT_URI should be https:// in production.")
     if env.get("GMAIL_PUSH_AUDIENCE") and not env.get("GMAIL_PUSH_SERVICE_ACCOUNT"):
