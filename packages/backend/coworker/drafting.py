@@ -57,7 +57,12 @@ def doc_answer(store: Store, user_id: int, question: str, max_sentences: int = 2
 
 
 def slot_lines(store: Store, user_id: int, count: int = 3, afternoon: bool = False) -> tuple[str, list[dict[str, str]]]:
-    slots = scheduling.free_slots(store, user_id, count=count, prefer_afternoon=afternoon)
+    from coworker.connectors.base import ConnectorError
+
+    try:
+        slots = scheduling.free_slots(store, user_id, count=count, prefer_afternoon=afternoon)
+    except ConnectorError:
+        return "", []  # drafts ask for availability instead of inventing open time
     return "\n".join(f"- {s['label']}" for s in slots), slots
 
 
@@ -128,14 +133,18 @@ def _template_body(store: Store, user_id: int, last: dict[str, Any], category: s
                 parts.append(sso)
         parts.append(f"Would any of these work for a 30-minute demo?\n{lines}" if lines else
                      "What times work for a 30-minute demo next week?")
-        return "\n\n".join(parts), slots, "New sales lead: offered a demo with open times from your calendar, and answered pricing from your pricing doc."
+        reason = ("New sales lead: offered a demo with open times from your calendar."
+                  if slots else "New sales lead: suggested a demo and asked for available times; calendar access is unavailable.")
+        return "\n\n".join(parts), slots, reason
     if category in ("scheduling", "partner", "candidate"):
         lines, slots = slot_lines(store, user_id, afternoon="afternoon" in lower)
         intro = {"scheduling": "Of course, happy to find a time.",
                  "partner": "Thanks for following up. I'd be glad to talk about it.",
                  "candidate": "Thanks for reaching out, I'd love to chat."}[category]
         body = f"{intro} Would any of these work?\n{lines}" if lines else f"{intro} What times work for you?"
-        return body, slots, "Scheduling request: offered open slots from your calendar within working hours."
+        reason = ("Scheduling request: offered open slots from your calendar within working hours."
+                  if slots else "Scheduling request: asked for available times; calendar access is unavailable.")
+        return body, slots, reason
     if category == "support":
         answer = doc_answer(store, user_id, text)
         body = (f"Thanks for flagging this. {answer}\n\nLet me know if that doesn't solve it and we'll dig in."

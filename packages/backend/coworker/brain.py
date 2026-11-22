@@ -50,6 +50,7 @@ How you work:
 - "Reply to my emails / leads / customers" means reply_to_emails: one draft per waiting thread, each a card here. Once sent, this chat shows exactly what went out.
 - "What did you do today?" means my_day.
 - Cite where facts come from (who said it and when). If you don't know, say so; never invent prices, dates, or commitments.
+- Check the calendar tool before describing events or open times. If it reports an access error, explain it; never infer that an unreadable calendar is clear.
 - You always act as {first}'s disclosed AI. Never claim to be {first} or a human.
 - Keep replies short and skimmable. Use the user's first name sparingly.
 
@@ -305,6 +306,9 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
     if re.search(r"\b(calendar|schedule (?:today|tomorrow|this week)|what'?s on my|my week|meetings? (?:today|tomorrow|this week))\b", low) \
             and not re.search(r"\bschedule (?:a|an|time|meeting|call)\b", low):
         events = yield from _call(ctx, "calendar", {"days": 7})
+        if isinstance(events, dict) and events.get("error"):
+            yield ("text", events["error"])
+            return
         if not events:
             yield ("text", "Your calendar is clear for the next 7 days.")
         else:
@@ -319,16 +323,23 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
             draft = yield from _call(ctx, "draft_reply", {"thread_id": thread["thread_id"],
                                                           "instruction": ""})
             body = draft["body"]
+            slot_text = ""
             if not draft.get("slots"):
                 slot_text, _ = drafting.slot_lines(s, uid)
                 name = drafting.first_name(thread["author_name"] if thread["direction"] == "inbound" else who)
-                body = drafting._wrap(s, uid, name, f"Would any of these work for a quick call?\n{slot_text}")
+                offer = f"Would any of these work for a quick call?\n{slot_text}" if slot_text else "What times work for a quick call?"
+                body = drafting._wrap(s, uid, name, offer)
             yield from _call(ctx, "send_email", {"to": draft["to"], "subject": draft["subject"], "body": body,
                                                  "thread_id": thread["thread_id"]})
-            yield ("text", f"I drafted a reply to {thread['author_name'] if thread['direction'] == 'inbound' else who} offering open times "
-                           "from your calendar. Approve it below and I'll send it.")
+            detail = ("offering open times from your calendar" if draft.get("slots") or slot_text else
+                      "asking for their availability because I couldn't verify your calendar")
+            yield ("text", f"I drafted a reply to {thread['author_name'] if thread['direction'] == 'inbound' else who} "
+                           f"{detail}. Approve it below and I'll send it.")
         else:
             slots = yield from _call(ctx, "find_free_slots", {})
+            if isinstance(slots, dict) and slots.get("error"):
+                yield ("text", slots["error"])
+                return
             yield ("text", f"I couldn't find an email thread with {who}. Here are open times you could offer:\n\n"
                    + "\n".join(f"- {sl['label']}" for sl in slots) + "\n\nTell me their email and I'll send an invite.")
         return

@@ -21,6 +21,7 @@ from coworker import (
     security,
     style,
 )
+from coworker.connectors.base import ConnectorError, workspace_for
 from coworker.store import Store, iso, parse_iso, utcnow
 
 
@@ -183,22 +184,36 @@ def _run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
         return out, f"Read thread ({len(out)} messages)"
     if name == "calendar":
         days = int(args.get("days") or 7)
+        try:
+            account = workspace_for(uid, s).refresh_calendar(days)
+        except ConnectorError as exc:
+            return {"error": str(exc)}, "Couldn't check your calendar"
         now = utcnow()
         tz = scheduling.tz_for(s.get_coworker(uid) or {})
         events = s.query(
             "SELECT * FROM cw_items WHERE user_id = %s AND kind = 'event' AND occurred_at >= %s AND occurred_at < %s ORDER BY occurred_at",
-            (uid, iso(now - timedelta(hours=1)), iso(now + timedelta(days=days))),
+            (uid, iso(now - timedelta(days=1)), iso(now + timedelta(days=days))),
         )
         out = []
         for e in events:
+            meta = e.get("meta") or {}
             when = parse_iso(e["occurred_at"])
-            out.append({"id": e["id"], "title": e["subject"], "when": scheduling.label(when, tz) if when else e["occurred_at"],
+            end = parse_iso(meta.get("end"))
+            if (end and end <= now) or (not end and when and when < now - timedelta(hours=1)):
+                continue
+            label = scheduling.label(when, tz) if when else e["occurred_at"]
+            if meta.get("all_day") and when:
+                label = f"{when.astimezone(tz).strftime('%a %b')} {when.astimezone(tz).day}, all day"
+            out.append({"id": e["id"], "title": e["subject"], "when": label,
                         "start": e["occurred_at"], "attendees": [a.get("email") for a in e.get("recipients") or []],
-                        "location": (e.get("meta") or {}).get("location", "")})
-        return out, f"Checked your calendar ({len(out)} events)"
+                        "location": meta.get("location", "")})
+        return out, f"Checked {account} calendar ({len(out)} events)"
     if name == "find_free_slots":
-        slots = scheduling.free_slots(s, uid, int(args.get("duration_minutes") or 30), int(args.get("days_ahead") or 7),
-                                      int(args.get("count") or 3))
+        try:
+            slots = scheduling.free_slots(s, uid, int(args.get("duration_minutes") or 30), int(args.get("days_ahead") or 7),
+                                          int(args.get("count") or 3))
+        except ConnectorError as exc:
+            return {"error": str(exc)}, "Couldn't check calendar availability"
         return slots, f"Found {len(slots)} open slots"
     if name == "join_meeting":
         from coworker import delegate

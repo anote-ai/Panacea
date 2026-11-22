@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any, Protocol
 
 from coworker.errors import UserFacingError
-from coworker.store import Store, get_store, iso
+from coworker.store import Store, get_store, iso, utcnow
 
 PROVIDERS = ("google", "microsoft", "slack")
 
@@ -62,11 +63,12 @@ class Workspace:
 
     # -- which backend --------------------------------------------------
 
-    def _live(self, provider: str) -> Any | None:
+    def _live(self, provider: str, *, retry_error: bool = False) -> Any | None:
         if self.mode != "live":
             return None
         row = self.store.get_connection_row(self.user_id, provider)
-        if not row or row.get("status") not in ("connected", "syncing"):
+        statuses = ("connected", "syncing", "error") if retry_error else ("connected", "syncing")
+        if not row or row.get("status") not in statuses:
             return None
         if provider == "google":
             from coworker.connectors.google import GoogleConnector
@@ -104,7 +106,7 @@ class Workspace:
         if self.mode != "live":
             return counts
         for provider in providers:
-            connector = self._live(provider)
+            connector = self._live(provider, retry_error=True)
             if not connector:
                 continue
             before = (self.store.get_connection_row(self.user_id, provider) or {}).get("status")
@@ -125,6 +127,46 @@ class Workspace:
                     observability.alert(f"sync-error:{provider}:{self.user_id}", f"{provider} sync failed",
                                         user_id=self.user_id, error=str(exc)[:200])
         return counts
+
+    def refresh_calendar(self, days_ahead: int = 7) -> str:
+        """Fetch the connected calendars directly before claiming events or availability.
+
+        Mail backfills are independent and can take minutes. A calendar question
+        must not treat an unfinished or failed mail sync as an empty calendar.
+        """
+        if self.mode != "live":
+            return "Anote demo workspace"
+        start = utcnow() - timedelta(days=1)
+        end = utcnow() + timedelta(days=max(1, days_ahead) + 1)
+        accounts = []
+        for provider in ("google", "microsoft"):
+            row = self.store.get_connection_row(self.user_id, provider)
+            if not row:
+                continue
+            account = row.get("account_label") or LABELS[provider]
+            if row.get("status") == "reauth_required":
+                raise ConnectorError(f"I can't access the {account} calendar. Reconnect it in Coworker → Settings.")
+            if not row.get("token_enc"):
+                continue
+            connector: Any
+            if provider == "google":
+                from coworker.connectors.google import GoogleConnector
+
+                connector = GoogleConnector.from_row(self.store, row)
+            else:
+                from coworker.connectors.microsoft import MicrosoftConnector
+
+                connector = MicrosoftConnector.from_row(self.store, row)
+            try:
+                connector._sync_calendar(self.store, self.user_id, start=start, end=end)
+            except ConnectorError as exc:
+                if exc.code == "reauth_required":
+                    self.store.upsert_connection(self.user_id, provider, status="reauth_required", error=str(exc))
+                raise ConnectorError(f"I couldn't check the {account} calendar: {exc}", exc.code) from exc
+            accounts.append(account)
+        if not accounts:
+            raise ConnectorError("I don't have a connected calendar. Connect Google or Microsoft 365 in Coworker → Settings.")
+        return ", ".join(accounts)
 
     # -- actions ---------------------------------------------------------
 

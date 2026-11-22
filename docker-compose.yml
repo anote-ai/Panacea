@@ -76,7 +76,7 @@ services:
       COWORKER_MODEL: ${COWORKER_MODEL:-claude-opus-5-5}
       COWORKER_EFFORT: ${COWORKER_EFFORT:-medium}
       COWORKER_OFFLINE: ${COWORKER_OFFLINE:-0}
-      # An empty override lets the connector use BACKEND_URL for its public callback.
+      # An empty override uses BACKEND_URL, then the sign-in callback if needed.
       GOOGLE_COWORKER_REDIRECT_URI: ${GOOGLE_COWORKER_REDIRECT_URI:-}
       SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
       SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}

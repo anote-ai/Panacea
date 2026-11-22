@@ -162,8 +162,15 @@ def google_oauth_callback():
 
     Registered directly on the Flask app (not under the /auth blueprint) as
     /callback so its URL matches the redirect URI configured in Google Cloud
-    Console exactly.
+    Console exactly. When Coworker shares this URL, its separately signed
+    state routes to the connection finisher instead of the sign-in handler.
     """
+    state = request.args.get("state", "")
+    if state:
+        from api_endpoints.coworker.connections import _read_state, oauth_callback
+
+        if _read_state(state, "google"):
+            return oauth_callback("google")
     frontend_url = _frontend_url()
 
     if request.args.get("error"):

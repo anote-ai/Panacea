@@ -457,13 +457,14 @@ def finish(store: Store, user_id: int, meeting_id: int) -> dict[str, Any]:
     followup = None
     if prospect_email:
         name = (meeting["prospect_name"] or "there").split(" ")[0]
+        slot_text, _ = drafting.slot_lines(store, user_id)
         body = drafting._wrap(store, user_id, name,
                               "Thanks for the time today. A quick recap:\n\n"
                               + (qual_lines or "- We talked through what you're looking for.")
                               + ("\n\nOn your question about " + "; ".join(escalations) + f": {first} will follow up personally."
                                  if escalations else "")
-                              + "\n\nNext step: a demo with your team. Would any of these work?\n"
-                              + drafting.slot_lines(store, user_id)[0])
+                              + "\n\nNext step: a demo with your team. "
+                              + (f"Would any of these work?\n{slot_text}" if slot_text else "What times work for you?"))
         followup = {"to": [prospect_email], "subject": f"Recap: {meeting['title']}", "body": body, "thread_id": ""}
     summary = {"text": text, "qualification": {f: answers.get(f, "") for f in QUALIFICATION_FIELDS},
                "buying_signals": signals, "score": score, "hot": score >= 60, "action_items": action_items,
