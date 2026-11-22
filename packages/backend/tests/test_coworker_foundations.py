@@ -4,10 +4,12 @@ from __future__ import annotations
 import base64
 import json
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 from coworker import memory, security, style
+from coworker.connectors import google
 from coworker.connectors.demo import DemoConnector
 from coworker.store import IntegrityError, Store, iso, parse_iso
 from tests.conftest import oauth_return
@@ -367,9 +369,6 @@ def test_google_start_not_configured(client, auth_headers, monkeypatch):
 
 def test_google_connection_redirect_uses_public_backend(client, auth_headers, monkeypatch):
     """The Compose default must not send production Google consent to localhost."""
-    from urllib.parse import parse_qs, urlparse
-    from coworker.connectors import google
-
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
     monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
