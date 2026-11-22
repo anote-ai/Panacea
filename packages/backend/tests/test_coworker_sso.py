@@ -1,6 +1,8 @@
 """Team plan SSO: Microsoft sign-in, domain auto-join, and "require Google/Microsoft sign-in"."""
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlparse
+
 import bcrypt
 import pytest
 
@@ -130,6 +132,14 @@ def test_microsoft_login_urls(client, monkeypatch):
     assert start.status_code == 302 and "User.Read" in start.location
     assert start.location.startswith("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?")
     assert "cw_login_nonce=" in start.headers.get("Set-Cookie", "")
+
+
+def test_empty_microsoft_login_redirect_override_uses_public_backend(client, monkeypatch, ms):
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
+    monkeypatch.setenv("MICROSOFT_LOGIN_REDIRECT_URI", "")  # Compose passes the optional variable as empty.
+    start = client.get("/auth/microsoft/login")
+    assert start.status_code == 302
+    assert parse_qs(urlparse(start.location).query)["redirect_uri"] == ["https://api.ourogen.ai/auth/microsoft/callback"]
 
 
 def test_microsoft_callback_errors(client, app, monkeypatch, ms):
