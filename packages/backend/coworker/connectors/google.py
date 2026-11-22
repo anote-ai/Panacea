@@ -2,7 +2,8 @@
 
 OAuth uses the same Google Cloud client as "Sign in with Google"
 (``GOOGLE_CLIENT_ID`` / ``GOOGLE_CLIENT_SECRET``) with a second redirect
-URI for the coworker (``GOOGLE_COWORKER_REDIRECT_URI``).
+URI for the coworker (``GOOGLE_COWORKER_REDIRECT_URI``). If the public
+backend URL is missing, the existing sign-in callback handles both flows.
 
 Scopes are requested incrementally: ``read`` at onboarding, and ``act``
 (send mail, write calendar) the first time a responsibility needs it.
@@ -18,6 +19,7 @@ from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
 from typing import Any
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 
@@ -56,8 +58,19 @@ def is_configured() -> bool:
 
 
 def redirect_uri() -> str:
-    default = f"{os.environ.get('BACKEND_URL', 'http://localhost:5000').rstrip('/')}/api/coworker/connections/google/callback"
-    return os.environ.get("GOOGLE_COWORKER_REDIRECT_URI") or default
+    configured = os.environ.get("GOOGLE_COWORKER_REDIRECT_URI")
+    production = os.environ.get("APP_ENV") == "production" or os.environ.get("IS_PROD", "").lower() == "true"
+    if configured and (not production or configured.startswith("https://")):
+        return configured
+    backend = os.environ.get("BACKEND_URL", "").rstrip("/")
+    if backend.startswith("https://"):
+        return f"{backend}/api/coworker/connections/google/callback"
+    # Production may have configured Google sign-in but omitted BACKEND_URL.
+    # Its already registered callback can also finish a Coworker connection.
+    login = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "")
+    if login.startswith("https://"):
+        return login
+    return f"{backend or 'http://localhost:5000'}/api/coworker/connections/google/callback"
 
 
 def scopes_for(level: str) -> list[str]:
@@ -112,6 +125,16 @@ def revoke(token: dict[str, Any]) -> None:
 def _b64url_decode(data: str) -> str:
     padded = data + "=" * (-len(data) % 4)
     return base64.urlsafe_b64decode(padded.encode()).decode("utf-8", errors="replace")
+
+
+def _calendar_time(value: str, timezone: str) -> str:
+    if "T" in value:
+        return iso(datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC))
+    try:
+        zone = ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        zone = ZoneInfo("UTC")
+    return iso(datetime.fromisoformat(value).replace(tzinfo=zone).astimezone(UTC))
 
 
 def _strip_html(html: str) -> str:
@@ -284,7 +307,7 @@ class GoogleConnector:
             if resp.status_code == 401:
                 raise ConnectorError("Google rejected our token. Please reconnect.", "reauth_required")
             if resp.status_code == 403 and "insufficient" in resp.text.lower():
-                raise ConnectorError("Ourogen needs permission to do this. Reconnect Google with send access.",
+                raise ConnectorError("Ourogen lacks permission for this Google request. Reconnect Google and grant access.",
                                      "needs_scope")
             if resp.status_code >= 400:
                 raise ConnectorError(f"Google API error {resp.status_code}: {resp.text[:200]}",
@@ -298,8 +321,8 @@ class GoogleConnector:
     # -- sync --------------------------------------------------------------
 
     def sync(self, store: Store, user_id: int) -> int:
-        count = self._sync_gmail(store, user_id)
-        count += self._sync_calendar(store, user_id)
+        count = self._sync_calendar(store, user_id)
+        count += self._sync_gmail(store, user_id)
         count += self._sync_drive(store, user_id)
         from coworker import mail_push
 
@@ -382,40 +405,59 @@ class GoogleConnector:
         data = self._request("GET", f"{GMAIL}/messages/{message_id}/attachments/{attachment_id}")
         return b64decode_any(str(data.get("data") or ""))
 
-    def _sync_calendar(self, store: Store, user_id: int) -> int:
+    def _sync_calendar(self, store: Store, user_id: int, *, start: datetime | None = None,
+                       end: datetime | None = None) -> int:
         now = datetime.now(UTC)
+        start = start or now - timedelta(days=14)
+        end = end or now + timedelta(days=21)
         params = {
-            "timeMin": (now - timedelta(days=14)).isoformat(),
-            "timeMax": (now + timedelta(days=21)).isoformat(),
+            "timeMin": start.isoformat(), "timeMax": end.isoformat(),
             "singleEvents": "true", "orderBy": "startTime", "maxResults": 250,
         }
-        data = self._request("GET", f"{CALENDAR}/events", params=params)
         count = 0
-        for ev in data.get("items", []):
-            start = (ev.get("start") or {}).get("dateTime") or (ev.get("start") or {}).get("date")
-            end = (ev.get("end") or {}).get("dateTime") or (ev.get("end") or {}).get("date")
-            if not start:
-                continue
-            start_iso = iso(datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(UTC)) if "T" in start else start
-            end_iso = iso(datetime.fromisoformat(end.replace("Z", "+00:00")).astimezone(UTC)) if end and "T" in end else end
-            attendees = [
-                {"name": a.get("displayName", ""), "email": a.get("email", "").lower()}
-                for a in ev.get("attendees", []) if not a.get("self")
-            ]
-            location = ev.get("hangoutLink") or ev.get("location", "")
-            item = {
-                "provider": "gcal", "external_id": ev["id"], "thread_id": f"event-{ev['id']}", "kind": "event",
-                "direction": "inbound", "author_name": (ev.get("organizer") or {}).get("displayName", ""),
-                "author_email": (ev.get("organizer") or {}).get("email", ""), "recipients": attendees,
-                "subject": ev.get("summary", "(no title)"), "body": location, "occurred_at": start_iso,
-                "meta": {"start": start_iso, "end": end_iso, "location": location, "html_link": ev.get("htmlLink", "")},
-            }
-            existing = store.one("SELECT id FROM cw_items WHERE user_id = %s AND provider = 'gcal' AND external_id = %s",
-                                 (user_id, ev["id"]))
-            if existing:
-                store.update("cw_items", existing["id"], user_id, {k: item[k] for k in ("subject", "occurred_at", "meta", "recipients")})
-            elif store.add_item(user_id, item):
-                count += 1
+        seen: set[str] = set()
+        while True:
+            data = self._request("GET", f"{CALENDAR}/events", params=params)
+            for ev in data.get("items", []):
+                if ev.get("status") == "cancelled":
+                    continue
+                event_start = (ev.get("start") or {}).get("dateTime") or (ev.get("start") or {}).get("date")
+                event_end = (ev.get("end") or {}).get("dateTime") or (ev.get("end") or {}).get("date")
+                if not event_start:
+                    continue
+                seen.add(ev["id"])
+                timezone = (ev.get("start") or {}).get("timeZone") or data.get("timeZone") or "UTC"
+                start_iso = _calendar_time(event_start, timezone)
+                end_iso = _calendar_time(event_end, timezone) if event_end else ""
+                attendees = [
+                    {"name": a.get("displayName", ""), "email": a.get("email", "").lower()}
+                    for a in ev.get("attendees", []) if not a.get("self")
+                ]
+                location = ev.get("hangoutLink") or ev.get("location", "")
+                item = {
+                    "provider": "gcal", "external_id": ev["id"], "thread_id": f"event-{ev['id']}", "kind": "event",
+                    "direction": "inbound", "author_name": (ev.get("organizer") or {}).get("displayName", ""),
+                    "author_email": (ev.get("organizer") or {}).get("email", ""), "recipients": attendees,
+                    "subject": ev.get("summary", "(no title)"), "body": location, "occurred_at": start_iso,
+                    "meta": {"start": start_iso, "end": end_iso, "all_day": "T" not in event_start,
+                             "location": location, "html_link": ev.get("htmlLink", "")},
+                }
+                existing = store.one("SELECT id FROM cw_items WHERE user_id = %s AND provider = 'gcal' AND external_id = %s",
+                                     (user_id, ev["id"]))
+                if existing:
+                    store.update("cw_items", existing["id"], user_id, {k: item[k] for k in ("subject", "occurred_at", "meta", "recipients")})
+                elif store.add_item(user_id, item):
+                    count += 1
+            page = data.get("nextPageToken")
+            if not page:
+                break
+            params["pageToken"] = page
+        for old in store.query(
+            "SELECT id, external_id FROM cw_items WHERE user_id = %s AND provider = 'gcal' AND kind = 'event' "
+            "AND occurred_at >= %s AND occurred_at < %s", (user_id, iso(start), iso(end))
+        ):
+            if old["external_id"] not in seen:
+                store.execute("DELETE FROM cw_items WHERE id = %s AND user_id = %s", (old["id"], user_id))
         return count
 
     def _sync_drive(self, store: Store, user_id: int) -> int:

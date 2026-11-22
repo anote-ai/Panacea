@@ -50,6 +50,9 @@ def free_slots(
     prefer_afternoon: bool = False,
 ) -> list[dict[str, str]]:
     """Free slots inside working hours, spread across different days."""
+    from coworker.connectors.base import workspace_for
+
+    workspace_for(user_id, store).refresh_calendar(days_ahead)
     coworker = store.get_coworker(user_id) or {}
     tz = tz_for(coworker)
     hours = {**DEFAULT_HOURS, **((coworker.get("settings") or {}).get("working_hours") or {})}

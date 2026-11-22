@@ -89,6 +89,10 @@ def google_start() -> tuple:
     if not google.is_configured():
         return error("Google isn't configured on this server. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
                      501, "not_configured")
+    production = os.environ.get("APP_ENV") == "production" or os.environ.get("IS_PROD", "").lower() == "true"
+    if production and not google.redirect_uri().startswith("https://"):
+        return error("Google connection is misconfigured: set a public HTTPS callback in production.",
+                     503, "not_configured")
     level = (request.get_json(silent=True) or {}).get("level", "read")
     if level not in ("read", "act"):
         return error("level must be 'read' or 'act'")

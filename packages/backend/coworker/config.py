@@ -43,8 +43,14 @@ def check(env: Mapping[str, Any]) -> tuple[list[str], list[str]]:
             warnings.append(f"{key} should be the public https:// URL (OAuth redirects and webhooks use it).")
     if env.get("GOOGLE_CLIENT_ID"):
         backend_url = str(env.get("BACKEND_URL") or "http://localhost:5000").rstrip("/")
-        google_redirect = str(env.get("GOOGLE_COWORKER_REDIRECT_URI") or
-                              f"{backend_url}/api/coworker/connections/google/callback")
+        override = str(env.get("GOOGLE_COWORKER_REDIRECT_URI") or "")
+        if override.startswith("https://"):
+            google_redirect = override
+        elif backend_url.startswith("https://"):
+            google_redirect = f"{backend_url}/api/coworker/connections/google/callback"
+        else:
+            google_redirect = (str(env.get("GOOGLE_OAUTH_REDIRECT_URI") or "") or
+                               f"{backend_url}/api/coworker/connections/google/callback")
         if not google_redirect.startswith("https://"):
             warnings.append("GOOGLE_COWORKER_REDIRECT_URI (or its BACKEND_URL fallback) should be https:// in production.")
         elif urlsplit(google_redirect).netloc != urlsplit(backend_url).netloc:

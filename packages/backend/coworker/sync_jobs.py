@@ -76,6 +76,13 @@ def run(store: Store, job: dict[str, Any]) -> dict[str, Any]:
             refresh_knowledge(user_id)
         coworker = store.get_coworker(user_id) or {}
         store.update_coworker(user_id, settings={**(coworker.get("settings") or {}), "last_sync": iso()})
+        failed = [c for c in store.list_connections(user_id)
+                  if c["provider"] in ("google", "microsoft", "slack")
+                  and c["status"] in ("error", "reauth_required")]
+        if failed:
+            detail = "; ".join(f"{c['provider']}: {c.get('error') or c['status']}" for c in failed)
+            _set(store, job["id"], status="error", phase="error", error=detail[:500], finished_at=iso())
+            return {"status": "error", "counts": counts, "error": detail}
         _set(store, job["id"], status="done", phase="done", finished_at=iso())
         return {"status": "done", "counts": counts}
     except Exception as exc:  # report, don't crash the worker or thread

@@ -214,7 +214,7 @@ class MicrosoftConnector:
             if resp.status_code == 401:
                 raise ConnectorError("Microsoft rejected our token. Please reconnect.", "reauth_required")
             if resp.status_code == 403:
-                raise ConnectorError("Ourogen needs permission to do this. Reconnect Outlook with send access.",
+                raise ConnectorError("Ourogen lacks permission for this Outlook request. Reconnect Outlook and grant access.",
                                      "needs_scope")
             if resp.status_code >= 400:
                 raise ConnectorError(f"Microsoft Graph error {resp.status_code}: {resp.text[:200]}",
@@ -230,7 +230,7 @@ class MicrosoftConnector:
     def sync(self, store: Store, user_id: int) -> int:
         if not self.account_email:
             self.account_email = fetch_account_email(self._access_token())
-        count = self._sync_mail(store, user_id) + self._sync_calendar(store, user_id)
+        count = self._sync_calendar(store, user_id) + self._sync_mail(store, user_id)
         from coworker import mail_push
 
         mail_push.ensure_graph_subscription(self)
@@ -303,40 +303,54 @@ class MicrosoftConnector:
                 "contentType": f.mime, "contentBytes": base64.b64encode(f.data).decode(),
             })
 
-    def _sync_calendar(self, store: Store, user_id: int) -> int:
+    def _sync_calendar(self, store: Store, user_id: int, *, start: datetime | None = None,
+                       end: datetime | None = None) -> int:
         now = datetime.now(UTC)
-        params: dict[str, Any] = {
-            "startDateTime": iso(now - timedelta(days=14)), "endDateTime": iso(now + timedelta(days=21)),
+        start = start or now - timedelta(days=14)
+        end = end or now + timedelta(days=21)
+        params: dict[str, Any] | None = {
+            "startDateTime": iso(start), "endDateTime": iso(end),
             "$top": 250, "$orderby": "start/dateTime",
             "$select": "id,subject,start,end,attendees,organizer,location,onlineMeeting,webLink,isCancelled",
         }
-        data = self._request("GET", "/me/calendarView", params=params, headers={"Prefer": 'outlook.timezone="UTC"'})
         count = 0
-        for ev in data.get("value", []):
-            if ev.get("isCancelled"):
-                continue
-            start = _to_utc((ev.get("start") or {}).get("dateTime", ""))
-            end = _to_utc((ev.get("end") or {}).get("dateTime", ""))
-            if not start:
-                continue
-            organizer = _address(ev.get("organizer"))
-            attendees = [a for a in (_address(x) for x in ev.get("attendees") or [])
-                         if a["email"] and a["email"] != (self.account_email or "").lower()]
-            location = ((ev.get("onlineMeeting") or {}).get("joinUrl")
-                        or (ev.get("location") or {}).get("displayName", ""))
-            item = {
-                "provider": "outlook_cal", "external_id": ev["id"], "thread_id": f"event-{ev['id']}", "kind": "event",
-                "direction": "inbound", "author_name": organizer["name"], "author_email": organizer["email"],
-                "recipients": attendees, "subject": ev.get("subject") or "(no title)", "body": location,
-                "occurred_at": start,
-                "meta": {"start": start, "end": end, "location": location, "html_link": ev.get("webLink", "")},
-            }
-            existing = store.one("SELECT id FROM cw_items WHERE user_id = %s AND provider = 'outlook_cal' AND external_id = %s",
-                                 (user_id, ev["id"]))
-            if existing:
-                store.update("cw_items", existing["id"], user_id, {k: item[k] for k in ("subject", "occurred_at", "meta", "recipients")})
-            elif store.add_item(user_id, item):
-                count += 1
+        seen: set[str] = set()
+        url: str | None = "/me/calendarView"
+        while url:
+            data = self._request("GET", url, params=params, headers={"Prefer": 'outlook.timezone="UTC"'})
+            for ev in data.get("value", []):
+                if ev.get("isCancelled"):
+                    continue
+                event_start = _to_utc((ev.get("start") or {}).get("dateTime", ""))
+                event_end = _to_utc((ev.get("end") or {}).get("dateTime", ""))
+                if not event_start:
+                    continue
+                seen.add(ev["id"])
+                organizer = _address(ev.get("organizer"))
+                attendees = [a for a in (_address(x) for x in ev.get("attendees") or [])
+                             if a["email"] and a["email"] != (self.account_email or "").lower()]
+                location = ((ev.get("onlineMeeting") or {}).get("joinUrl")
+                            or (ev.get("location") or {}).get("displayName", ""))
+                item = {
+                    "provider": "outlook_cal", "external_id": ev["id"], "thread_id": f"event-{ev['id']}", "kind": "event",
+                    "direction": "inbound", "author_name": organizer["name"], "author_email": organizer["email"],
+                    "recipients": attendees, "subject": ev.get("subject") or "(no title)", "body": location,
+                    "occurred_at": event_start,
+                    "meta": {"start": event_start, "end": event_end, "location": location, "html_link": ev.get("webLink", "")},
+                }
+                existing = store.one("SELECT id FROM cw_items WHERE user_id = %s AND provider = 'outlook_cal' AND external_id = %s",
+                                     (user_id, ev["id"]))
+                if existing:
+                    store.update("cw_items", existing["id"], user_id, {k: item[k] for k in ("subject", "occurred_at", "meta", "recipients")})
+                elif store.add_item(user_id, item):
+                    count += 1
+            url, params = data.get("@odata.nextLink"), None
+        for old in store.query(
+            "SELECT id, external_id FROM cw_items WHERE user_id = %s AND provider = 'outlook_cal' AND kind = 'event' "
+            "AND occurred_at >= %s AND occurred_at < %s", (user_id, iso(start), iso(end))
+        ):
+            if old["external_id"] not in seen:
+                store.execute("DELETE FROM cw_items WHERE id = %s AND user_id = %s", (old["id"], user_id))
         return count
 
     # -- writes ------------------------------------------------------------
