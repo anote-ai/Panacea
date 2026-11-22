@@ -15,13 +15,14 @@ from typing import Any
 
 from coworker import policy, security
 from coworker.connectors.base import ConnectorError, workspace_for
+from coworker.errors import UserFacingError
 from coworker.store import Store, iso, utcnow
 
 PROPOSAL_TTL_HOURS = 72
 OPEN_STATUSES = ("proposed", "approved")
 
 
-class ActionError(Exception):
+class ActionError(UserFacingError):
     def __init__(self, message: str, code: str = "bad_request") -> None:
         super().__init__(message)
         self.code = code

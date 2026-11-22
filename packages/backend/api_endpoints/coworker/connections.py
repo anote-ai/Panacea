@@ -12,6 +12,7 @@ from api_endpoints.coworker.common import coworker_bp, error, frontend_url, stor
 from api_endpoints.coworker.core import refresh_knowledge
 from coworker.connectors import crm, google, hubspot, microsoft, pipedrive, salesforce, slack
 from coworker.connectors.base import ConnectorError, decrypt_token, encrypt_token
+from coworker.errors import public_message
 from middleware.auth import require_auth
 
 STATE_MAX_AGE = 600
@@ -103,7 +104,7 @@ def google_callback() -> Any:
     try:
         token = google.exchange_code(_args().get("code", ""))
     except ConnectorError as exc:
-        return _back("google", False, str(exc))
+        return _back("google", False, public_message(exc))
     user_id = int(state["uid"])
     s = store()
     previous = decrypt_token((s.get_connection_row(user_id, "google") or {}).get("token_enc"))
@@ -155,7 +156,7 @@ def microsoft_callback() -> Any:
     try:
         token = microsoft.exchange_code(_args().get("code", ""))
     except ConnectorError as exc:
-        return _back("microsoft", False, str(exc))
+        return _back("microsoft", False, public_message(exc))
     user_id = int(state["uid"])
     s = store()
     email = microsoft.fetch_account_email(token.get("access_token", ""))
@@ -186,7 +187,7 @@ def slack_callback() -> Any:
     try:
         token = slack.exchange_code(_args().get("code", ""))
     except ConnectorError as exc:
-        return _back("slack", False, str(exc))
+        return _back("slack", False, public_message(exc))
     _save_slack(int(state["uid"]), token)
     return _back("slack", True)
 
@@ -201,7 +202,7 @@ def slack_token() -> tuple:
     try:
         token = slack.verify_token(value)
     except ConnectorError as exc:
-        return error(str(exc), 400, exc.code)
+        return error(public_message(exc), 400, exc.code)
     _save_slack(uid(), token)
     return jsonify({"connected": True, "team": token.get("team", "")}), 200
 
@@ -243,7 +244,7 @@ def hubspot_callback() -> Any:
     try:
         token = hubspot.exchange_code(_args().get("code", ""))
     except ConnectorError as exc:
-        return _back("hubspot", False, str(exc))
+        return _back("hubspot", False, public_message(exc))
     _save_hubspot(int(state["uid"]), token)
     return _back("hubspot", True)
 
@@ -259,7 +260,7 @@ def hubspot_token() -> tuple:
     try:
         token = hubspot.verify_private_token(value)
     except ConnectorError as exc:
-        return error(str(exc), 400, "invalid_token")
+        return error(public_message(exc), 400, "invalid_token")
     _save_hubspot(uid(), token)
     return jsonify({"connected": True, "portal": token["portal"]}), 200
 
@@ -291,7 +292,7 @@ def salesforce_callback() -> Any:
     try:
         token = salesforce.exchange_code(_args().get("code", ""))
     except ConnectorError as exc:
-        return _back("salesforce", False, str(exc))
+        return _back("salesforce", False, public_message(exc))
     _save_crm(int(state["uid"]), "salesforce", token, token.get("org", "Salesforce"))
     return _back("salesforce", True)
 
@@ -312,7 +313,7 @@ def pipedrive_callback() -> Any:
     try:
         token = pipedrive.exchange_code(_args().get("code", ""))
     except ConnectorError as exc:
-        return _back("pipedrive", False, str(exc))
+        return _back("pipedrive", False, public_message(exc))
     _save_crm(int(state["uid"]), "pipedrive", token, token.get("company", "Pipedrive"))
     return _back("pipedrive", True)
 
@@ -328,7 +329,7 @@ def pipedrive_token() -> tuple:
     try:
         token = pipedrive.verify_api_token(value)
     except ConnectorError as exc:
-        return error(str(exc), 400, "invalid_token")
+        return error(public_message(exc), 400, "invalid_token")
     _save_crm(uid(), "pipedrive", token, token["company"])
     return jsonify({"connected": True, "company": token["company"]}), 200
 

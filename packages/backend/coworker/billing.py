@@ -10,6 +10,7 @@ import os
 from datetime import UTC
 from typing import Any
 
+from coworker.errors import UserFacingError
 from coworker.store import Store, iso, utcnow
 
 PLANS: dict[str, dict[str, Any]] = {
@@ -30,7 +31,7 @@ COST_PER_1K_TTS_CHARS = float(os.environ.get("COWORKER_COST_PER_1K_TTS_CHARS", "
 COST_PER_ACTION = float(os.environ.get("COWORKER_COST_PER_ACTION", "0.02"))
 
 
-class PlanError(Exception):
+class PlanError(UserFacingError):
     pass
 
 

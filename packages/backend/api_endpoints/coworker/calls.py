@@ -12,6 +12,7 @@ from api_endpoints.coworker.common import coworker_bp, error, store, uid
 from coworker import billing, blobstore, meetings, twin, voice
 from coworker.connectors import recall, tavus
 from coworker.connectors.base import ConnectorError
+from coworker.errors import public_message
 from middleware.auth import require_auth
 from middleware.rate_limit import RateLimiter
 
@@ -84,7 +85,7 @@ def create_meeting() -> tuple:
         try:
             billing.require(store(), user_id, "calls")
         except billing.PlanError as exc:
-            return error(str(exc), 402, "plan_required")
+            return error(public_message(exc), 402, "plan_required")
     if mode == "bot":
         url = str(data.get("meetingUrl", ""))
         if not url.startswith("https://"):
@@ -105,7 +106,7 @@ def create_meeting() -> tuple:
                                        meetings.disclosure_line(store(), user_id) + " Say 'please leave' and I will.", hook)
         except ConnectorError as exc:
             store().update("cw_meetings", meeting["id"], user_id, {"status": "failed"})
-            return error(str(exc), 502, "bot_failed")
+            return error(public_message(exc), 502, "bot_failed")
         store().update("cw_meetings", meeting["id"], user_id, {"bot_id": bot_id})
         meeting = store().get("cw_meetings", meeting["id"], user_id) or meeting
     return jsonify({"meeting": meetings.serialize(meeting)}), 201
@@ -210,7 +211,7 @@ def tts() -> Any:
     try:
         audio = voice.tts(text, voice_id)
     except voice.VoiceError as exc:
-        return error(str(exc), 502, "voice_failed")
+        return error(public_message(exc), 502, "voice_failed")
     store().add_usage(user_id, "tts_chars", len(text))
     return Response(audio, mimetype="audio/mpeg")
 
@@ -238,7 +239,7 @@ def upload_asset() -> tuple:
     try:
         row = twin.save_asset(store(), user_id, request.form.get("kind", ""), f.filename or "upload", f.mimetype or "", f.read())
     except ValueError as exc:
-        return error(str(exc))
+        return error(public_message(exc))
     try:
         seconds = float(request.form.get("seconds") or 0)
     except ValueError:
@@ -289,7 +290,7 @@ def consent_verify() -> tuple:
     try:
         result = twin.verify(store(), user_id, consent_id, transcript, recording)
     except ValueError as exc:
-        return error(str(exc))
+        return error(public_message(exc))
     return jsonify(result), 200 if result["verified"] else 422
 
 
@@ -306,15 +307,15 @@ def create_voice() -> tuple:
     try:
         billing.require(store(), uid(), "twin")
     except billing.PlanError as exc:
-        return error(str(exc), 402, "plan_required")
+        return error(public_message(exc), 402, "plan_required")
     try:
         voice_id = twin.create_voice(store(), uid())
     except PermissionError as exc:
-        return error(str(exc), 403, "consent_required")
+        return error(public_message(exc), 403, "consent_required")
     except RuntimeError as exc:
-        return error(str(exc), 501, "not_configured")
+        return error(public_message(exc), 501, "not_configured")
     except (ValueError, voice.VoiceError) as exc:
-        return error(str(exc))
+        return error(public_message(exc))
     return jsonify({"voiceId": voice_id}), 201
 
 
@@ -341,5 +342,5 @@ def avatar_session() -> tuple:
             meetings.disclosure_line(store(), user_id),
         )
     except ConnectorError as exc:
-        return error(str(exc), 502, "avatar_failed")
+        return error(public_message(exc), 502, "avatar_failed")
     return jsonify(session), 201

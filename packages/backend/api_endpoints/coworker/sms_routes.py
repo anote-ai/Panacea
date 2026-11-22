@@ -9,6 +9,7 @@ from flask import Response, current_app, jsonify, request
 
 from api_endpoints.coworker.common import coworker_bp, error, store, uid
 from coworker import sms
+from coworker.errors import public_message
 from middleware.auth import require_auth
 from middleware.rate_limit import RateLimiter
 
@@ -16,7 +17,7 @@ _number_limiter = RateLimiter(max_calls=30, period=60, name="sms-inbound-number"
 
 
 def _fail(exc: sms.SmsError) -> tuple:
-    return error(str(exc), exc.status, exc.code)
+    return error(public_message(exc), exc.status, exc.code)
 
 
 @coworker_bp.get("/phone")

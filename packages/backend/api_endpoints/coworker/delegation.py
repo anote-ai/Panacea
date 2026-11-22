@@ -12,6 +12,7 @@ from flask import Response, jsonify, request, stream_with_context
 
 from api_endpoints.coworker.common import coworker_bp, error, store, uid
 from coworker import brain, executor, policy, responsibilities
+from coworker.errors import public_message
 from coworker.store import iso, parse_iso, utcnow
 from database.db import (
     create_chat,
@@ -94,8 +95,8 @@ def chat_stream() -> Any:
                     else:
                         yield sse_event("card", {"card": payload["type"], **payload})
         except Exception as exc:
-            parts.append(f"\n\nSomething went wrong: {exc}")
-            yield sse_event("error", {"message": f"Your coworker hit an error: {exc}"})
+            parts.append(f"\n\nSomething went wrong: {public_message(exc)}")
+            yield sse_event("error", {"message": f"Your coworker hit an error: {public_message(exc)}"})
         content = "".join(parts).strip()
         if content:
             cnx2 = get_connection()
@@ -145,7 +146,7 @@ def _action_route(fn: Any, action_id: int, *args: Any) -> tuple:
         action = fn(store(), uid(), action_id, *args)
     except executor.ActionError as exc:
         status = {"not_found": 404, "conflict": 409, "paused": 423}.get(exc.code, 400)
-        return error(str(exc), status, exc.code)
+        return error(public_message(exc), status, exc.code)
     return jsonify({"action": executor.serialize(action)}), 200
 
 
@@ -359,7 +360,7 @@ def create_responsibility() -> tuple:
         try:
             spec = responsibilities.scheduled_spec(str(data["instruction"]), data["schedule"], str(data.get("name") or ""))
         except ValueError as exc:
-            return error(str(exc))
+            return error(public_message(exc))
     else:
         spec = responsibilities.proposal_payload(data["instruction"]) if not template else {"template": template}
     if data.get("autonomy") in policy.LEVELS:
@@ -403,7 +404,7 @@ def update_responsibility(resp_id: int) -> tuple:
         try:
             values["trigger_spec"] = schedules.clean({**(row.get("trigger_spec") or {}), **data["schedule"]})
         except ValueError as exc:
-            return error(str(exc))
+            return error(public_message(exc))
     if not values or not store().update("cw_responsibilities", resp_id, user_id, values):
         return error("Not found or nothing to update", 404, "not_found")
     return jsonify({"responsibility": _serialize_resp(store().get("cw_responsibilities", resp_id, user_id) or {})}), 200
@@ -521,7 +522,7 @@ def confirm_employer() -> tuple:
     try:
         record = governance.authorize(store(), uid(), str(data.get("basis", "")))
     except ValueError as exc:
-        return error(str(exc))
+        return error(public_message(exc))
     return jsonify({"employerAuthorized": record, **governance.status(store(), uid())}), 200
 
 
@@ -554,7 +555,7 @@ def register_push() -> tuple:
     try:
         devices = push.register(store(), uid(), str((request.get_json(silent=True) or {}).get("token", "")))
     except ValueError as exc:
-        return error(str(exc))
+        return error(public_message(exc))
     return jsonify({"devices": len(devices)}), 200
 
 

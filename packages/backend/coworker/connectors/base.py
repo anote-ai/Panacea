@@ -5,12 +5,13 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from coworker.errors import UserFacingError
 from coworker.store import Store, get_store, iso
 
 PROVIDERS = ("google", "microsoft", "slack")
 
 
-class ConnectorError(Exception):
+class ConnectorError(UserFacingError):
     """A provider call failed. ``code`` lets the UI react (e.g. reconnect)."""
 
     def __init__(self, message: str, code: str = "provider_error") -> None:

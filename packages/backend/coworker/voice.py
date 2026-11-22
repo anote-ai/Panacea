@@ -10,11 +10,13 @@ from typing import Any
 
 import requests
 
+from coworker.errors import UserFacingError
+
 API = "https://api.elevenlabs.io/v1"
 TIMEOUT = 60
 
 
-class VoiceError(Exception):
+class VoiceError(UserFacingError):
     pass
 
 

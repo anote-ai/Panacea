@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -85,7 +86,7 @@ def test_create_message_dispatches_by_provider(s, monkeypatch):
         "choices": [{"finish_reason": "stop", "message": {"content": "Hello from Gemini"}}]}
     with patch("openai.OpenAI", return_value=fake) as ctor:
         assert llm.complete_text("hi", user_id=1) == "Hello from Gemini"
-    assert ctor.call_args.kwargs["base_url"].startswith("https://generativelanguage.googleapis.com")
+    assert urlparse(ctor.call_args.kwargs["base_url"]).hostname == "generativelanguage.googleapis.com"
     assert ctor.call_args.kwargs["api_key"] == "gk"
     s.update_coworker(1, settings={"model": "llama3.1"})
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434/")

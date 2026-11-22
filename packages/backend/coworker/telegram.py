@@ -26,6 +26,7 @@ from typing import Any
 
 import requests
 
+from coworker.errors import UserFacingError
 from coworker.store import Store, iso, parse_iso, utcnow
 
 log = logging.getLogger("coworker.telegram")
@@ -40,7 +41,7 @@ _offset = 0
 _username = ""
 
 
-class TelegramError(Exception):
+class TelegramError(UserFacingError):
     def __init__(self, message: str, code: str = "invalid", status: int = 400) -> None:
         super().__init__(message)
         self.code = code

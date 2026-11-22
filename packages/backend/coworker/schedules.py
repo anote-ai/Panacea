@@ -30,6 +30,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from coworker.errors import InvalidInput
 from coworker.store import Store, iso, parse_iso, utcnow
 
 GRACE = timedelta(hours=2)
@@ -50,7 +51,7 @@ def clean(raw: dict[str, Any]) -> dict[str, Any]:
     """A valid trigger spec from user or model input. Raises ValueError when it can't be one."""
     freq = str(raw.get("freq") or "").lower()
     if freq not in FREQS:
-        raise ValueError("freq must be one of " + ", ".join(FREQS))
+        raise InvalidInput("freq must be one of " + ", ".join(FREQS))
     hh, mm = _hm(str(raw.get("time") or "09:00"))
     spec: dict[str, Any] = {"type": "schedule", "freq": freq, "time": f"{hh:02d}:{mm:02d}"}
     if freq == "weekly":
@@ -73,9 +74,9 @@ def _day(word: str) -> str:
 
 
 def _hm(value: str) -> tuple[int, int]:
-    m = re.fullmatch(r"\s*(\d{1,2})(?::(\d{2}))?\s*", value)
+    m = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?", value.strip())
     if not m or int(m.group(1)) > 23 or int(m.group(2) or 0) > 59:
-        raise ValueError("time must be HH:MM (24-hour)")
+        raise InvalidInput("time must be HH:MM (24-hour)")
     return int(m.group(1)), int(m.group(2) or 0)
 
 
@@ -215,7 +216,9 @@ def strip_schedule(text: str) -> str:
                  r"|^\s*(?:hourly|daily|nightly|weekly|monthly)\b"  # "Daily at 7, …" (but keep "my weekly update")
                  r"|\bmonday\s+(?:through|to|thru|-)\s+friday\b", " ", text, flags=re.I)
     out = _TIME_RE.sub(" ", out)
-    out = re.sub(r"\s+([,.!?])", r"\1", re.sub(r"\s{2,}", " ", out)).strip(" ,.-")
+    # Whitespace runs are collapsed to one character first, so a single \s
+    # before punctuation is enough (and keeps the pattern linear).
+    out = re.sub(r"\s([,.!?])", r"\1", re.sub(r"\s{2,}", " ", out)).strip(" ,.-")
     return out[:1].upper() + out[1:] if out else text.strip()
 
 

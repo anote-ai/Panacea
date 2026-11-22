@@ -34,6 +34,7 @@ from typing import Any
 
 import requests
 
+from coworker.errors import UserFacingError
 from coworker.store import IntegrityError, Store, iso, parse_iso, utcnow
 
 log = logging.getLogger("coworker.sms")
@@ -50,7 +51,7 @@ HELP = ("Ourogen: text me anything you'd ask in chat. YES 12 approves action 12,
         "EDIT 12 <new text> changes and sends it. PAUSE stops your coworker, RESUME restarts it. STOP ends texts.")
 
 
-class SmsError(Exception):
+class SmsError(UserFacingError):
     def __init__(self, message: str, code: str = "invalid", status: int = 400) -> None:
         super().__init__(message)
         self.code = code
@@ -255,9 +256,9 @@ def notify_approvals(store: Store, user_id: int, pending: list[dict[str, Any]]) 
                   f"\nReply YES {example} to approve, NO {example} to skip.", "approvals")
 
 
-_YES = re.compile(r"^\s*(?:yes|y|approve|ok|send)\s*#?(\d+)?\s*$", re.I)
-_NO = re.compile(r"^\s*(?:no|n|skip|reject)\s*#?(\d+)?\s*$", re.I)
-_EDIT = re.compile(r"^\s*edit\s*#?(\d+)\s+(.+)$", re.I | re.S)
+_YES = re.compile(r"^\s*(?:yes|y|approve|ok|send)(?:\s*#?(\d+))?\s*$", re.I)
+_NO = re.compile(r"^\s*(?:no|n|skip|reject)(?:\s*#?(\d+))?\s*$", re.I)
+_EDIT = re.compile(r"^\s*edit\s*#?(\d+)\s+(\S.*)$", re.I | re.S)
 
 
 def handle_inbound(store: Store, sender: str, text: str, whatsapp: bool = False) -> str:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -60,7 +61,7 @@ def test_join_meeting_without_bot_uses_studio_and_matches_calendar(s, posted):
     out = delegate.join_meeting(s, 1, chat_id=5, title="the Globex QBR", context="ask about renewal")
     assert out["how"] == "studio" and out["event"]["subject"] == "Globex QBR"
     m = out["meeting"]
-    assert m["mode"] == "live_call" and m["prospect_name"] == "Kevin O'Brien" and m["meeting_url"].startswith("https://zoom.us")
+    assert m["mode"] == "live_call" and m["prospect_name"] == "Kevin O'Brien" and urlparse(m["meeting_url"]).hostname == "zoom.us"
     s.update_coworker(1, status="paused")
     with pytest.raises(delegate.DelegateError):
         delegate.join_meeting(s, 1, chat_id=5, title="x")

@@ -19,7 +19,7 @@ import re
 from collections.abc import Generator
 from typing import Any
 
-from coworker import drafting, llm, memory, responsibilities, scheduling, security, tools
+from coworker import drafting, links, llm, memory, responsibilities, scheduling, security, tools
 from coworker.store import Store, utcnow
 
 MAX_ITERATIONS = 10
@@ -214,7 +214,7 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
         return
 
     if re.search(r"\b(join|attend|take|sit in on|go to|cover)\b.{0,40}\b(meeting|call|zoom|meet|teams|standup|qbr|demo)\b", low) \
-            or re.search(r"https://\S*(zoom\.us|meet\.google|teams\.microsoft)", low):
+            or links.has_meeting_link(low):
         url = (re.search(r"https://\S+", m) or [""])[0]
         cm = re.search(r"\b(?:and|to)\s+((?:pitch|ask|tell|explain|cover|find out|qualify|push|focus|walk|demo|get)\b.+)$", m, re.I)
         context = cm.group(1).strip() if cm else m
@@ -296,7 +296,7 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
 
     # 4. Meeting prep
     if re.search(r"\b(prep|prepare|brief)\b", low) and re.search(r"\b(meeting|call|me|tomorrow|next)\b", low):
-        query = _extract_name(m, r"(?:with|for) (?P<name>[\w .'-]+?)(?:\?|$| tomorrow| today| next)") or ""
+        query = _extract_name(m, r"(?:with|for) (?P<name>[\w .'-]{1,60}?)(?:\?|$| tomorrow| today| next)") or ""
         brief = yield from _call(ctx, "meeting_brief", {"query": query})
         yield ("text", brief.get("markdown") if isinstance(brief, dict) and brief.get("markdown") else "I couldn't find an upcoming meeting to prep.")
         return
@@ -335,10 +335,10 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
 
     # 7. Reply / follow up / nudge someone
     who = _extract_name(m, r"\b(?:reply to|respond to|answer|write back to|get back to|draft (?:a )?(?:reply|response|email|note) to|"
-                           r"email|follow up with|nudge|ping)\s+(?P<name>[\w .'-]+?)(?:\s+(?:saying|that|and tell|to say|telling|with|about)\b|\?|$|\.|,)")
+                           r"email|follow up with|nudge|ping)\s+(?P<name>[\w.'-][\w .'-]{0,59}?)(?:\s+(?:saying|that|and tell|to say|telling|with|about)\b|\?|$|\.|,)")
     if who and not re.search(r"\bslack\b", low):
         instruction = ""
-        im = re.search(r"\b(?:saying|that|and tell (?:them|her|him)|to say|telling (?:them|her|him))\b\s+(.+)$", m, re.I)
+        im = re.search(r"\b(?:saying|that|and tell (?:them|her|him)|to say|telling (?:them|her|him))\b\s+(\S.*)$", m, re.I)
         if im:
             instruction = im.group(1).strip()
         thread = _person_thread(ctx, who)
@@ -362,7 +362,7 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
         return
 
     # 8. Slack message
-    sm = re.search(r"\b(?:tell|message|slack|dm|let)\s+(?P<name>\w+)(?: know)?(?: on slack)?\s+(?:that|:|to say)?\s*(?P<text>.+)$", m, re.I)
+    sm = re.search(r"\b(?:tell|message|slack|dm|let)\s+(?P<name>\w+)(?: know)?(?: on slack)?\s+(?:(?:that|:|to say)\s*)?(?P<text>\S.*)$", m, re.I)
     if sm and re.search(r"\b(slack|dm|tell|let \w+ know)\b", low):
         name = sm.group("name").lower()
         text = sm.group("text").strip()

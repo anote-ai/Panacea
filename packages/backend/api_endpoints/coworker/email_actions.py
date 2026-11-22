@@ -17,6 +17,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from api_endpoints.coworker.common import coworker_bp, store
 from coworker import executor
+from coworker.errors import public_message
 from coworker.executor import ActionError
 
 MAX_AGE = 72 * 3600
@@ -116,7 +117,7 @@ def email_action_submit(token: str) -> Response:
         else:
             return _page("Review", "<h1>Pick approve or reject</h1>", 400)
     except ActionError as exc:
-        return _page("Couldn't do that", f"<h1>Couldn't do that</h1><p>{html.escape(str(exc))}</p>", 409)
+        return _page("Couldn't do that", f"<h1>Couldn't do that</h1><p>{html.escape(public_message(exc))}</p>", 409)
     return _page("Done", f"<h1>{html.escape(msg)}</h1>{_preview(action)}")
 
 

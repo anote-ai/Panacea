@@ -21,6 +21,7 @@ from typing import Any
 
 import requests
 
+from coworker.errors import InvalidInput
 from coworker.store import IntegrityError, Store, iso, utcnow
 
 log = logging.getLogger("coworker.push")
@@ -41,7 +42,7 @@ def _save(store: Store, user_id: int, values: list[str]) -> None:
 
 def register(store: Store, user_id: int, token: str) -> list[str]:
     if not TOKEN_RE.match(token or ""):
-        raise ValueError("Not an Expo push token")
+        raise InvalidInput("Not an Expo push token")
     current = [t for t in tokens(store, user_id) if t != token]
     _save(store, user_id, current + [token])
     return tokens(store, user_id)

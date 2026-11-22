@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from coworker.errors import InvalidInput
 from coworker.memory import PUBLIC_DOMAINS
 from coworker.store import Store, iso
 
@@ -58,7 +59,7 @@ def needs_employer_ok(store: Store, user_id: int) -> bool:
 
 def authorize(store: Store, user_id: int, basis: str) -> dict[str, Any]:
     if basis not in BASES:
-        raise ValueError(f"basis must be one of {', '.join(BASES)}")
+        raise InvalidInput(f"basis must be one of {', '.join(BASES)}")
     coworker = store.get_coworker(user_id) or {}
     domain = work_domain(store, user_id)
     record = {"domain": domain, "basis": basis, "at": iso()}

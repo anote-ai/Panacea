@@ -27,14 +27,26 @@ def _local_root() -> str:
     return os.environ.get("TWIN_FOLDER", "/tmp/ourogen_twin")
 
 
+def _safe_name(name: str) -> str:
+    """A plain file name: no directories, no traversal, no hidden/empty names."""
+    base = os.path.basename(str(name).replace("\\", "/")).strip()
+    if base in ("", ".", "..") or base.startswith("."):
+        raise ValueError("invalid file name")
+    return base
+
+
 def put(user_id: int, name: str, data: bytes, mime: str) -> str:
-    key = f"twin/{int(user_id)}/{name}"
+    safe = _safe_name(name)
+    key = f"twin/{int(user_id)}/{safe}"
     bucket = _bucket()
     if bucket:
         _s3().put_object(Bucket=bucket, Key=key, Body=data, ContentType=mime or "application/octet-stream",
                          ServerSideEncryption=os.environ.get("TWIN_S3_SSE", "aws:kms"))
         return f"s3://{bucket}/{key}"
-    path = os.path.join(_local_root(), str(int(user_id)), name)
+    root = os.path.realpath(_local_root())
+    path = os.path.realpath(os.path.join(root, str(int(user_id)), safe))
+    if not path.startswith(root + os.sep):
+        raise ValueError("invalid file name")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as fh:
         fh.write(data)

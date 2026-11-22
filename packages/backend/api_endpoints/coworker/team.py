@@ -8,11 +8,12 @@ from flask import jsonify, request
 from api_endpoints.coworker.common import coworker_bp, error, owner_profile, store, uid
 from coworker import billing, orgs
 from coworker.billing import PlanError
+from coworker.errors import public_message
 from middleware.auth import require_auth
 
 
 def _fail(exc: orgs.OrgError) -> tuple:
-    return error(str(exc), exc.status, exc.code)
+    return error(public_message(exc), exc.status, exc.code)
 
 
 def _seats_changed(user_id: int) -> None:
@@ -21,7 +22,7 @@ def _seats_changed(user_id: int) -> None:
         try:
             billing.sync_seats(store(), org)
         except Exception as exc:  # billing must never block team management; Stripe reconciles on the next change
-            store().log(user_id, "billing", f"Couldn't update Team seats in Stripe: {exc}")
+            store().log(user_id, "billing", f"Couldn't update Team seats in Stripe: {public_message(exc)}")
 
 
 @coworker_bp.get("/org")
@@ -38,7 +39,7 @@ def create_org() -> tuple:
     try:
         billing.require(store(), user_id, "admin")
     except PlanError as exc:
-        return error(f"{exc} Teams need the Team plan.", 402, "plan_required")
+        return error(f"{public_message(exc)} Teams need the Team plan.", 402, "plan_required")
     _, email = owner_profile(user_id)
     coworker = store().get_coworker(user_id) or {}
     try:

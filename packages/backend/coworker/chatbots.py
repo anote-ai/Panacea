@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from coworker.errors import public_message
 from coworker.store import IntegrityError, Store, iso
 
 CHAT_NAMES = {"teams": "💬 Teams", "gchat": "💬 Google Chat"}
@@ -119,4 +120,4 @@ def decide(store: Store, user_id: int, verb: str, action_id: int) -> str:
         action = executor.reject(store, user_id, action_id)
         return f"Skipped: {action['title']}"
     except ActionError as exc:
-        return f"Couldn't do that: {exc}"
+        return f"Couldn't do that: {public_message(exc)}"

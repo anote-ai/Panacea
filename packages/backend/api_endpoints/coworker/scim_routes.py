@@ -9,6 +9,7 @@ from flask import jsonify, request
 
 from api_endpoints.coworker.common import coworker_bp, error, store, uid
 from coworker import orgs, scim
+from coworker.errors import public_message
 from middleware.auth import require_auth
 
 SCIM_TYPE = "application/scim+json"
@@ -82,7 +83,7 @@ def create_scim_token() -> tuple:
     try:
         return jsonify({"token": scim.new_token(store(), uid())}), 201
     except orgs.OrgError as exc:
-        return error(str(exc), exc.status, exc.code)
+        return error(public_message(exc), exc.status, exc.code)
 
 
 @coworker_bp.delete("/org/scim-token")
@@ -91,5 +92,5 @@ def delete_scim_token() -> tuple:
     try:
         scim.revoke_token(store(), uid())
     except orgs.OrgError as exc:
-        return error(str(exc), exc.status, exc.code)
+        return error(public_message(exc), exc.status, exc.code)
     return jsonify({"ok": True}), 200

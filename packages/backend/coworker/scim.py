@@ -102,7 +102,7 @@ def list_users(store: Store, org: dict[str, Any], filter_: str = "", start: int 
     if filter_:
         import re
 
-        m = re.fullmatch(r'\s*(userName|emails(?:\.value)?|emails\[type eq "work"\]\.value)\s+eq\s+"([^"]*)"\s*', filter_, re.I)
+        m = re.fullmatch(r'(userName|emails(?:\.value)?|emails\[type eq "work"\]\.value)\s+eq\s+"([^"]*)"', filter_.strip(), re.I)
         if not m:
             raise ScimError("Only 'userName eq \"...\"' filters are supported", 400, "invalidFilter")
         rows = [r for r in rows if r["email"] == m.group(2).strip().lower()]

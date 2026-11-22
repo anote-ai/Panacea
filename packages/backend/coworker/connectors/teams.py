@@ -21,6 +21,7 @@ from typing import Any
 import requests
 
 from coworker import chatbots
+from coworker.errors import UserFacingError
 from coworker.store import Store
 
 OPENID_CONFIG = "https://login.botframework.com/v1/.well-known/openidconfiguration"
@@ -30,7 +31,7 @@ _jwks: Any = None
 _token: dict[str, Any] = {}
 
 
-class TeamsError(Exception):
+class TeamsError(UserFacingError):
     pass
 
 
@@ -121,7 +122,7 @@ def send(conversation: dict[str, Any], text: str) -> None:
 
 
 def _clean(text: str) -> str:
-    return re.sub(r"<at>.*?</at>", "", text or "").strip()
+    return re.sub(r"<at>[^<]*</at>", "", text or "").strip()
 
 
 def handle(store: Store, activity: dict[str, Any]) -> str:

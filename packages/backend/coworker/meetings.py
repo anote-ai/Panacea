@@ -28,7 +28,7 @@ import re
 import time
 from typing import Any
 
-from coworker import drafting, executor, llm, memory, security
+from coworker import drafting, executor, links, llm, memory, security
 from coworker.store import Store, iso, parse_iso, utcnow
 
 QUALIFICATION_FIELDS = ["need", "current_process", "team_size", "decision_maker", "timeline", "budget"]
@@ -163,13 +163,7 @@ def start(store: Store, user_id: int, *, mode: str, title: str = "", prospect_na
 
 
 def _platform(url: str) -> str:
-    if "zoom.us" in url:
-        return "zoom"
-    if "meet.google.com" in url:
-        return "google_meet"
-    if "teams.microsoft.com" in url or "teams.live.com" in url:
-        return "teams"
-    return "browser" if not url else "other"
+    return links.platform(url)
 
 
 def next_prospect_line(meeting: dict[str, Any]) -> str | None:

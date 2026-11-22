@@ -10,12 +10,13 @@ from flask import jsonify, request
 
 from api_endpoints.coworker.common import coworker_bp, error, frontend_url, store, uid
 from coworker import billing
+from coworker.errors import public_message
 from coworker.store import iso
 from middleware.auth import require_auth
 from middleware.rate_limit import RateLimiter
 
 _pilot_limiter = RateLimiter(max_calls=5, period=3600, name="pilot")
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
 PILOT_FIELDS = ("teamSize", "emailsPerDay", "meetingsPerWeek", "handOff", "tools", "notes", "utm")
 
 
@@ -46,7 +47,7 @@ def change_plan() -> tuple:
         result = billing.change_plan(store(), uid(), plan)
     except billing.PlanError as exc:
         code = 501 if "isn't configured" in str(exc) else 400
-        return error(str(exc), code, "not_configured" if code == 501 else "bad_request")
+        return error(public_message(exc), code, "not_configured" if code == 501 else "bad_request")
     return jsonify({**result, "billing": billing.summary(store(), uid())}), 200
 
 
@@ -56,7 +57,7 @@ def billing_portal() -> tuple:
     try:
         url = billing.portal_url(store(), uid(), f"{frontend_url()}/app/coworker/settings")
     except billing.PlanError as exc:
-        return error(str(exc))
+        return error(public_message(exc))
     return jsonify({"url": url}), 200
 
 

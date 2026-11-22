@@ -26,6 +26,7 @@ import os
 from typing import Any
 
 from coworker import policy
+from coworker.errors import UserFacingError
 from coworker.store import IntegrityError, Store, iso
 
 ROLES = ("admin", "member")
@@ -37,7 +38,7 @@ PUBLIC_EMAIL_DOMAINS = frozenset({
 })
 
 
-class OrgError(Exception):
+class OrgError(UserFacingError):
     def __init__(self, message: str, code: str = "invalid", status: int = 400) -> None:
         super().__init__(message)
         self.code = code

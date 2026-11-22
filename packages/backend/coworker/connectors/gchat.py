@@ -17,6 +17,7 @@ import os
 from typing import Any
 
 from coworker import chatbots
+from coworker.errors import UserFacingError
 from coworker.store import Store
 
 CHAT_ISSUER = "chat@system.gserviceaccount.com"
@@ -25,7 +26,7 @@ SYNC_SECONDS = 25
 _pool = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="gchat")
 
 
-class GChatError(Exception):
+class GChatError(UserFacingError):
     pass
 
 

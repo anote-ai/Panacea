@@ -8,6 +8,7 @@ from flask import current_app, jsonify, request
 
 from api_endpoints.coworker.common import coworker_bp, error, store
 from coworker.connectors import gchat, teams
+from coworker.errors import public_message
 
 
 @coworker_bp.post("/teams/messages")
@@ -19,7 +20,7 @@ def teams_messages() -> Any:
     try:
         teams.verify(request.headers.get("Authorization", ""), str(activity.get("serviceUrl") or ""))
     except teams.TeamsError as exc:
-        return error(str(exc), 401, "unauthorized")
+        return error(public_message(exc), 401, "unauthorized")
     app = current_app._get_current_object()  # type: ignore[attr-defined]
 
     def work() -> None:
@@ -43,5 +44,5 @@ def gchat_events() -> Any:
     try:
         gchat.verify(request.headers.get("Authorization", ""))
     except gchat.GChatError as exc:
-        return error(str(exc), 401, "unauthorized")
+        return error(public_message(exc), 401, "unauthorized")
     return jsonify(gchat.handle(store(), request.get_json(silent=True) or {})), 200

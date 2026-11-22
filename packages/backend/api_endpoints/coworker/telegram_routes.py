@@ -8,11 +8,12 @@ from flask import current_app, jsonify, request
 
 from api_endpoints.coworker.common import coworker_bp, error, store, uid
 from coworker import telegram
+from coworker.errors import public_message
 from middleware.auth import require_auth
 
 
 def _fail(exc: telegram.TelegramError) -> tuple:
-    return error(str(exc), exc.status, exc.code)
+    return error(public_message(exc), exc.status, exc.code)
 
 
 @coworker_bp.get("/telegram")

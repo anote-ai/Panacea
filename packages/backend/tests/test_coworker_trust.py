@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -167,7 +168,7 @@ def test_pilot_applications(client, auth_headers, demo, monkeypatch):
     monkeypatch.setenv("PILOT_BOOKING_URL", "https://cal.com/ourogen/pilot")
     with patch("api_endpoints.coworker.trust.requests.post") as post:
         resp = client.post("/api/coworker/pilot/applications", json=body)
-    assert resp.status_code == 201 and resp.get_json()["bookingUrl"].startswith("https://cal.com")
+    assert resp.status_code == 201 and urlparse(resp.get_json()["bookingUrl"]).hostname == "cal.com"
     assert "Dana W" in post.call_args.kwargs["json"]["text"]
     assert client.post("/api/coworker/pilot/applications", json={**body, "email": "nope"}).status_code == 400
     assert client.post("/api/coworker/pilot/applications", json={**body, "website": "spam.com"}).get_json() == {"ok": True}

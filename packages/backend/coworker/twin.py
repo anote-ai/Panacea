@@ -27,6 +27,7 @@ import secrets
 from typing import Any
 
 from coworker import blobstore, voice, voiceprint
+from coworker.errors import ConsentRequired, InvalidInput, NotConfigured
 from coworker.store import Store, iso
 
 KINDS = ("voice_sample", "video_sample", "photo", "consent_recording")
@@ -37,11 +38,11 @@ CONSENT_TYPES = ("voice_clone", "video_likeness")
 
 def save_asset(store: Store, user_id: int, kind: str, filename: str, mime: str, data: bytes) -> dict[str, Any]:
     if kind not in KINDS:
-        raise ValueError(f"kind must be one of {', '.join(KINDS)}")
+        raise InvalidInput(f"kind must be one of {', '.join(KINDS)}")
     if not ALLOWED_MIME.match(mime or ""):
-        raise ValueError("Upload audio, video, or an image")
+        raise InvalidInput("Upload audio, video, or an image")
     if len(data) > MAX_BYTES:
-        raise ValueError("File is too large (60 MB max)")
+        raise InvalidInput("File is too large (60 MB max)")
     safe = re.sub(r"[^\w.-]", "_", os.path.basename(filename or "upload"))[:120]
     path = blobstore.put(user_id, f"{secrets.token_hex(6)}-{safe}", data, mime)
     aid = store.insert("cw_twin_assets", {
@@ -88,7 +89,7 @@ def _normalize(text: str) -> str:
 def verify(store: Store, user_id: int, consent_id: int, transcript: str, recording: tuple[str, str, bytes] | None) -> dict[str, Any]:
     row = store.get("cw_consents", consent_id, user_id)
     if not row or row["status"] not in ("pending", "failed"):
-        raise ValueError("Request a new consent code first")
+        raise InvalidInput("Request a new consent code first")
     norm = _normalize(transcript)
     digits = re.sub(r"\D", "", norm)
     name_parts = [p for p in re.findall(r"[a-z]+", row["subject_name"].lower()) if len(p) > 1]
@@ -167,7 +168,7 @@ def approve_voice_match(store: Store, user_id: int, reviewer: str) -> dict[str, 
     """Admin override after a person reviewed the consent recording and samples."""
     consent = _consent(store, user_id)
     if not consent:
-        raise ValueError("No verified consent to review")
+        raise InvalidInput("No verified consent to review")
     coworker = store.get_coworker(user_id) or {}
     override = {"consent_id": consent["id"], "by": reviewer, "at": iso()}
     store.update_coworker(user_id, settings={**(coworker.get("settings") or {}), "voice_match_override": override})
@@ -177,20 +178,20 @@ def approve_voice_match(store: Store, user_id: int, reviewer: str) -> dict[str, 
 
 def create_voice(store: Store, user_id: int) -> str:
     if not verified(store, user_id, "voice_clone"):
-        raise PermissionError("Record and verify your consent statement first")
+        raise ConsentRequired("Record and verify your consent statement first")
     samples = [a for a in assets(store, user_id) if a["kind"] in ("voice_sample", "video_sample")]
     if not samples:
-        raise ValueError("Add at least one voice or video sample first")
+        raise InvalidInput("Add at least one voice or video sample first")
     if os.environ.get("VOICEPRINT_REQUIRED", "1") != "0":
         match = voice_match(store, user_id)
         if match["status"] != "match":
             bad = [r.get("filename", "") for r in match["samples"] if r.get("verdict") == "mismatch"]
             store.log(user_id, "security", f"Blocked voice cloning: consent recording check was {match['status']}",
                       {"voice_match": match})
-            raise PermissionError(MATCH_MESSAGES.get(match["status"], MATCH_MESSAGES["inconclusive"]).format(
+            raise ConsentRequired(MATCH_MESSAGES.get(match["status"], MATCH_MESSAGES["inconclusive"]).format(
                 files=", ".join(bad) or "your samples"))
     if not voice.is_configured():
-        raise RuntimeError("Voice cloning isn't configured (set ELEVENLABS_API_KEY). Calls will use a stock voice.")
+        raise NotConfigured("Voice cloning isn't configured (set ELEVENLABS_API_KEY). Calls will use a stock voice.")
     coworker = store.get_coworker(user_id) or {}
     files = []
     for a in samples[:10]:
