@@ -102,6 +102,11 @@ SAFE = {
 
 def test_config_check_safe_and_unsafe():
     assert config.check(SAFE) == ([], [])
+    assert config.check({**SAFE, "GOOGLE_CLIENT_ID": "g", "BACKEND_URL": "https://api.ourogen.ai",
+                         "GOOGLE_COWORKER_REDIRECT_URI": ""}) == ([], [])
+    _, warnings = config.check({**SAFE, "GOOGLE_CLIENT_ID": "g", "BACKEND_URL": "https://api.ourogen.ai",
+                                "GOOGLE_COWORKER_REDIRECT_URI": "https://chat.ourogen.ai/api/coworker/connections/google/callback"})
+    assert any("callback host differs" in w for w in warnings)
     errors, warnings = config.check({"APP_ENV": "production", "JWT_SECRET_KEY": "dev-secret-change-me",
                                      "COWORKER_DB_URL": "sqlite:///x.db", "GOOGLE_CLIENT_ID": "g",
                                      "BACKEND_URL": "http://x"})

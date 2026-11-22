@@ -4,10 +4,12 @@ from __future__ import annotations
 import base64
 import json
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 from coworker import memory, security, style
+from coworker.connectors import google
 from coworker.connectors.demo import DemoConnector
 from coworker.store import IntegrityError, Store, iso, parse_iso
 from tests.conftest import oauth_return
@@ -363,6 +365,27 @@ def test_api_rebuild_with_llm_enrichment(client, auth_headers, demo, monkeypatch
 def test_google_start_not_configured(client, auth_headers, monkeypatch):
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
     assert client.post("/api/coworker/connections/google/start", headers=auth_headers).status_code == 501
+
+
+def test_google_connection_redirect_uses_public_backend(client, auth_headers, monkeypatch):
+    """The Compose default must not send production Google consent to localhost."""
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
+    monkeypatch.setenv("GOOGLE_COWORKER_REDIRECT_URI", "")
+    expected = "https://api.ourogen.ai/api/coworker/connections/google/callback"
+    response = client.post("/api/coworker/connections/google/start", headers=auth_headers)
+    assert response.status_code == 200
+    assert parse_qs(urlparse(response.get_json()["url"]).query)["redirect_uri"] == [expected]
+    with patch("coworker.connectors.google.requests.post") as post:
+        post.return_value.status_code = 200
+        post.return_value.json.return_value = {"access_token": "t"}
+        google.exchange_code("code")
+        assert post.call_args.kwargs["data"]["redirect_uri"] == expected
+    from coworker import vendor_check
+
+    monkeypatch.setenv("APP_ENV", "production")
+    assert expected in vendor_check.check_google()["detail"]
 
 
 def test_google_oauth_flow(client, auth_headers, demo, monkeypatch):
