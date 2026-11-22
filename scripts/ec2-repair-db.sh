@@ -14,13 +14,21 @@
 #    to set DB_USER's password to DB_PASSWORD (creating DB_USER and granting
 #    it DB_NAME if DB_USER isn't root), so panacea/prod stays the source of
 #    truth. Then restart the backend and require /health/db.
-# 3. Else: stop and report; no known password works.
+# 3. Else, only when RESET_ROOT=1: MySQL's documented root reset, keeping all
+#    data. Stop the db container, start the same image on the same data with
+#    --skip-grant-tables --skip-networking, set the password, then start the
+#    db service normally again.
+# 4. Else: stop and report; no known password works.
 #
-# Inputs (environment): HEALTH_PORT (default 5000).
+# The target password is the one the backend container actually has
+# (docker compose may expand "$" in .env values), falling back to .env.
+#
+# Inputs (environment): HEALTH_PORT (default 5000), RESET_ROOT (0/1).
 set -euo pipefail
 
 APP_HOME=/home/ssm-user/app
 : "${HEALTH_PORT:=5000}"
+: "${RESET_ROOT:=0}"
 cd "$APP_HOME"
 
 # Read DB settings from .env without sourcing it (values may contain shell
@@ -40,6 +48,15 @@ PY
 DB_USER=$(read_env DB_USER root)
 DB_NAME=$(read_env DB_NAME anote)
 DB_PASSWORD=$(read_env DB_PASSWORD "")
+# Prefer what the backend container really received.
+if docker compose ps --status running --services 2>/dev/null | grep -qx backend; then
+  if BACKEND_USER=$(docker compose exec -T backend printenv DB_USER 2>/dev/null); then DB_USER="$BACKEND_USER"; fi
+  if BACKEND_NAME=$(docker compose exec -T backend printenv DB_NAME 2>/dev/null); then DB_NAME="$BACKEND_NAME"; fi
+  if BACKEND_PW=$(docker compose exec -T backend printenv DB_PASSWORD 2>/dev/null); then
+    [[ "$BACKEND_PW" != "$DB_PASSWORD" ]] && echo "==> Note: the backend's DB_PASSWORD differs from the raw .env value (compose expanded it); using the backend's."
+    DB_PASSWORD="$BACKEND_PW"
+  fi
+fi
 echo "==> Backend connects as user '$DB_USER' to database '$DB_NAME'"
 
 if ! docker compose ps --status running --services 2>/dev/null | grep -qx db; then
@@ -98,13 +115,42 @@ if secret_works; then
 fi
 echo "==> MySQL rejects the panacea/prod password for '$DB_USER'."
 
-if ! find_admin; then
+reset_root() {
+  local cid image
+  cid=$(docker compose ps -q db)
+  image=$(docker inspect -f '{{.Config.Image}}' "$cid")
+  echo "==> Root reset: stopping db, starting $image on the same data with grant checks off (no network)"
+  docker rm -f ourogen-db-reset >/dev/null 2>&1 || true
+  docker compose stop db
+  # Whatever happens next, put the normal db service back.
+  trap 'docker rm -f ourogen-db-reset >/dev/null 2>&1 || true; docker compose start db >/dev/null 2>&1 || true' EXIT
+  docker run -d --name ourogen-db-reset --volumes-from "$cid" "$image" --skip-grant-tables --skip-networking >/dev/null
+  for _ in $(seq 1 60); do
+    docker exec ourogen-db-reset mysqladmin ping --silent >/dev/null 2>&1 && break
+    sleep 2
+  done
+  { echo "FLUSH PRIVILEGES;"; printf '%s\n' "$SQL"; } | docker exec -i ourogen-db-reset mysql -uroot
+  docker rm -f ourogen-db-reset >/dev/null
+  trap - EXIT
+  docker compose start db
+  for _ in $(seq 1 60); do
+    secret_works && break
+    sleep 2
+  done
+}
+
+if ! find_admin && [[ "$RESET_ROOT" == 1 ]]; then
+  echo "==> No known password works; RESET_ROOT=1, so resetting via --skip-grant-tables (data is kept)."
+  ADMIN_MODE=reset
+fi
+if [[ -z "$ADMIN_MODE" ]]; then
   echo "REPAIR_STOPPED: MySQL rejects root with both the db container's MYSQL_ROOT_PASSWORD and DB_PASSWORD, so no known password"
   echo "works. Nothing was changed. Options: recover the original root password, or (if the database"
   echo "holds nothing to keep) recreate the db container's data volume so it initializes with DB_PASSWORD."
+  echo "To reset root while keeping the data, re-run the workflow with confirm = reset."
   exit 1
 fi
-echo "==> Admin access OK (via $ADMIN_MODE root password); setting '$DB_USER' to the panacea/prod password."
+echo "==> Admin access OK (via $ADMIN_MODE); setting '$DB_USER' to the panacea/prod password."
 
 # Build the SQL with values escaped for single-quoted MySQL strings and
 # backtick identifiers, and feed it on stdin (never on the command line).
@@ -124,7 +170,11 @@ stmts.append("FLUSH PRIVILEGES")
 print(";\n".join(stmts) + ";")
 PY
 )
-printf '%s\n' "$SQL" | admin_sql
+if [[ "$ADMIN_MODE" == reset ]]; then
+  reset_root
+else
+  printf '%s\n' "$SQL" | admin_sql
+fi
 
 if secret_works; then
   echo "==> MySQL now accepts the panacea/prod credentials."
