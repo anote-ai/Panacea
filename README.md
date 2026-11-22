@@ -1,5 +1,7 @@
 # Ourogen
 
+> **New: Ourogen Coworker**, an AI version of you that handles email, Slack, scheduling, and calls with your approval. [Try it in 10 minutes →](COWORKER.md) · [See the walkthrough →](walkthrough/README.md)
+
 Ourogen is an AI assistant for chat, questions about your documents, and coding help. This
 monorepo contains every part of it:
 
