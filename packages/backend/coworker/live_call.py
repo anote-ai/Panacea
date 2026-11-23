@@ -79,11 +79,15 @@ def on_segment(store: Store, user_id: int, meeting_id: int, text: str) -> int | 
     if is_backchannel(text) and not awaiting_confirmation:
         return None
     if _speaking_until(meeting) > time.time() and meeting.get("bot_id"):
-        from coworker.connectors import recall
+        from coworker.connectors import avatar_bridge, recall
         from coworker.connectors.base import ConnectorError
 
         try:
-            recall.stop_audio(meeting["bot_id"])
+            session_id = str((meeting.get("metrics") or {}).get("avatar_session_id") or "")
+            if session_id:
+                avatar_bridge.stop(session_id)
+            else:
+                recall.stop_audio(meeting["bot_id"])
         except ConnectorError as exc:
             log.info("couldn't stop bot audio: %s", exc)
         metrics = meeting.get("metrics") or {}
@@ -142,7 +146,7 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> str:
     from concurrent.futures import ThreadPoolExecutor
 
     from coworker import voice
-    from coworker.connectors import recall
+    from coworker.connectors import avatar_bridge, recall
 
     if not meeting.get("bot_id") or not text:
         return "unavailable"
@@ -150,10 +154,19 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> str:
         recall.send_chat(meeting["bot_id"], text)
         return "chat_only"
     voice_id = ((store.get_coworker(user_id) or {}).get("settings") or {}).get("voice_id")
+    avatar_session_id = str((meeting.get("metrics") or {}).get("avatar_session_id") or "")
+
+    def speak(audio: bytes, spoken_text: str) -> None:
+        encoded = base64.b64encode(audio).decode()
+        if avatar_session_id:
+            avatar_bridge.speak(avatar_session_id, encoded, spoken_text)
+        else:
+            recall.speak(meeting["bot_id"], encoded)
+
     first, rest = split_first_sentence(text)
     if not rest:
         audio = _audio(text, voice_id)
-        recall.speak(meeting["bot_id"], base64.b64encode(audio).decode())
+        speak(audio, text)
         _set_metric(store, user_id, meeting["id"], speaking_until=time.time() + mp3_seconds(audio))
         return "sent"
     with ThreadPoolExecutor(max_workers=1) as pool:
@@ -163,7 +176,7 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> str:
         # Marked before the audio goes out (and long enough to cover the rest), so any interruption is caught.
         _set_metric(store, user_id, meeting["id"],
                     speaking_until=started + mp3_seconds(head) + len(rest.split()) / WORDS_PER_SECOND)
-        recall.speak(meeting["bot_id"], base64.b64encode(head).decode())
+        speak(head, first)
         tail = later.result()
     wait = mp3_seconds(head) - (time.time() - started) - 0.15  # queue the rest just before the first part ends
     if wait > 0:
@@ -171,7 +184,7 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> str:
     current = store.get("cw_meetings", meeting["id"], user_id) or {}
     if _speaking_until(current) == 0 or current.get("status") != "active":
         return "sent"  # they interrupted (barge-in cleared it) or the call ended
-    recall.speak(meeting["bot_id"], base64.b64encode(tail).decode())
+    speak(tail, rest)
     _set_metric(store, user_id, meeting["id"], speaking_until=time.time() + mp3_seconds(tail))
     return "sent"
 
@@ -222,7 +235,7 @@ def _confirm_spoken_consent(store: Store, user_id: int, meeting: dict[str, Any],
 def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: float | None = None) -> dict[str, Any] | None:
     """After the quiet window, answer everything said in this turn (unless a newer segment arrived)."""
     from coworker import meetings
-    from coworker.connectors import recall
+    from coworker.connectors import avatar_bridge, recall
     from coworker.connectors.base import ConnectorError
     from coworker.voice import VoiceError
 
@@ -274,6 +287,12 @@ def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: f
                 recall.leave(m["bot_id"])
             except ConnectorError as exc:
                 log.warning("couldn't leave meeting %s: %s", meeting_id, exc)
+            avatar_session_id = str((m.get("metrics") or {}).get("avatar_session_id") or "")
+            if avatar_session_id:
+                try:
+                    avatar_bridge.close(avatar_session_id)
+                except ConnectorError as exc:
+                    log.info("couldn't close avatar session %s: %s", meeting_id, exc)
     elapsed = int((time.monotonic() - started) * 1000)
     metrics = (store.get("cw_meetings", meeting_id, user_id) or {}).get("metrics") or {}
     _set_metric(store, user_id, meeting_id, turn_ms=[*(metrics.get("turn_ms") or []), elapsed][-200:])
