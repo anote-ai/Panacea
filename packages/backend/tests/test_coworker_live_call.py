@@ -53,6 +53,28 @@ def test_spoken_no_ends_call_without_storing_words(s, meeting):
     leave.assert_called_once_with("bot-1")
 
 
+def test_link_consent_still_requires_spoken_confirmation_and_scrubs_words(s, meeting):
+    s.update("cw_meetings", meeting["id"], 1, {"metrics": {"consent": "granted", "spoken_confirmation": "pending"}})
+    turn = live_call.on_segment(s, 1, meeting["id"], "Yes, that's okay.")
+    with patch("coworker.connectors.recall.send_chat") as chat:
+        result = live_call.take_turn(s, 1, meeting["id"], turn, wait=0)
+    assert result["meeting"]["metrics"]["spoken_confirmation"] == "confirmed"
+    assert "Thank you for confirming" in chat.call_args.args[1]
+    assert result["meeting"]["transcript"][-2]["redacted"]
+    row = s.one("SELECT text FROM cw_turns WHERE id = %s", (turn,))
+    assert row["text"] == meetings.NOT_RECORDED
+
+
+def test_spoken_confirmation_refusal_leaves_without_saving_words(s, meeting):
+    s.update("cw_meetings", meeting["id"], 1, {"metrics": {"consent": "granted", "spoken_confirmation": "pending"}})
+    turn = live_call.on_segment(s, 1, meeting["id"], "No, please leave.")
+    with patch("coworker.connectors.recall.send_chat"), patch("coworker.connectors.recall.leave") as leave:
+        result = live_call.take_turn(s, 1, meeting["id"], turn, wait=0)
+    assert result["ended"] and result["meeting"]["metrics"]["spoken_confirmation"] == "declined"
+    assert result["meeting"]["transcript"][-2]["redacted"]
+    leave.assert_called_once_with("bot-1")
+
+
 def test_one_reply_per_turn_with_everything_they_said(s, meeting):
     first = live_call.on_segment(s, 1, meeting["id"], "We have about forty people")
     second = live_call.on_segment(s, 1, meeting["id"], "and we need it by March. What does it cost?")
