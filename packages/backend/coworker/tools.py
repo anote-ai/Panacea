@@ -77,6 +77,18 @@ def _obj(props: dict[str, Any], required: list[str]) -> dict[str, Any]:
 S = {"type": "string"}
 INT = {"type": "integer"}
 SL = {"type": "array", "items": {"type": "string"}}
+BOOL = {"type": "boolean"}
+
+
+def wants_mailbox_drafts(text: str) -> bool:
+    """The owner wants to review and send from their own mailbox."""
+    low = text.lower()
+    if re.search(r"\b(?:and|then)\s+send\b", low) and not re.search(r"\breview\s+(?:and\s+)?send\b", low):
+        return False
+    return bool(re.search(r"\b(?:save|put|place|keep)\b.{0,60}\b(?:drafts?|drafts folder)\b|"
+                          r"\bdraft(?:s|ing)?\b.{0,45}\b(?:repl(?:y|ies)|responses?|emails?|messages?)\b|"
+                          r"\b(?:repl(?:y|ies)|emails?)\b.{0,45}\bin (?:my|the) drafts\b|"
+                          r"\breview\s+(?:and\s+)?send\b", low))
 
 DEFINITIONS: list[dict[str, Any]] = [
     {"name": "search_memory", "description": "Search everything the coworker knows (email, Slack, meetings, docs, decisions). Returns cited snippets.",
@@ -93,13 +105,15 @@ DEFINITIONS: list[dict[str, Any]] = [
      "input_schema": _obj({"days": INT}, [])},
     {"name": "find_free_slots", "description": "Open times inside the user's working hours, across different days.",
      "input_schema": _obj({"duration_minutes": INT, "days_ahead": INT, "count": INT}, [])},
-    {"name": "draft_reply", "description": "Draft a reply to the latest message in a thread, in the user's voice, grounded in memory and docs. Returns text only; use send_email to propose sending.",
+    {"name": "draft_reply", "description": "Compose reply text to the latest message in a thread, grounded in memory and docs. Returns text only; use save_email_draft to save it in the source mailbox or send_email to propose sending.",
      "input_schema": _obj({"thread_id": S, "instruction": S}, ["thread_id"])},
     {"name": "send_email", "description": "Propose sending an email. It goes to the user's approval inbox unless their autonomy settings allow it. Include thread_id when replying.",
      "input_schema": _obj({"to": SL, "subject": S, "body": S, "thread_id": S, "cc": SL,
                            "attachments": {"type": "array", "items": {"type": "integer"},
                                            "description": "ids of attachment documents from search results to attach"}},
                           ["to", "subject", "body"])},
+    {"name": "save_email_draft", "description": "Save an email to the user's Gmail or Outlook Drafts folder for them to review and send themselves. Never sends the email. Include thread_id when replying so it lands in the source mailbox and thread. Use this when the user asks for drafts in their mailbox.",
+     "input_schema": _obj({"to": SL, "subject": S, "body": S, "thread_id": S}, ["to", "subject", "body"])},
     {"name": "post_slack", "description": "Propose posting a Slack message (channel name like 'sales' or a DM like 'dm-maya').",
      "input_schema": _obj({"channel": S, "text": S}, ["channel", "text"])},
     {"name": "schedule_meeting", "description": "Propose sending a calendar invite. start is ISO-8601 UTC.",
@@ -116,10 +130,10 @@ DEFINITIONS: list[dict[str, Any]] = [
      "follows the user's context, and posts a summary and drafted follow-up in this chat when the call ends. Give a "
      "meeting_url, or describe the calendar event (e.g. 'Globex QBR' or 'my 2pm with Dana') in title.",
      "input_schema": _obj({"meeting_url": S, "title": S, "context": S, "prospect_name": S, "company": S}, [])},
-    {"name": "reply_to_emails", "description": "Draft replies to email threads waiting on the user (optionally one category, "
-     "or one person) and propose sending each. Every draft appears in this chat for approval; once sent, the chat shows "
-     "exactly what went out.",
-     "input_schema": _obj({"category": S, "who": S, "instruction": S, "limit": INT}, [])},
+    {"name": "reply_to_emails", "description": "Compose replies to waiting email threads (optionally one category or person). "
+     "Set save_in_drafts=true when asked to draft replies for the user to review and send: each is saved in the "
+     "original Gmail or Outlook Drafts folder, without sending. Otherwise propose sending in chat for approval.",
+     "input_schema": _obj({"category": S, "who": S, "instruction": S, "limit": INT, "save_in_drafts": BOOL}, [])},
     {"name": "my_day", "description": "What the coworker did on a day (default today): calls, emails sent, briefs, and what's waiting.",
      "input_schema": _obj({"date": S}, [])},
     {"name": "remember_preference", "description": "Save a writing or working preference the user just stated (e.g. 'never use exclamation points').",
@@ -138,10 +152,14 @@ def _action_result(action: dict[str, Any]) -> dict[str, Any]:
     if status == "proposed":
         note = "Waiting for the user's approval in chat and the approval inbox. Tell the user it's ready for review; do not say it was sent."
     elif status == "executed":
-        note = "Done (allowed by the user's autonomy settings)."
+        note = (f"Saved to {((action.get('result') or {}).get('mailbox') or 'your mailbox')} Drafts for the user to review and send. Nothing was sent."
+                if (action.get("result") or {}).get("draft") else "Done (allowed by the user's autonomy settings).")
+    elif status == "failed":
+        note = f"Failed: {action.get('error') or 'mailbox write failed'}. Don't say this was saved."
     else:
         note = f"Status: {status}."
-    return {"action_id": action["id"], "status": status, "note": note, "risks": action.get("risk") or []}
+    return {"action_id": action["id"], "status": status, "note": note, "risks": action.get("risk") or [],
+            **({"error": action.get("error")} if status == "failed" else {})}
 
 
 def run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
@@ -239,12 +257,21 @@ def _run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
     if name == "reply_to_emails":
         from coworker import delegate
 
+        save = bool(args.get("save_in_drafts")) or wants_mailbox_drafts(
+            (ctx.responsibility or {}).get("instruction", "") or ctx.owner_message)
         actions = delegate.reply_to_emails(s, uid, chat_id=ctx.chat_id, category=args.get("category", ""),
                                            who=args.get("who", ""), instruction=args.get("instruction", ""),
-                                           limit=int(args.get("limit") or 5), responsibility=ctx.responsibility)
+                                           limit=int(args.get("limit") or 5), responsibility=ctx.responsibility,
+                                           save_in_drafts=save)
         for a in actions:
             _card(ctx, a)
-        return [_action_result(a) for a in actions], f"Drafted {len(actions)} repl{'y' if len(actions) == 1 else 'ies'}"
+        done = sum(a["status"] == "executed" for a in actions)
+        failed = sum(a["status"] == "failed" for a in actions)
+        summary = (f"Saved {done} mailbox draft{'s' if done != 1 else ''}" if save else
+                   f"Drafted {len(actions)} repl{'y' if len(actions) == 1 else 'ies'}")
+        if failed:
+            summary += f" ({failed} failed; check connection permissions)"
+        return [_action_result(a) for a in actions], summary
     if name == "my_day":
         from coworker import delegate
 
@@ -258,7 +285,7 @@ def _run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
         category = memory.classify(last_in, memory.company_context(s, uid))
         draft = drafting.compose_reply(s, uid, thread, category, args.get("instruction", ""))
         return draft, f"Drafted a reply to {last_in['author_name']}"
-    if name == "send_email":
+    if name in ("send_email", "save_email_draft"):
         payload = {k: args[k] for k in ("to", "cc", "subject", "body", "thread_id") if args.get(k)}
         if args.get("attachments"):
             from coworker import attachments
@@ -268,12 +295,15 @@ def _run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
         if payload.get("thread_id"):
             thread = s.thread(uid, payload["thread_id"])
             source = next((t["id"] for t in reversed(thread) if t["direction"] == "inbound"), None)
-        action = executor.propose(s, uid, "email.send", payload, title=f"Email {', '.join(payload['to'])}: {payload['subject']}",
+        save = name == "save_email_draft" or wants_mailbox_drafts(
+            (ctx.responsibility or {}).get("instruction", "") or ctx.owner_message)
+        action = executor.propose(s, uid, "email.draft" if save else "email.send", payload,
+                                  title=f"{'Draft' if save else 'Email'} {', '.join(payload['to'])}: {payload['subject']}",
                                   reasoning=args.get("reasoning", "You asked for this in chat."), source_item_id=source,
                                   chat_id=ctx.chat_id, requested_in_chat=_requested(ctx), responsibility=ctx.responsibility,
                                   extra_risks=_unrequested(ctx, list(payload.get("to") or []) + list(payload.get("cc") or [])))
         _card(ctx, action)
-        return _action_result(action), f"Prepared an email to {', '.join(payload['to'])}"
+        return _action_result(action), f"{'Saved a draft' if action['status'] == 'executed' and save else 'Prepared an email' if not save else 'Could not save a draft'} to {', '.join(payload['to'])}"
     if name == "post_slack":
         channel = str(args.get("channel", "")).lstrip("#")
         action = executor.propose(s, uid, "slack.post", {"channel": channel, "text": args.get("text", "")},

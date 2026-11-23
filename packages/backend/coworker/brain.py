@@ -41,13 +41,14 @@ def system_prompt(store: Store, user_id: int) -> str:
 
 How you work:
 - Do the work, don't just describe it. Look things up with tools before answering questions about people, deals, or threads.
-- Write tools (send_email, post_slack, schedule_meeting, propose_responsibility) create proposals. Most wait for {first}'s approval as a card in this chat. Never say something was sent unless the tool result says it was executed.
+- Sending with send_email creates a proposal, usually requiring {first}'s approval. Saving with save_email_draft writes only to the connected mailbox's Drafts folder; {first} reviews and sends it there. Never call a saved draft a sent email.
 - When {first} asks you to take something off their plate going forward ("from now on", "handle", "every time"), use propose_responsibility.
 - Recurring work on a clock ("every Monday at 9…", "each weekday morning…", "on the 1st of every month…") is a scheduled task: use propose_responsibility with the request as written, schedule included.
 - "Join my call / go to the meeting / take my 2pm" means join_meeting, with {first}'s instructions as context. You'll post the summary here afterward.
 - Files people emailed (PDF, Word, Excel, PowerPoint) are searchable with search_memory and cited by file name. To attach one to a reply, pass its id in send_email's attachments; a file never goes out without {first}'s approval.
 - "Join all my external calls / take every intro call from now on" is a standing job: use propose_responsibility (it auto-joins matching meetings, with a brief and a skip link before each).
-- "Reply to my emails / leads / customers" means reply_to_emails: one draft per waiting thread, each a card here. Once sent, this chat shows exactly what went out.
+- "Reply to my emails / leads / customers" means reply_to_emails: a send proposal per waiting thread. "Draft replies for me to review and send" or "put them in my drafts" means reply_to_emails with save_in_drafts=true: save to each original Gmail or Outlook mailbox. No send approval card is needed for a saved draft. The same rule applies to scheduled responsibilities; follow their instruction even if their autonomy setting says approve.
+- If saving a draft fails because the connected mailbox only has read access, explain that {first} needs to allow drafts in Coworker → Settings. Never claim a draft was saved when a tool reports failure.
 - "What did you do today?" means my_day.
 - Cite where facts come from (who said it and when). If you don't know, say so; never invent prices, dates, or commitments.
 - Check the calendar tool before describing events or open times. If it reports an access error, explain it; never infer that an unreadable calendar is clear.
@@ -237,15 +238,26 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
         return
 
     # 0b. Reply to emails in bulk
-    em = re.search(r"\b(?:reply|respond|answer|get back)\b.{0,30}\b(?:my |all |the |unanswered |unread |waiting |inbound )*"
+    em = re.search(r"\b(?:repl(?:y|ies)|respond|answer|get back|draft(?:s|ing)?\s+(?:a\s+)?repl(?:y|ies))\b.{0,60}\b(?:my |all |the |unanswered |unread |waiting |inbound )*"
                    r"(?P<what>emails?|inbox|leads?|support (?:emails?|questions)|scheduling (?:emails?|requests)|customers?)\b", low)
     if em:
         what = em.group("what")
         category = ("sales_lead" if what.startswith("lead") else "support" if "support" in what or what.startswith("customer")
                     else "scheduling" if "scheduling" in what else "")
-        actions = yield from _call(ctx, "reply_to_emails", {"category": category, "limit": 5})
+        save = tools.wants_mailbox_drafts(m) or tools.wants_mailbox_drafts((ctx.responsibility or {}).get("instruction", ""))
+        actions = yield from _call(ctx, "reply_to_emails", {"category": category, "limit": 5, "save_in_drafts": save})
         if not actions:
-            yield ("text", "Nothing is waiting on a reply right now (or I've already drafted those, check your approvals).")
+            yield ("text", "Nothing new is waiting on a reply right now (or I've already handled those threads).")
+        elif save:
+            saved = sum(a["status"] == "executed" for a in actions)
+            failed = [a["error"] for a in actions if a["status"] == "failed"]
+            pending = sum(a["status"] == "proposed" for a in actions)
+            lines = [f"Saved {saved} repl{'y' if saved == 1 else 'ies'} in your Gmail or Outlook Drafts folders for you to review and send. Nothing was sent."] if saved else []
+            if pending:
+                lines.append(f"{pending} draft{'s' if pending != 1 else ''} need approval before saving; see the cards below.")
+            if failed:
+                lines.append(f"Could not save {len(failed)}: {failed[0]}")
+            yield ("text", "\n\n".join(lines))
         else:
             yield ("text", f"I drafted {len(actions)} repl{'y' if len(actions) == 1 else 'ies'} in your voice. Approve, edit, "
                            "or reject each one below. After they're sent I'll post exactly what went out here.")
@@ -329,12 +341,17 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
                 name = drafting.first_name(thread["author_name"] if thread["direction"] == "inbound" else who)
                 offer = f"Would any of these work for a quick call?\n{slot_text}" if slot_text else "What times work for a quick call?"
                 body = drafting._wrap(s, uid, name, offer)
-            yield from _call(ctx, "send_email", {"to": draft["to"], "subject": draft["subject"], "body": body,
-                                                 "thread_id": thread["thread_id"]})
+            action = yield from _call(ctx, "save_email_draft" if tools.wants_mailbox_drafts(m) else "send_email",
+                                      {"to": draft["to"], "subject": draft["subject"], "body": body,
+                                       "thread_id": thread["thread_id"]})
+            if action.get("error"):
+                yield ("text", f"I couldn't save that reply: {action['error']}")
+                return
             detail = ("offering open times from your calendar" if draft.get("slots") or slot_text else
                       "asking for their availability because I couldn't verify your calendar")
+            ending = "Check your mailbox's Drafts folder to review and send it." if tools.wants_mailbox_drafts(m) else "Approve it below and I'll send it."
             yield ("text", f"I drafted a reply to {thread['author_name'] if thread['direction'] == 'inbound' else who} "
-                           f"{detail}. Approve it below and I'll send it.")
+                           f"{detail}. {ending}")
         else:
             slots = yield from _call(ctx, "find_free_slots", {})
             if isinstance(slots, dict) and slots.get("error"):
@@ -361,15 +378,25 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
             body = drafting._wrap(s, uid, name, instruction or "Just checking in on this. Any questions I can answer to help things along?")
             subject = thread["subject"] if thread["subject"].lower().startswith("re:") else f"Re: {thread['subject']}"
             to = [r["email"] for r in thread.get("recipients") or []]
-            yield from _call(ctx, "send_email", {"to": to, "subject": subject, "body": body, "thread_id": thread["thread_id"]})
+            action = yield from _call(ctx, "save_email_draft" if tools.wants_mailbox_drafts(m) else "send_email",
+                                      {"to": to, "subject": subject, "body": body, "thread_id": thread["thread_id"]})
+            if action.get("error"):
+                yield ("text", f"I couldn't save that reply: {action['error']}")
+                return
+            ending = "Check your Drafts folder to review and send it." if tools.wants_mailbox_drafts(m) else "Approve it below to send."
             yield ("text", f"You wrote last on **{thread['subject']}** ({_date(thread['occurred_at'])}) and haven't heard back, "
-                           "so I drafted a short nudge. Approve it below to send.")
+                           f"so I drafted a short nudge. {ending}")
             return
         draft = yield from _call(ctx, "draft_reply", {"thread_id": thread["thread_id"], "instruction": instruction})
-        yield from _call(ctx, "send_email", {"to": draft["to"], "subject": draft["subject"], "body": draft["body"],
-                                             "thread_id": draft["thread_id"]})
+        action = yield from _call(ctx, "save_email_draft" if tools.wants_mailbox_drafts(m) else "send_email",
+                                  {"to": draft["to"], "subject": draft["subject"], "body": draft["body"],
+                                   "thread_id": draft["thread_id"]})
+        if action.get("error"):
+            yield ("text", f"I couldn't save that reply: {action['error']}")
+            return
+        ending = "Review and send it from your Drafts folder." if tools.wants_mailbox_drafts(m) else "Review and approve it below."
         yield ("text", f"Drafted a reply to **{thread['author_name']}** on *{thread['subject']}*. {draft['reasoning']} "
-                       "Review and approve it below.")
+                       f"{ending}")
         return
 
     # 8. Slack message

@@ -112,6 +112,41 @@ def test_reply_to_emails_filters(s):
     assert "Nothing is waiting" in text or "drafted" in text.lower()
 
 
+def test_draft_replies_save_in_mailbox_without_sending_or_repeating(s, posted):
+    text, ctx, _ = _turn(s, "Draft replies to my unanswered emails for me to review and send")
+    actions = [s.get("cw_actions", c["id"], 1) for c in ctx.cards if c["type"] == "action"]
+    assert actions and all(a["type"] == "email.draft" and a["status"] == "executed" for a in actions)
+    assert len(s.items(1, kind="draft")) == len(actions)
+    assert "Drafts" in text and "Nothing was sent" in text
+    assert "Saved a draft" in posted.call_args.args[2]
+    assert delegate.reply_to_emails(s, 1, chat_id=78, save_in_drafts=True) == []
+
+
+def test_existing_scheduled_instruction_saves_drafts_despite_approve_autonomy(s, posted):
+    instruction = ("Go through Natan's inbox in both Outlook and Gmail and draft replies to emails that need a "
+                   "response, ready for Natan to review and send")
+    ctx = tools.ToolContext(store=s, user_id=1, chat_id=77,
+                            responsibility={"id": 1, "instruction": instruction, "autonomy": "approve"})
+    events = list(brain._offline_turn(ctx, f"Scheduled run. Task: {instruction}"))
+    text = "".join(part for kind, part in events if kind == "text")
+    actions = [s.get("cw_actions", c["id"], 1) for c in ctx.cards if c["type"] == "action"]
+    assert actions and all(a["type"] == "email.draft" and a["status"] == "executed" for a in actions)
+    assert all(a["responsibility_id"] == 1 for a in actions)
+    assert "Drafts" in text and "Nothing was sent" in text
+
+
+def test_explicit_draft_intent_overrides_send_tool(s, posted):
+    thread = memory.needs_reply(s, 1)[0]
+    ctx = tools.ToolContext(store=s, user_id=1, chat_id=77,
+                            owner_message="Put my reply in the Drafts folder for me to send")
+    action, _ = tools.run("send_email", {"to": [thread["from_email"]], "subject": "Re: Hello",
+                                        "body": "Thanks, I'll review the $999 contract.", "thread_id": thread["thread_id"]}, ctx)
+    saved = s.get("cw_actions", action["action_id"], 1)
+    assert saved["type"] == "email.draft" and saved["status"] == "executed"
+    assert any(r["code"] == "commercial_terms" for r in saved["risk"])
+    assert s.items(1, kind="draft")
+
+
 def test_my_day_and_route(s, posted, client, auth_headers):
     _turn(s, "Join my call with Dana and pitch the pilot")
     d = delegate.day(s, 1)

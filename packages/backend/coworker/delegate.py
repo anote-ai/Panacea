@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from coworker import drafting, executor, meetings, memory, scheduling
+from coworker import drafting, executor, meetings, memory, scheduling, security
 from coworker.store import Store, iso, parse_iso, utcnow
 
 URL_RE = re.compile(r"https://[^\s)>\]]+")
@@ -116,8 +116,8 @@ def run_demo_call(store: Store, user_id: int, *, chat_id: int | None, context: s
 
 def reply_to_emails(store: Store, user_id: int, *, chat_id: int | None, category: str = "", limit: int = 5,
                     instruction: str = "", who: str = "",
-                    responsibility: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    """Draft and propose a reply for each waiting thread. Returns the actions."""
+                    responsibility: dict[str, Any] | None = None, save_in_drafts: bool = False) -> list[dict[str, Any]]:
+    """Prepare replies; either save to the source mailbox or propose sending."""
     rows = memory.needs_reply(store, user_id, include_internal=False)
     if category:
         rows = [r for r in rows if r["category"] == category]
@@ -127,16 +127,21 @@ def reply_to_emails(store: Store, user_id: int, *, chat_id: int | None, category
         low = who.lower()
         rows = [r for r in rows if low in f"{r.get('from', '')} {r.get('from_email', '')} {r.get('title', '')}".lower()]
     existing = {a["source_item_id"] for a in store.query(
-        "SELECT source_item_id FROM cw_actions WHERE user_id = %s AND status IN ('proposed','approved','executing') "
+        "SELECT source_item_id FROM cw_actions WHERE user_id = %s AND "
+        "(status IN ('proposed','approved','executing') OR (type = 'email.draft' AND status = 'executed')) "
         "AND source_item_id IS NOT NULL", (user_id,))}
     actions = []
     for r in rows[:max(1, min(limit, 15))]:
         if r["id"] in existing:
             continue  # already waiting for approval; never draft the same reply twice
         thread = store.thread(user_id, r["thread_id"])
+        if save_in_drafts and any(security.is_suspicious(it.get("body") or "") for it in thread if it["direction"] == "inbound"):
+            store.log(user_id, "security", f"Didn't draft a reply to a suspicious message from {r.get('from_email', '')}",
+                      {"item_id": r["id"]}, chat_id=chat_id)
+            continue
         draft = drafting.compose_reply(store, user_id, thread, r["category"], instruction)
         actions.append(executor.propose(
-            store, user_id, "email.send",
+            store, user_id, "email.draft" if save_in_drafts else "email.send",
             {"to": draft["to"], "subject": draft["subject"], "body": draft["body"], "thread_id": draft["thread_id"]},
             title=f"Reply to {r.get('from') or draft['to'][0]}: {draft['subject']}"[:200], reasoning=draft["reasoning"],
             source_item_id=r["id"], chat_id=chat_id, responsibility=responsibility,  # drafted from their email: full checks

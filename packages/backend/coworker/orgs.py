@@ -146,7 +146,8 @@ def clean_policies(raw: dict[str, Any]) -> dict[str, Any]:
     ceiling = raw.get("autonomy_ceiling") or {}
     if isinstance(ceiling, dict):
         out["autonomy_ceiling"] = {k: v for k, v in ceiling.items()
-                                   if k in policy.ACTION_TYPES and k not in policy.ALWAYS_APPROVE and v in policy.LEVELS}
+                                   if k in policy.ACTION_TYPES and k not in policy.ALWAYS_APPROVE | policy.NOT_CONFIGURABLE
+                                   and v in policy.LEVELS}
     domains = raw.get("blocked_domains") or []
     if isinstance(domains, str):
         domains = domains.replace(",", "\n").splitlines()

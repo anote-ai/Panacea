@@ -91,18 +91,22 @@ def propose(
     ctx = _context(store, user_id, payload, source_item_id)
     coworker = ctx.pop("coworker")
     risks = []
-    if policy.ACTION_TYPES[action_type]["external"]:
+    if policy.ACTION_TYPES[action_type]["external"] or action_type == "email.draft":
         risks = security.assess_outbound(
             action_type, payload, owner_email=coworker.get("owner_email", ""), requested_in_chat=requested_in_chat, **ctx,
         )
     risks += extra_risks or []
     from coworker import orgs
 
-    level = orgs.cap_level(store, user_id, action_type, policy.level_for(coworker, action_type, responsibility))
+    level = (policy.level_for(coworker, action_type, responsibility) if action_type in policy.NOT_CONFIGURABLE else
+             orgs.cap_level(store, user_id, action_type, policy.level_for(coworker, action_type, responsibility)))
     blocked = orgs.blocked_recipients(store, user_id, _recipients(payload))
     if blocked:
         risks.append({"code": "org_blocked", "message": f"Your organization doesn't allow sending to {', '.join(blocked)}."})
-    decision = policy.decide(action_type, level, risks)
+    # Drafts stay in the owner's mailbox; show the send risks for their review,
+    # without turning every private draft into a send approval.
+    blocking_risks = [r for r in risks if r["code"] == "org_blocked"] if action_type == "email.draft" else risks
+    decision = policy.decide(action_type, level, blocking_risks)
     action_id = store.insert("cw_actions", {
         "user_id": user_id, "type": action_type, "status": "proposed", "title": title[:500], "payload": payload,
         "reasoning": reasoning, "autonomy": level, "approval_reason": decision["reason"], "risk": risks,
@@ -114,7 +118,9 @@ def propose(
                   {"risks": risks}, action_id=action_id)
     from coworker import governance
 
-    if decision["auto"] and coworker.get("status") == "active" and not governance.needs_employer_ok(store, user_id):
+    if (decision["auto"] and coworker.get("status") == "active"
+            and not governance.org_disabled(coworker.get("owner_email") or "")
+            and (action_type == "email.draft" or not governance.needs_employer_ok(store, user_id))):
         store.update("cw_actions", action_id, user_id, {"status": "approved", "decided_at": iso(),
                                                         "execute_after": _execute_after(coworker, action_type)})
         store.log(user_id, "auto_approved", f"Auto-approved: {title}", {"level": level}, action_id=action_id)
@@ -269,6 +275,18 @@ def _execute(store: Store, user_id: int, action: dict[str, Any], coworker: dict[
     ws = workspace_for(user_id, store)
     footer_needed = action["autonomy"] in ("notify", "silent") or (coworker.get("settings") or {}).get("disclose_on_approved", True)
     kind = action["type"]
+    source = store.get("cw_items", action["source_item_id"], user_id) if action.get("source_item_id") else None
+    provider = (source or {}).get("provider", "")
+    if kind == "email.draft":
+        from coworker import attachments
+
+        files = attachments.files_for(store, user_id, payload.get("attachments") or [])
+        res = ws.create_draft(payload.get("to") or [], payload.get("subject", ""), payload.get("body", ""),
+                              payload.get("thread_id", ""), files, provider=provider)
+        mailbox = "Outlook" if provider == "outlook" else "Gmail" if provider == "gmail" else (
+            "Outlook" if ws.email_connector(provider, payload.get("thread_id", "")).provider == "microsoft" else "Gmail")
+        return {"external_id": res.external_id, "draft": True, "mailbox": mailbox,
+                "undo": {**res.undo, "provider": provider or ("microsoft" if mailbox == "Outlook" else "google")}}
     if kind == "email.send":
         body = payload.get("body", "")
         if footer_needed and disclosure(coworker) not in body:
@@ -278,10 +296,11 @@ def _execute(store: Store, user_id: int, action: dict[str, Any], coworker: dict[
         files = attachments.files_for(store, user_id, payload.get("attachments") or [])
         if action["autonomy"] == "suggest":
             res = ws.create_draft(payload.get("to") or [], payload.get("subject", ""), body, payload.get("thread_id", ""),
-                                  files)
-            return {"external_id": res.external_id, "draft": True, "undo": res.undo}
+                                  files, provider=provider)
+            return {"external_id": res.external_id, "draft": True,
+                    "undo": {**res.undo, "provider": provider}}
         res = ws.send_email(payload.get("to") or [], payload.get("subject", ""), body, payload.get("thread_id", ""),
-                            payload.get("cc") or [], files)
+                            payload.get("cc") or [], files, provider=provider)
         return {"external_id": res.external_id, "thread_id": res.thread_id, "undo": res.undo}
     if kind == "slack.post" and payload.get("via") == "bot":  # an answer in a teammate's thread, from the bot
         from coworker import slackbot

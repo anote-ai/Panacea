@@ -503,6 +503,7 @@ def test_autonomy_activity_digest_routes(client, auth_headers, demo):
     h = auth_headers
     body = client.get("/api/coworker/autonomy", headers=h).get_json()
     assert body["levels"]["email.send"] == "approve" and body["hardFloors"]
+    assert "email.draft" not in body["levels"]  # mailbox drafts never need individual send approvals
     assert client.put("/api/coworker/autonomy", json={"bogus": "silent"}, headers=h).status_code == 400
     assert client.put("/api/coworker/autonomy", json={"email.send": "notify"}, headers=h).get_json()["levels"]["email.send"] == "notify"
     csv_resp = client.get("/api/coworker/activity?format=csv", headers=h)

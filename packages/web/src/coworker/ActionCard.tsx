@@ -6,6 +6,7 @@ import type { Action } from './types';
 
 const ICON: Record<string, string> = {
   'email.send': '✉️',
+  'email.draft': '📝',
   'slack.post': '💬',
   'calendar.create': '📅',
   'crm.update': '🗂️',
@@ -106,7 +107,9 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
       ? 'Confirm'
       : action.autonomy === 'suggest' && action.type === 'email.send'
         ? 'Save as draft'
-        : action.type === 'email.send'
+        : action.type === 'email.draft'
+          ? 'Save to Drafts'
+          : action.type === 'email.send'
           ? 'Approve & send'
           : action.type === 'calendar.create'
             ? 'Send invite'
@@ -120,13 +123,14 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
           {action.title}
         </span>
         <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${status.cls}`}>
-          {action.status === 'approved' && secondsLeft > 0 ? `Sending in ${secondsLeft}s` : status.text}
+          {action.status === 'approved' && secondsLeft > 0 ? `Sending in ${secondsLeft}s` :
+            action.status === 'executed' && action.result?.draft ? 'Saved to Drafts' : status.text}
         </span>
       </div>
 
       {!compact && (
         <div className="px-4 py-3 space-y-1.5">
-          {action.type === 'email.send' && (
+          {(action.type === 'email.send' || action.type === 'email.draft') && (
             <>
               <Field label="To">
                 {editing ? (
@@ -211,7 +215,7 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
               {action.reasoning}
             </p>
           )}
-          {action.risks?.length > 0 && action.status === 'proposed' && (
+          {action.risks?.length > 0 && (action.status === 'proposed' || action.type === 'email.draft') && (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {action.risks.map((r) => (
                 <span key={r.code} title={r.message}
@@ -222,7 +226,7 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
             </div>
           )}
           {action.error && <p className="text-xs text-red-600 dark:text-red-400">{action.error}</p>}
-          {action.result?.draft && <p className="text-xs text-gray-500">Saved to your Gmail drafts for you to send.</p>}
+          {action.result?.draft && <p className="text-xs text-gray-500">Saved to your {action.result.mailbox || 'mailbox'} Drafts folder for you to review and send.</p>}
         </div>
       )}
 

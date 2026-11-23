@@ -66,9 +66,12 @@ def action_done(action: dict[str, Any], result: dict[str, Any]) -> str:
     """What to say in chat once an action from that chat went out."""
     p = action.get("payload") or {}
     kind = action["type"]
-    if kind == "email.send":
-        verb = "Saved a draft in Gmail" if result.get("draft") else "Sent"
-        return (f"✅ {verb} to {', '.join(p.get('to') or [])}: **{p.get('subject', '')}**\n\n{_quote(p.get('body', ''))}"
+    if kind in ("email.send", "email.draft"):
+        verb = f"Saved a draft in {result.get('mailbox') or 'your mailbox'}" if result.get("draft") else "Sent"
+        warnings = " ".join(r["message"] for r in action.get("risk") or [] if r["code"] in
+                            ("cross_thread_data", "outside_thread", "commercial_terms", "suspicious_trigger"))
+        review = f"\n\n⚠ Review before sending: {warnings}" if warnings and result.get("draft") else ""
+        return (f"✅ {verb} to {', '.join(p.get('to') or [])}: **{p.get('subject', '')}**\n\n{_quote(p.get('body', ''))}{review}"
                 + marker({"t": "action", "id": action["id"]}))
     if kind == "slack.post":
         return f"✅ Posted in #{p.get('channel', '')}:\n\n{_quote(p.get('text', ''))}" + marker({"t": "action", "id": action["id"]})

@@ -15,8 +15,8 @@ const LEVEL_HELP: Record<string, string> = {
 };
 
 const MAILBOXES = [
-  { provider: 'google', label: 'Google: Gmail, Calendar, Drive', icon: '📧', sendScope: 'gmail.send', env: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET' },
-  { provider: 'microsoft', label: 'Microsoft 365: Outlook mail and calendar', icon: '📨', sendScope: 'Mail.Send', env: 'MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET' },
+  { provider: 'google', label: 'Google: Gmail, Calendar, Drive', icon: '📧', sendScope: 'gmail.send', draftScope: 'gmail.compose', env: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET' },
+  { provider: 'microsoft', label: 'Microsoft 365: Outlook mail and calendar', icon: '📨', sendScope: 'Mail.Send', draftScope: 'Mail.ReadWrite', env: 'MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET' },
 ] as const;
 
 const CRMS = [
@@ -38,7 +38,7 @@ export function ConnectionsPanel({ returnTo = '/app/coworker/settings' }: { retu
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const connectMailbox = async (provider: 'google' | 'microsoft', level: 'read' | 'act') => {
+  const connectMailbox = async (provider: 'google' | 'microsoft', level: 'read' | 'draft' | 'act') => {
     try {
       localStorage.setItem('coworker_return_to', returnTo);
       const d = await api.post(`/connections/${provider}/start`, { level });
@@ -138,6 +138,7 @@ export function ConnectionsPanel({ returnTo = '/app/coworker/settings' }: { retu
         const c = conn(box.provider);
         const configured = capabilities?.[box.provider];
         const canSend = c?.scopes?.includes(box.sendScope);
+        const canDraft = c?.scopes?.includes(box.draftScope);
         return (
           <Card key={box.provider} className="p-4">
             <div className="flex items-center gap-3">
@@ -154,8 +155,11 @@ export function ConnectionsPanel({ returnTo = '/app/coworker/settings' }: { retu
               {c ? (
                 <div className="flex gap-2">
                   {c.status === 'reauth_required'
-                    ? <button className={primaryBtn} onClick={() => connectMailbox(box.provider, canSend ? 'act' : 'read')}>Reconnect</button>
-                    : !canSend && <button className={ghostBtn} onClick={() => connectMailbox(box.provider, 'act')}>Allow sending</button>}
+                    ? <button className={primaryBtn} onClick={() => connectMailbox(box.provider, canSend ? 'act' : canDraft ? 'draft' : 'read')}>Reconnect</button>
+                    : <>
+                        {!canDraft && <button className={ghostBtn} onClick={() => connectMailbox(box.provider, 'draft')}>Allow drafts</button>}
+                        {!canSend && <button className={ghostBtn} onClick={() => connectMailbox(box.provider, 'act')}>Allow sending</button>}
+                      </>}
                   <button className={ghostBtn} onClick={() => disconnect(box.provider)}>Disconnect</button>
                 </div>
               ) : (
