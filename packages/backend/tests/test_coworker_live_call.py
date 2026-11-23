@@ -216,3 +216,24 @@ def test_first_sentence_first_and_interruptions(s, meeting, monkeypatch):
     assert speak.call_count == 1
     monkeypatch.setattr(live_call, "_audio", real_audio)
     monkeypatch.setattr(live_call, "_set_metric", real_set)
+
+
+def test_animated_avatar_is_the_only_audio_path_and_stops_on_barge_in(s, meeting, monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "el")
+    s.update("cw_meetings", meeting["id"], 1, {"metrics": {
+        "consent": "granted", "avatar_session_id": "avatar-1", "speaking_until": time.time() + 30}})
+    current = s.get("cw_meetings", meeting["id"], 1)
+    with patch("coworker.voice.tts", return_value=b"mp3"), \
+            patch("coworker.connectors.avatar_bridge.speak") as avatar_speak, \
+            patch("coworker.connectors.recall.speak") as recall_speak:
+        assert live_call._say(s, 1, current, "Short reply.") == "sent"
+    avatar_speak.assert_called_once()
+    recall_speak.assert_not_called()
+    refreshed = s.get("cw_meetings", meeting["id"], 1)
+    s.update("cw_meetings", meeting["id"], 1, {"metrics": {
+        **refreshed["metrics"], "speaking_until": time.time() + 30}})
+    with patch("coworker.connectors.avatar_bridge.stop") as stop, \
+            patch("coworker.connectors.recall.stop_audio") as recall_stop:
+        live_call.on_segment(s, 1, meeting["id"], "Sorry to interrupt")
+    stop.assert_called_once_with("avatar-1")
+    recall_stop.assert_not_called()

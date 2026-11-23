@@ -7,16 +7,18 @@ only move one pending meeting to a final decision once.
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeSerializer, URLSafeTimedSerializer
 
 from coworker import bot_media
-from coworker.connectors import recall
+from coworker.connectors import avatar_bridge, recall
 from coworker.store import Store, iso
 
 MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+log = logging.getLogger("coworker.meeting_consent")
 
 
 class ConsentLinkError(ValueError):
@@ -126,18 +128,45 @@ def _start_bot(store: Store, user_id: int, meeting_id: int, secret: str) -> dict
                 "you're okay with me participating and taking notes. Is that okay?")
     audio = bot_media.greeting(store, user_id, greeting)
     avatar = bot_media.camera_frame(store, user_id)
+    avatar_session: dict[str, str] | None = None
+    if avatar_bridge.is_configured() and audio:
+        try:
+            avatar_session = avatar_bridge.create_session(
+                meeting_id=meeting_id, user_id=user_id,
+                display_name=f"{first}'s AI coworker (Ourogen)", greeting_text=greeting,
+                greeting_mp3_b64=audio,
+            )
+        except Exception as exc:
+            # Calls must remain usable if the optional avatar vendor is down.
+            log.warning("animated avatar unavailable for meeting %s; using photo fallback: %s", meeting_id, exc)
+            avatar_session = None
     webhook_token = URLSafeSerializer(secret, salt="recall-webhook").dumps({"u": user_id, "m": meeting_id})
     hook = f"{recall.webhook_base_url()}/api/coworker/meetings/recall/webhook?token={webhook_token}"
-    bot_id = recall.create_bot(
-        meeting["meeting_url"], f"{first}'s AI coworker (Ourogen)",
-        f"I'm {first}'s disclosed AI coworker. Link consent was recorded before I joined, and I'm asking for "
-        "spoken confirmation now. Say 'no' or 'please leave' and I will.", hook,
-        greeting_mp3_b64=audio, avatar_jpeg_b64=avatar,
-    )
+    try:
+        bot_id = recall.create_bot(
+            meeting["meeting_url"], f"{first}'s AI coworker (Ourogen)",
+            f"I'm {first}'s disclosed AI coworker. Link consent was recorded before I joined, and I'm asking for "
+            "spoken confirmation now. Say 'no' or 'please leave' and I will.", hook,
+            greeting_mp3_b64=None if avatar_session else audio,
+            avatar_jpeg_b64=None if avatar_session else avatar,
+            avatar_page_url=avatar_session["camera_url"] if avatar_session else None,
+        )
+    except Exception:
+        if avatar_session:
+            try:
+                avatar_bridge.close(avatar_session["id"])
+            except Exception:
+                pass
+        raise
     transcript = [{"speaker": "coworker", "text": greeting, "at": iso(), "kind": "disclosure"}]
     metrics = {**(meeting.get("metrics") or {}), "spoken_confirmation": "pending",
                "spoken_confirmation_asked": 0,
-               "audio_status": "greeting_queued" if audio else "chat_only"}
+               "audio_status": "avatar_queued" if avatar_session else ("greeting_queued" if audio else "chat_only")}
+    if avatar_session:
+        metrics["avatar_session_id"] = avatar_session["id"]
+        metrics["avatar_mode"] = "animated"
+    else:
+        metrics["avatar_mode"] = "photo"
     store.update("cw_meetings", meeting_id, user_id, {
         "status": "active", "bot_id": bot_id, "transcript": transcript, "metrics": metrics,
     })
