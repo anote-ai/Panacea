@@ -122,18 +122,22 @@ def _start_bot(store: Store, user_id: int, meeting_id: int, secret: str) -> dict
     coworker = store.get_coworker(user_id) or {}
     first = (coworker.get("owner_name") or "the team").split(" ")[0]
     greeting = (f"Hi, I'm {first}'s AI coworker. I'm an AI, not {first}. "
-                "Thanks for agreeing to AI note-taking. What would you like to discuss?")
+                "You approved the consent link before I joined. Before we begin, please confirm out loud that "
+                "you're okay with me participating and taking notes. Is that okay?")
     audio = bot_media.greeting(store, user_id, greeting)
     avatar = bot_media.camera_frame(store, user_id)
     webhook_token = URLSafeSerializer(secret, salt="recall-webhook").dumps({"u": user_id, "m": meeting_id})
     hook = f"{recall.webhook_base_url()}/api/coworker/meetings/recall/webhook?token={webhook_token}"
     bot_id = recall.create_bot(
         meeting["meeting_url"], f"{first}'s AI coworker (Ourogen)",
-        f"I'm {first}'s disclosed AI coworker. Attendee consent was recorded before I joined. "
-        "Say 'please leave' and I will.", hook, greeting_mp3_b64=audio, avatar_jpeg_b64=avatar,
+        f"I'm {first}'s disclosed AI coworker. Link consent was recorded before I joined, and I'm asking for "
+        "spoken confirmation now. Say 'no' or 'please leave' and I will.", hook,
+        greeting_mp3_b64=audio, avatar_jpeg_b64=avatar,
     )
     transcript = [{"speaker": "coworker", "text": greeting, "at": iso(), "kind": "disclosure"}]
-    metrics = {**(meeting.get("metrics") or {}), "audio_status": "greeting_queued" if audio else "chat_only"}
+    metrics = {**(meeting.get("metrics") or {}), "spoken_confirmation": "pending",
+               "spoken_confirmation_asked": 0,
+               "audio_status": "greeting_queued" if audio else "chat_only"}
     store.update("cw_meetings", meeting_id, user_id, {
         "status": "active", "bot_id": bot_id, "transcript": transcript, "metrics": metrics,
     })

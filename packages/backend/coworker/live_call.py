@@ -72,9 +72,11 @@ def on_segment(store: Store, user_id: int, meeting_id: int, text: str) -> int | 
     meeting = store.get("cw_meetings", meeting_id, user_id)
     if not text or not meeting or meeting["status"] != "active":
         return None
-    # A bare "yes"/"okay" is the answer to the opening consent question,
-    # not a backchannel. Once consent is decided, suppress such small talk.
-    if is_backchannel(text) and (meeting.get("metrics") or {}).get("consent") != "pending":
+    # A bare "yes"/"okay" is the answer to an opening consent question,
+    # not a backchannel. Once both consent gates are decided, suppress such small talk.
+    metrics = meeting.get("metrics") or {}
+    awaiting_confirmation = metrics.get("consent") == "pending" or metrics.get("spoken_confirmation") == "pending"
+    if is_backchannel(text) and not awaiting_confirmation:
         return None
     if _speaking_until(meeting) > time.time() and meeting.get("bot_id"):
         from coworker.connectors import recall
@@ -174,6 +176,49 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> str:
     return "sent"
 
 
+def _confirm_spoken_consent(store: Store, user_id: int, meeting: dict[str, Any], text: str,
+                            turn_id: int) -> dict[str, Any]:
+    """Handle the audible confirmation after link consent without retaining their words."""
+    from coworker import meetings
+
+    metrics = dict(meeting.get("metrics") or {})
+    transcript = list(meeting.get("transcript") or [])
+    # cw_turns is only a short-lived delivery buffer. Scrub the raw words now so
+    # pre-confirmation speech is not retained in Ourogen's database.
+    store.execute("UPDATE cw_turns SET text = %s WHERE meeting_id = %s AND user_id = %s AND claimed_by = %s",
+                  (meetings.NOT_RECORDED, meeting["id"], user_id, turn_id))
+    transcript.append({"speaker": "prospect", "text": meetings.NOT_RECORDED, "at": iso(), "redacted": True})
+    declined = bool(meetings.LEAVE_RE.search(text) or meetings.CONSENT_NO_RE.search(text))
+    confirmed = bool(meetings.CONSENT_YES_RE.search(text)) and not declined
+    ended = False
+    if confirmed:
+        metrics["spoken_confirmation"] = "confirmed"
+        metrics["spoken_confirmation_at"] = iso()
+        reply, kind = "Thank you for confirming. What would you like to discuss?", "consent"
+    elif declined:
+        metrics["spoken_confirmation"] = "declined"
+        metrics["recording_stopped"] = True
+        reply, kind, ended = "Understood. I won't take notes, and I'll leave the call. Thank you.", "leave", True
+    elif int(metrics.get("spoken_confirmation_asked", 0)) >= 1:
+        metrics["spoken_confirmation"] = "not_confirmed"
+        metrics["recording_stopped"] = True
+        reply, kind, ended = "I didn't hear a clear confirmation, so I'll leave without taking notes. Thank you.", "leave", True
+    else:
+        metrics["spoken_confirmation_asked"] = 1
+        reply, kind = "Before we continue, please say yes if you're okay with me participating and taking notes, or no and I'll leave.", "consent"
+    transcript.append({"speaker": "coworker", "text": reply, "at": iso(), "kind": kind})
+    values: dict[str, Any] = {"transcript": transcript, "metrics": metrics}
+    if ended:
+        values.update({"status": "ended", "ended_at": iso()})
+    store.update("cw_meetings", meeting["id"], user_id, values)
+    current = store.get("cw_meetings", meeting["id"], user_id)
+    assert current is not None
+    if ended:
+        meetings.finish(store, user_id, meeting["id"])
+        current = store.get("cw_meetings", meeting["id"], user_id) or current
+    return {"reply": reply, "kind": kind, "meeting": current, "ended": ended, "latency_ms": 0}
+
+
 def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: float | None = None) -> dict[str, Any] | None:
     """After the quiet window, answer everything said in this turn (unless a newer segment arrived)."""
     from coworker import meetings
@@ -188,7 +233,8 @@ def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: f
     started = time.monotonic()
     meeting = store.get("cw_meetings", meeting_id, user_id) or {}
     done = threading.Event()
-    pending = (meeting.get("metrics") or {}).get("consent") == "pending"
+    metrics = meeting.get("metrics") or {}
+    pending = metrics.get("consent") == "pending" or metrics.get("spoken_confirmation") == "pending"
 
     def filler() -> None:
         if not done.wait(FILLER_AFTER):
@@ -200,7 +246,10 @@ def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: f
     if not pending:  # never speak over someone's answer to the consent question
         threading.Thread(target=filler, name=f"call-filler-{meeting_id}", daemon=True).start()
     try:
-        result = meetings.respond(store, user_id, meeting_id, text)
+        if metrics.get("spoken_confirmation") == "pending":
+            result = _confirm_spoken_consent(store, user_id, meeting, text, turn_id)
+        else:
+            result = meetings.respond(store, user_id, meeting_id, text)
     finally:
         done.set()
     m = result["meeting"]
