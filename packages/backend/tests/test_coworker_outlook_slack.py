@@ -12,8 +12,8 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from coworker.connectors import microsoft, slack
-from coworker.connectors.base import ConnectorError, Workspace, encrypt_token
-from coworker.store import Store
+from coworker.connectors.base import ConnectorError, SendResult, Workspace, encrypt_token
+from coworker.store import Store, iso
 from tests.conftest import oauth_return
 
 
@@ -93,7 +93,7 @@ class FakeGraph:
         return _resp(202)
 
 
-def _connector(store: Store, scope: str = "Mail.Read Mail.Send Calendars.ReadWrite") -> microsoft.MicrosoftConnector:
+def _connector(store: Store, scope: str = "Mail.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite") -> microsoft.MicrosoftConnector:
     token = {"access_token": "at", "refresh_token": "rt", "expires_at": time.time() + 3600, "scope": scope}
     store.upsert_connection(1, "microsoft", token_enc=encrypt_token(token), status="connected",
                             account_label="natan@contoso.com")
@@ -160,6 +160,9 @@ def test_outlook_needs_send_scope_and_token_refresh(store):
     with pytest.raises(ConnectorError) as exc:
         conn.send_email(store, 1, to=["a@b.com"], subject="x", body="y")
     assert exc.value.code == "needs_scope"
+    with pytest.raises(ConnectorError) as exc:
+        conn.create_draft(store, 1, to=["a@b.com"], subject="x", body="y")
+    assert exc.value.code == "needs_scope"
 
     conn.token["expires_at"] = 0
     fresh = _resp(200, {"access_token": "at2", "refresh_token": "rt2", "expires_in": 3600, "scope": "Mail.Read"})
@@ -201,6 +204,55 @@ def test_workspace_routes_email_to_outlook(store):
     assert governance.work_domain(store, 1) == "contoso.com"
 
 
+def test_draft_action_routes_to_source_mailbox_with_both_connected(store):
+    from coworker import executor
+
+    google = MagicMock(provider="google")
+    outlook = MagicMock(provider="microsoft")
+    google.create_draft.return_value = SendResult(external_id="gmail-draft", undo={"draft_id": "g1"})
+    outlook.create_draft.return_value = SendResult(external_id="outlook-draft", undo={"draft_id": "m1"})
+    with patch.object(Workspace, "_live", lambda self, provider, **_: google if provider == "google" else outlook), \
+         patch("coworker.reports.post"):
+        for source_provider, expected in (("gmail", google), ("outlook", outlook)):
+            source = store.add_item(1, {
+                "provider": source_provider, "external_id": f"incoming-{source_provider}",
+                "thread_id": f"thread-{source_provider}", "kind": "email", "direction": "inbound",
+                "author_email": "a@b.com", "subject": "Hello", "body": "Can you reply?", "occurred_at": iso(),
+            })
+            action = executor.propose(store, 1, "email.draft",
+                                      {"to": ["a@b.com"], "subject": "Re: Hello", "body": "Yes.",
+                                       "thread_id": f"thread-{source_provider}"},
+                                      title="Reply draft", source_item_id=source)
+            assert action["status"] == "executed" and action["result"]["draft"] is True
+            assert action["result"]["mailbox"] == ("Gmail" if source_provider == "gmail" else "Outlook")
+            assert action["result"]["undo"]["provider"] == source_provider
+            assert action["payload"]["mailbox_provider"] == source_provider
+            assert expected.create_draft.call_args.kwargs["thread_id"] == f"thread-{source_provider}"
+            Workspace(store, 1).send_email(["a@b.com"], "Re: Hello", "Thanks", f"thread-{source_provider}")
+            assert expected.send_email.call_args.kwargs["thread_id"] == f"thread-{source_provider}"
+    assert google.create_draft.call_count == outlook.create_draft.call_count == 1
+    assert google.send_email.call_count == outlook.send_email.call_count == 1
+
+
+def test_disconnected_source_mailbox_never_falls_back_to_other_account(store):
+    from coworker import executor
+
+    outlook = MagicMock(provider="microsoft")
+    source = store.add_item(1, {"provider": "gmail", "external_id": "g-in", "thread_id": "g-thread",
+                                "kind": "email", "direction": "inbound", "author_email": "a@b.com",
+                                "subject": "Hello", "body": "Reply please", "occurred_at": iso()})
+    with patch.object(Workspace, "_live", lambda self, provider, **_: outlook if provider == "microsoft" else None):
+        action = executor.propose(store, 1, "email.draft", {"to": ["a@b.com"], "subject": "Re: Hello",
+                                                           "body": "Sure", "thread_id": "g-thread"},
+                                  title="Reply draft", source_item_id=source)
+    assert action["status"] == "failed" and "Google isn't connected" in action["error"]
+    outlook.create_draft.assert_not_called()
+    with patch.object(Workspace, "_live", lambda self, provider, **_: outlook if provider == "microsoft" else None):
+        with pytest.raises(ConnectorError, match="Google isn't connected"):
+            Workspace(store, 1).send_email(["a@b.com"], "Re: Hello", "Sure", "g-thread")
+    outlook.send_email.assert_not_called()
+
+
 def test_outlook_oauth_routes(client, auth_headers, monkeypatch):
     h = auth_headers
     client.post("/api/coworker", json={"mode": "demo"}, headers=h)
@@ -212,6 +264,8 @@ def test_outlook_oauth_routes(client, auth_headers, monkeypatch):
     assert client.post("/api/coworker/connections/microsoft/start", json={"level": "x"}, headers=h).status_code == 400
     url = client.post("/api/coworker/connections/microsoft/start", json={"level": "act"}, headers=h).get_json()["url"]
     assert url.startswith("https://login.microsoftonline.com/common/oauth2/v2.0/authorize") and "Mail.Send" in url
+    draft_url = client.post("/api/coworker/connections/microsoft/start", json={"level": "draft"}, headers=h).get_json()["url"]
+    assert "Mail.ReadWrite" in draft_url and "Mail.Send" not in draft_url
     state = parse_qs(urlparse(url).query)["state"][0]
     token = {"access_token": "at", "refresh_token": "rt", "scope": "Mail.Read Mail.Send", "expires_at": 9e9}
     with patch("coworker.connectors.microsoft.exchange_code", return_value=token), \

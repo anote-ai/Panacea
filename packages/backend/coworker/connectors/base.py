@@ -89,12 +89,31 @@ class Workspace:
 
         return DemoConnector()
 
-    def email_connector(self) -> Any | None:
-        """The live mailbox the coworker reads and sends from: Gmail, else Outlook."""
+    def email_connector(self, provider: str = "", thread_id: str = "") -> Any | None:
+        """Choose the mailbox that owns a thread, or the default for new mail."""
+        if provider in ("gmail", "google", "outlook", "microsoft"):
+            return self._live("google" if provider in ("gmail", "google") else "microsoft")
+        if thread_id:
+            thread = self.store.thread(self.user_id, thread_id)
+            last = next((item for item in reversed(thread) if item.get("kind") == "email" and
+                         item.get("provider") in ("gmail", "outlook")), None)
+            if last:
+                return self.email_connector(last["provider"])
         return self._live("google") or self._live("microsoft")
 
-    def _for_email(self) -> Any:
-        return self.email_connector() or self._demo()
+    def _for_email(self, provider: str = "", thread_id: str = "") -> Any:
+        if self.mode != "live":
+            return self._demo()
+        connector = self.email_connector(provider, thread_id)
+        if connector is None:
+            if not provider and thread_id:
+                source = next((it for it in reversed(self.store.thread(self.user_id, thread_id))
+                               if it.get("kind") == "email" and it.get("provider") in ("gmail", "outlook")), None)
+                provider = (source or {}).get("provider", "")
+            label = ("Google" if provider in ("gmail", "google") else "Outlook" if provider in
+                     ("outlook", "microsoft") else "mailbox")
+            raise ConnectorError(f"{label} isn't connected. Reconnect it in Coworker → Settings.", "not_connected")
+        return connector
 
     def _for_slack(self) -> Any:
         return self._live("slack") or self._demo()
@@ -171,15 +190,15 @@ class Workspace:
     # -- actions ---------------------------------------------------------
 
     def send_email(self, to: list[str], subject: str, body: str, thread_id: str = "",
-                   cc: list[str] | None = None, files: list[Any] | None = None) -> SendResult:
-        result: SendResult = self._for_email().send_email(
+                   cc: list[str] | None = None, files: list[Any] | None = None, *, provider: str = "") -> SendResult:
+        result: SendResult = self._for_email(provider, thread_id).send_email(
             self.store, self.user_id, to=to, subject=subject, body=body, thread_id=thread_id, cc=cc or [], files=files or []
         )
         return result
 
     def create_draft(self, to: list[str], subject: str, body: str, thread_id: str = "",
-                     files: list[Any] | None = None) -> SendResult:
-        result: SendResult = self._for_email().create_draft(
+                     files: list[Any] | None = None, *, provider: str = "") -> SendResult:
+        result: SendResult = self._for_email(provider, thread_id).create_draft(
             self.store, self.user_id, to=to, subject=subject, body=body, thread_id=thread_id, files=files or []
         )
         return result
@@ -197,7 +216,7 @@ class Workspace:
         return result
 
     def undo(self, action_type: str, undo: dict[str, Any]) -> bool:
-        target = self._for_slack() if action_type.startswith("slack.") else self._for_email()
+        target = self._for_slack() if action_type.startswith("slack.") else self._for_email(undo.get("provider", ""))
         return bool(target.undo(self.store, self.user_id, action_type, undo))
 
     def calendar(self, start: str, end: str) -> list[dict[str, Any]]:

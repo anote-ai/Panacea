@@ -139,7 +139,7 @@ def test_outlook_reads_attachments(s):
 
     sent: list[tuple[str, str, Any]] = []
     with patch.object(MicrosoftConnector, "_request", side_effect=lambda m, u, **kw: sent.append((m, u, kw.get("json"))) or {"id": "d1"}):
-        conn.token["scope"] = "Mail.Send"
+        conn.token["scope"] = "Mail.Send Mail.ReadWrite"
         conn.send_email(s, 1, to=["dana@x.com"], subject="Deck", body="Here", files=[attachments.File("a.pdf", "application/pdf", b"%PDF")])
         conn.create_draft(s, 1, to=["dana@x.com"], subject="Deck", body="Here", files=[attachments.File("b.txt", "text/plain", b"hi")])
     added = [j for m, u, j in sent if u.endswith("/attachments")]

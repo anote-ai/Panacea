@@ -393,6 +393,8 @@ def test_google_oauth_flow(client, auth_headers, demo, monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
     url = client.post("/api/coworker/connections/google/start", json={"level": "act"}, headers=auth_headers).get_json()["url"]
     assert "gmail.send" in url and "access_type=offline" in url
+    draft_url = client.post("/api/coworker/connections/google/start", json={"level": "draft"}, headers=auth_headers).get_json()["url"]
+    assert "gmail.compose" in draft_url and "gmail.send" not in draft_url
     assert client.post("/api/coworker/connections/google/start", json={"level": "x"}, headers=auth_headers).status_code == 400
     from urllib.parse import parse_qs, urlparse
 
@@ -556,6 +558,9 @@ def test_google_connector_refresh_and_errors(store):
     fresh = GoogleConnector(store, 1, {"access_token": "at", "expires_at": 9e9, "scope": ""}, {})
     with pytest.raises(ConnectorError) as exc:
         fresh.send_email(store, 1, to=["a@b.com"], subject="s", body="b")
+    assert exc.value.code == "needs_scope"
+    with pytest.raises(ConnectorError) as exc:
+        fresh.create_draft(store, 1, to=["a@b.com"], subject="s", body="b")
     assert exc.value.code == "needs_scope"
     with patch("coworker.connectors.google.requests.request", return_value=_resp(403, {}, "insufficientPermissions")):
         with pytest.raises(ConnectorError) as exc:

@@ -25,6 +25,7 @@ DEFAULT_LEVEL = "approve"
 
 ACTION_TYPES: dict[str, dict[str, Any]] = {
     "email.send": {"label": "Send email", "external": True},
+    "email.draft": {"label": "Save email draft", "external": False},
     "slack.post": {"label": "Post on Slack", "external": True},
     "calendar.create": {"label": "Send calendar invite", "external": True},
     "crm.update": {"label": "Update CRM", "external": False},
@@ -33,10 +34,15 @@ ACTION_TYPES: dict[str, dict[str, Any]] = {
 
 # Configuration changes always need the user's explicit yes.
 ALWAYS_APPROVE = {"responsibility.create"}
+NOT_CONFIGURABLE = {"email.draft"}  # saving privately never needs per-message send approval
 EARNED_AUTONOMY_STREAK = 20
 
 
 def level_for(coworker: dict[str, Any], action_type: str, responsibility: dict[str, Any] | None = None) -> str:
+    # A mailbox draft is private to the owner. Their send approval/autonomy
+    # setting applies when sending, not when saving something for them to edit.
+    if action_type == "email.draft":
+        return "silent"
     if responsibility and responsibility.get("autonomy") in LEVELS:
         return str(responsibility["autonomy"])
     autonomy = coworker.get("autonomy") or {}

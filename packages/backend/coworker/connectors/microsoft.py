@@ -27,6 +27,7 @@ GRAPH = "https://graph.microsoft.com/v1.0"
 
 SCOPES = {
     "read": ["offline_access", "openid", "email", "profile", "User.Read", "Mail.Read", "Calendars.Read"],
+    "draft": ["Mail.ReadWrite"],
     "act": ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite"],
 }
 # The Gmail scope names the rest of the app checks, mapped to Graph's.
@@ -57,7 +58,7 @@ def redirect_uri() -> str:
 
 
 def scopes_for(level: str) -> list[str]:
-    return SCOPES["read"] + (SCOPES["act"] if level == "act" else [])
+    return SCOPES["read"] + (SCOPES["draft"] if level == "draft" else SCOPES["act"] if level == "act" else [])
 
 
 def auth_url(state: str, level: str = "read") -> str:
@@ -392,6 +393,9 @@ class MicrosoftConnector:
 
     def create_draft(self, store: Store, user_id: int, *, to: list[str], subject: str, body: str,
                      thread_id: str = "", files: list[Any] | None = None) -> SendResult:
+        if not self.has_scope("Mail.ReadWrite"):
+            raise ConnectorError("Ourogen needs permission to save Outlook drafts. Allow drafts in Coworker → Settings.",
+                                 "needs_scope")
         draft = self._compose(store, user_id, to, subject, body, thread_id, None)
         self._attach(draft["id"], files)
         return SendResult(external_id=draft.get("id", ""), thread_id=thread_id, undo={"draft_id": draft.get("id", "")})

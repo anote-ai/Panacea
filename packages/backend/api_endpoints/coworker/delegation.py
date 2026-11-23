@@ -458,12 +458,13 @@ def get_autonomy() -> tuple:
     user_id, coworker = _coworker_or_404()
     from coworker import orgs
 
-    levels = {t: policy.level_for(coworker or {}, t) for t in policy.ACTION_TYPES if t not in policy.ALWAYS_APPROVE}
+    configurable = [t for t in policy.ACTION_TYPES if t not in policy.ALWAYS_APPROVE | policy.NOT_CONFIGURABLE]
+    levels = {t: policy.level_for(coworker or {}, t) for t in configurable}
     ceiling = (orgs.policies(store(), user_id).get("autonomy_ceiling") or {}) if coworker else {}
     suggestions = [sg for t in levels if (sg := policy.earned_autonomy(store(), user_id, t))]
     return jsonify({
         "levels": levels, "options": list(policy.LEVELS),
-        "types": {t: v["label"] for t, v in policy.ACTION_TYPES.items() if t not in policy.ALWAYS_APPROVE},
+        "types": {t: v["label"] for t, v in policy.ACTION_TYPES.items() if t in configurable},
         "suggestions": suggestions,
         "orgCeiling": ceiling,
         "hardFloors": [
@@ -481,7 +482,8 @@ def set_autonomy() -> tuple:
     if not coworker:
         return error("Set up your coworker first", 404, "not_found")
     data = request.get_json(silent=True) or {}
-    levels = {k: v for k, v in data.items() if k in policy.ACTION_TYPES and k not in policy.ALWAYS_APPROVE and v in policy.LEVELS}
+    levels = {k: v for k, v in data.items() if k in policy.ACTION_TYPES and k not in policy.ALWAYS_APPROVE
+              and k not in policy.NOT_CONFIGURABLE and v in policy.LEVELS}
     if not levels:
         return error("Provide {action_type: level}")
     store().update_coworker(user_id, autonomy={**(coworker.get("autonomy") or {}), **levels})

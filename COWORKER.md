@@ -2,6 +2,8 @@
 
 Ourogen Coworker is an AI version of you at work. It reads your email, Slack, and calendar, drafts in your voice, takes on standing jobs, runs first sales calls, and joins meetings. It always says it's your AI. Nothing goes out without your approval until you say otherwise.
 
+Ask it to **draft replies for me to review and send** to save replies in the original Gmail or Outlook Drafts folder without sending. This also works in scheduled responsibilities. The connected mailbox needs draft write access (`gmail.compose` or `Mail.ReadWrite`); grant it once with **Allow drafts** in Coworker → Settings. No approval is needed for each draft. Asking it to **reply to my emails** without specifying mailbox drafts continues to create send approval cards in chat.
+
 This guide gets you from zero to a working coworker in about 10 minutes with **no API keys**, then shows what each key unlocks.
 
 ---

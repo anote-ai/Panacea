@@ -41,6 +41,7 @@ SCOPES = {
         "https://www.googleapis.com/auth/calendar.readonly",
         "https://www.googleapis.com/auth/drive.readonly",
     ],
+    "draft": ["https://www.googleapis.com/auth/gmail.compose"],
     "act": [
         "https://www.googleapis.com/auth/gmail.send",
         "https://www.googleapis.com/auth/gmail.compose",
@@ -74,7 +75,7 @@ def redirect_uri() -> str:
 
 
 def scopes_for(level: str) -> list[str]:
-    return SCOPES["read"] + (SCOPES["act"] if level == "act" else [])
+    return SCOPES["read"] + (SCOPES["draft"] if level == "draft" else SCOPES["act"] if level == "act" else [])
 
 
 def auth_url(state: str, level: str = "read") -> str:
@@ -491,7 +492,7 @@ class GoogleConnector:
 
     def _reply_headers(self, store: Store, user_id: int, thread_id: str) -> tuple[str, str, str]:
         rows = store.thread(user_id, thread_id) if thread_id else []
-        last = next((r for r in reversed(rows) if r.get("kind") == "email"), None)
+        last = next((r for r in reversed(rows) if r.get("kind") == "email" and r.get("provider") == "gmail"), None)
         if not last:
             return "", "", ""
         meta = last.get("meta") or {}
@@ -512,6 +513,9 @@ class GoogleConnector:
 
     def create_draft(self, store: Store, user_id: int, *, to: list[str], subject: str, body: str,
                      thread_id: str = "", files: list[Any] | None = None) -> SendResult:
+        if not self.has_scope("gmail.compose"):
+            raise ConnectorError("Ourogen needs permission to save Gmail drafts. Allow drafts in Coworker → Settings.",
+                                 "needs_scope")
         in_reply_to, references, gmail_thread = self._reply_headers(store, user_id, thread_id)
         message: dict[str, Any] = {"raw": build_mime(self.account_email, to, subject, body, None, in_reply_to, references,
                                                      files)}

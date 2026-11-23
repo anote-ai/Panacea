@@ -94,8 +94,8 @@ def google_start() -> tuple:
         return error("Google connection is misconfigured: set a public HTTPS callback in production.",
                      503, "not_configured")
     level = (request.get_json(silent=True) or {}).get("level", "read")
-    if level not in ("read", "act"):
-        return error("level must be 'read' or 'act'")
+    if level not in ("read", "draft", "act"):
+        return error("level must be 'read', 'draft', or 'act'")
     return jsonify({"url": google.auth_url(_state(uid(), "google", level), level)}), 200
 
 
@@ -146,8 +146,8 @@ def microsoft_start() -> tuple:
         return error("Outlook isn't configured on this server. Set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET.",
                      501, "not_configured")
     level = (request.get_json(silent=True) or {}).get("level", "read")
-    if level not in ("read", "act"):
-        return error("level must be 'read' or 'act'")
+    if level not in ("read", "draft", "act"):
+        return error("level must be 'read', 'draft', or 'act'")
     return jsonify({"url": microsoft.auth_url(_state(uid(), "microsoft", level), level)}), 200
 
 
