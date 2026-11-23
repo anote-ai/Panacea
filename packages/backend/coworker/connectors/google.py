@@ -11,6 +11,8 @@ Scopes are requested incrementally: ``read`` at onboarding, and ``act``
 from __future__ import annotations
 
 import base64
+import json
+import logging
 import os
 import re
 import time
@@ -50,8 +52,13 @@ SCOPES = {
 }
 
 BACKFILL_DAYS = int(os.environ.get("COWORKER_BACKFILL_DAYS", "90"))
-MAX_MESSAGES_PER_SYNC = int(os.environ.get("COWORKER_MAX_MESSAGES_PER_SYNC", "300"))
+# A full message costs 60 Gmail quota units, plus up to five attachment reads
+# at 20 units each. Keep a pass below the 6,000 units/minute/user allowance.
+GMAIL_MESSAGES_PER_SYNC = max(1, min(30, int(os.environ.get("COWORKER_GMAIL_MESSAGES_PER_SYNC", "30"))))
+GMAIL_SYNC_INTERVAL = 75  # reserve a full quota window across web, worker, and push syncs
+GMAIL_QUOTA_RETRY = 120
 TIMEOUT = 20
+log = logging.getLogger("coworker.google")
 
 
 def is_configured() -> bool:
@@ -302,11 +309,27 @@ class GoogleConnector:
             if resp.status_code == 401 and attempt == 0:
                 self.token["expires_at"] = 0
                 continue
-            if resp.status_code in (429, 500, 502, 503) and attempt < 2:
+            if resp.status_code in (429, 500, 502, 503) and attempt < 2 and not (
+                url.startswith(GMAIL) and resp.status_code == 429
+            ):
                 time.sleep(2 ** attempt)
                 continue
             if resp.status_code == 401:
                 raise ConnectorError("Google rejected our token. Please reconnect.", "reauth_required")
+            if url.startswith(GMAIL) and resp.status_code in (403, 429):
+                details = resp.text.lower()
+                try:
+                    error = resp.json().get("error") or {}
+                    reasons = [str(entry.get("reason") or "").lower() for entry in error.get("errors", [])]
+                    details += " " + " ".join(reasons)
+                except (ValueError, AttributeError, TypeError):
+                    pass
+                if resp.status_code == 429 or any(reason in details for reason in (
+                    "quota exceeded", "rate limit", "ratelimitexceeded", "resource_exhausted",
+                    "units per minute per user", "too many requests",
+                )):
+                    raise ConnectorError("Gmail reached its temporary API quota. Sync will retry automatically.",
+                                         "rate_limited")
             if resp.status_code == 403 and "insufficient" in resp.text.lower():
                 raise ConnectorError("Ourogen lacks permission for this Google request. Reconnect Google and grant access.",
                                      "needs_scope")
@@ -323,69 +346,135 @@ class GoogleConnector:
 
     def sync(self, store: Store, user_id: int) -> int:
         count = self._sync_calendar(store, user_id)
-        count += self._sync_gmail(store, user_id)
+        gmail_claimed = self._claim_gmail_slot(store, user_id)
+        if gmail_claimed:
+            self._gmail_ingested = 0
+            quota_limited = False
+            try:
+                count += self._sync_gmail(store, user_id)
+            except ConnectorError as exc:
+                if exc.code != "rate_limited":
+                    raise
+                count += self._gmail_ingested
+                self.cursor["gmail_next_sync_at"] = time.time() + GMAIL_QUOTA_RETRY
+                quota_limited = True
+                log.info("Gmail quota reached for user %s; deferring mail sync", user_id)
+        if gmail_claimed:
+            from coworker import mail_push
+
+            if not quota_limited:
+                mail_push.ensure_gmail_watch(self)
+            store.upsert_connection(user_id, "google", sync_cursor=json.dumps(self.cursor))
         count += self._sync_drive(store, user_id)
-        from coworker import mail_push
-
-        mail_push.ensure_gmail_watch(self)
-        import json
-
-        store.upsert_connection(user_id, "google", sync_cursor=json.dumps(self.cursor))
         return count
 
-    def _message_ids_full(self) -> list[str]:
-        """Backfill: newest first, so the onboarding view fills in quickly."""
-        ids: list[str] = []
-        page_token = None
-        query = f"newer_than:{BACKFILL_DAYS}d -in:chats"
-        while len(ids) < MAX_MESSAGES_PER_SYNC:
-            params: dict[str, Any] = {"q": query, "maxResults": 100}
-            if page_token:
-                params["pageToken"] = page_token
-            data = self._request("GET", f"{GMAIL}/messages", params=params)
-            ids += [m["id"] for m in data.get("messages", [])]
-            page_token = data.get("nextPageToken")
-            if not page_token:
-                break
-        return ids[:MAX_MESSAGES_PER_SYNC]
+    def _claim_gmail_slot(self, store: Store, user_id: int) -> bool:
+        """Atomically reserve one Gmail pass across push threads and the worker."""
+        row = store.get_connection_row(user_id, "google")
+        if not row:  # connector used directly in a test or a one-off import
+            return True
+        raw = row.get("sync_cursor") or ""
+        try:
+            cursor = json.loads(raw) if isinstance(raw, str) and raw else {}
+        except ValueError:
+            cursor = {}
+        if float(cursor.get("gmail_next_sync_at") or 0) > time.time():
+            return False
+        cursor["gmail_next_sync_at"] = time.time() + GMAIL_SYNC_INTERVAL
+        claimed = store.execute(
+            "UPDATE cw_connections SET sync_cursor = %s WHERE id = %s AND user_id = %s "
+            "AND COALESCE(sync_cursor, '') = %s",
+            (json.dumps(cursor), row["id"], user_id, raw),
+        )
+        if claimed:
+            self.cursor = cursor
+        return bool(claimed)
 
-    def _message_ids_incremental(self, history_id: str) -> list[str] | None:
-        ids: list[str] = []
-        page_token = None
-        while True:
-            params: dict[str, Any] = {"startHistoryId": history_id, "historyTypes": "messageAdded"}
-            if page_token:
-                params["pageToken"] = page_token
-            try:
-                data = self._request("GET", f"{GMAIL}/history", params=params)
-            except ConnectorError as exc:
-                if exc.code == "not_found":
-                    return None  # history too old: fall back to a full sync
-                raise
-            for h in data.get("history", []):
-                ids += [m["message"]["id"] for m in h.get("messagesAdded", [])]
-            page_token = data.get("nextPageToken")
-            if not page_token:
-                return ids
+    def _message_ids_full(self) -> tuple[list[str], str]:
+        """One page of a resumable backfill, newest first."""
+        after = self.cursor.setdefault("gmail_backfill_after", int(time.time() - BACKFILL_DAYS * 86400))
+        params: dict[str, Any] = {"q": f"after:{after} -in:chats", "maxResults": GMAIL_MESSAGES_PER_SYNC}
+        if self.cursor.get("gmail_backfill_page_token"):
+            params["pageToken"] = self.cursor["gmail_backfill_page_token"]
+        data = self._request("GET", f"{GMAIL}/messages", params=params)
+        return [m["id"] for m in data.get("messages", [])], str(data.get("nextPageToken") or "")
+
+    def _message_ids_incremental(self, history_id: str) -> tuple[list[str], str, str] | None:
+        params: dict[str, Any] = {"startHistoryId": history_id, "historyTypes": "messageAdded", "maxResults": 50}
+        if self.cursor.get("gmail_history_page_token"):
+            params["pageToken"] = self.cursor["gmail_history_page_token"]
+        try:
+            data = self._request("GET", f"{GMAIL}/history", params=params)
+        except ConnectorError as exc:
+            if exc.code == "not_found":
+                return None  # history too old: fall back to a full sync
+            raise
+        ids = [m["message"]["id"] for h in data.get("history", []) for m in h.get("messagesAdded", [])]
+        return list(dict.fromkeys(ids)), str(data.get("nextPageToken") or ""), str(data.get("historyId") or "")
 
     def _sync_gmail(self, store: Store, user_id: int) -> int:
         profile = self._request("GET", f"{GMAIL}/profile")
         self.account_email = profile.get("emailAddress", self.account_email)
         history_id = self.cursor.get("gmail_history_id")
-        ids = self._message_ids_incremental(history_id) if history_id else None
-        if ids is None:
-            ids = self._message_ids_full()
+        if history_id:
+            pending = list(self.cursor.get("gmail_pending_ids") or [])
+            if pending:
+                ids = pending[:GMAIL_MESSAGES_PER_SYNC]
+                remaining = pending[GMAIL_MESSAGES_PER_SYNC:]
+                next_page = str(self.cursor.get("gmail_history_page_token") or "")
+                target = str(self.cursor.get("gmail_history_target") or "")
+            else:
+                page = self._message_ids_incremental(str(history_id))
+                if page is None:
+                    self.cursor.pop("gmail_history_id", None)
+                    self.cursor.pop("gmail_history_page_token", None)
+                    self.cursor.pop("gmail_history_target", None)
+                    history_id = None
+                else:
+                    found, next_page, target = page
+                    ids, remaining = found[:GMAIL_MESSAGES_PER_SYNC], found[GMAIL_MESSAGES_PER_SYNC:]
+                    target = str(self.cursor.get("gmail_history_target") or target or profile.get("historyId") or history_id)
+        if not history_id:
+            self.cursor.setdefault("gmail_backfill_history_id", profile.get("historyId", ""))
+            ids, next_page = self._message_ids_full()
         count = 0
         for mid in ids:
             if store.one("SELECT id FROM cw_items WHERE user_id = %s AND provider = 'gmail' AND external_id = %s",
                          (user_id, mid)):
                 continue
-            msg = self._request("GET", f"{GMAIL}/messages/{mid}", params={"format": "full"})
+            try:
+                msg = self._request("GET", f"{GMAIL}/messages/{mid}", params={"format": "full"})
+            except ConnectorError as exc:
+                if exc.code == "not_found":
+                    continue  # deleted after listing; don't block the remaining page
+                raise
             item = parse_message(msg, self.account_email)
+            # A quota failure while reading attachments must leave this message
+            # eligible for replay when the page is retried.
+            self._ingest_attachments(store, user_id, item)
             if store.add_item(user_id, item):
                 count += 1
-                self._ingest_attachments(store, user_id, item)
-        self.cursor["gmail_history_id"] = profile.get("historyId", history_id)
+                self._gmail_ingested = count
+        if history_id:
+            if remaining:
+                self.cursor["gmail_pending_ids"] = remaining
+            else:
+                self.cursor.pop("gmail_pending_ids", None)
+            if next_page:
+                self.cursor["gmail_history_page_token"] = next_page
+            else:
+                self.cursor.pop("gmail_history_page_token", None)
+            if remaining or next_page:
+                self.cursor["gmail_history_target"] = target
+            else:
+                self.cursor["gmail_history_id"] = target
+                self.cursor.pop("gmail_history_target", None)
+        elif next_page:
+            self.cursor["gmail_backfill_page_token"] = next_page
+        else:
+            self.cursor["gmail_history_id"] = self.cursor.pop("gmail_backfill_history_id", "") or profile.get("historyId")
+            self.cursor.pop("gmail_backfill_page_token", None)
+            self.cursor.pop("gmail_backfill_after", None)
         return count
 
     def _ingest_attachments(self, store: Store, user_id: int, item: dict[str, Any]) -> None:
@@ -396,7 +485,9 @@ class GoogleConnector:
                 continue
             try:
                 data = self.attachment_bytes(item["external_id"], att["id"])
-            except ConnectorError:
+            except ConnectorError as exc:
+                if exc.code == "rate_limited":
+                    raise
                 continue
             attachments.ingest(store, user_id, item, att, data)
 
