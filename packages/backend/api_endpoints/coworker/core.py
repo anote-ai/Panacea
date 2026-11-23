@@ -70,7 +70,8 @@ def get_coworker() -> tuple:
         "pipedrive_oauth": pipedrive.is_configured(),
         "voice": voice.is_configured(),
         "avatar": tavus.is_configured(),
-        "meeting_bot": recall.is_configured(),
+        "meeting_bot": recall.bot_ready(),
+        "meeting_bot_issue": recall.bot_setup_issue(),
     }
     if not row:
         return jsonify({"coworker": None, "capabilities": capabilities, "scenarios": _scenarios()}), 200

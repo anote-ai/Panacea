@@ -19,6 +19,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from coworker import drafting, executor, meetings, memory, scheduling, security
+from coworker.connectors.base import ConnectorError
 from coworker.store import Store, iso, parse_iso, utcnow
 
 URL_RE = re.compile(r"https://[^\s)>\]]+")
@@ -64,7 +65,9 @@ def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url
                 prospect_email = prospect_email or guest.get("email") or ""
     from coworker.connectors import recall
 
-    use_bot = bool(meeting_url) and recall.is_configured()
+    if meeting_url and recall.is_configured() and not recall.bot_ready():
+        raise DelegateError(recall.bot_setup_issue())
+    use_bot = bool(meeting_url) and recall.bot_ready()
     if use_bot:
         meeting = meetings.start(store, user_id, mode="bot", title=title, prospect_name=prospect_name, company=company,
                                  prospect_email=prospect_email, meeting_url=meeting_url, context=context, chat_id=chat_id)
@@ -80,9 +83,13 @@ def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url
         except ImportError:  # pragma: no cover
             pass
         token = URLSafeSerializer(secret, salt="recall-webhook").dumps({"u": user_id, "m": meeting["id"]})
-        hook = f"{os.environ.get('BACKEND_URL', 'http://localhost:5000').rstrip('/')}/api/coworker/meetings/recall/webhook?token={token}"
-        bot_id = recall.create_bot(meeting_url, f"{first}'s AI coworker (Ourogen)",
-                                   meetings.disclosure_line(store, user_id) + " Say 'please leave' and I will.", hook)
+        hook = f"{recall.webhook_base_url()}/api/coworker/meetings/recall/webhook?token={token}"
+        try:
+            bot_id = recall.create_bot(meeting_url, f"{first}'s AI coworker (Ourogen)",
+                                       meetings.disclosure_line(store, user_id) + " Say 'please leave' and I will.", hook)
+        except ConnectorError:
+            store.update("cw_meetings", meeting["id"], user_id, {"status": "failed"})
+            raise
         store.update("cw_meetings", meeting["id"], user_id, {"bot_id": bot_id})
         how = "bot"
         from coworker import push

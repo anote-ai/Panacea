@@ -76,7 +76,8 @@ def test_recall_webhook_is_rate_limited(client):
     from itsdangerous import URLSafeSerializer
 
     token = URLSafeSerializer("test-secret", salt="recall-webhook").dumps({"u": 1, "m": 1})
-    with patch.object(calls._webhook_meeting_limiter, "is_allowed", return_value=False):
+    with patch.object(calls._webhook_meeting_limiter, "is_allowed", return_value=False), \
+         patch.object(calls.recall, "verify_webhook", return_value=True):
         resp = client.post(f"/api/coworker/meetings/recall/webhook?token={token}", json={})
     assert resp.status_code == 429
 

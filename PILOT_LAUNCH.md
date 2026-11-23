@@ -133,9 +133,10 @@ The manifest above already sets the bot up. If you configure the app by hand ins
 
 ## 5. Meetings (Recall.ai) and voice (ElevenLabs)
 
-1. Set `RECALL_API_KEY`. If your Recall workspace isn't in us-east-1, also set `RECALL_API_BASE` to your region's URL.
-2. Set `ELEVENLABS_API_KEY` so the coworker can speak in the user's cloned voice. Without it, the bot speaks in a stock voice.
-3. Set `VOICEPRINT_BACKEND=resemblyzer` before you open sign-ups to people you don't know. The built-in voice match only catches clearly different voices.
+1. In AWS Secrets Manager (`us-east-1`), edit the JSON value of `panacea/prod` and add `RECALL_API_KEY` from your Recall workspace's API keys page. Add `RECALL_WORKSPACE_VERIFICATION_SECRET` from the same workspace's verification secret page (`whsec_…`). Recall signs live transcript requests with this secret; the meeting bot stays disabled until both values are present. If your workspace isn't in us-east-1, set `RECALL_API_BASE` to that workspace's regional API URL too.
+2. Set `BACKEND_URL=https://api.ourogen.ai` in the same secret so Recall can reach the transcript webhook. Production deployment forwards these values into the backend and worker. Redeploy after changing the secret; then check **Coworker → Calls** or the deployment log's `Meeting bot backend configuration: ready` line. Do not print the full Compose configuration, paste key values into chat, or commit them to the repo.
+3. Add `ELEVENLABS_API_KEY` in `panacea/prod` if the bot should speak in the meeting. Without it, the bot responds in meeting chat. A browser voice is available only in the practice call studio.
+4. Set `VOICEPRINT_BACKEND=resemblyzer` before you open sign-ups to people you don't know. The built-in voice match only catches clearly different voices.
 
 How the user sends the coworker to a meeting: in chat, *"Join my 2pm with Northwind. Find out their budget and timeline."* Here is what happens:
 
@@ -151,7 +152,7 @@ How the user sends the coworker to a meeting: in chat, *"Join my 2pm with Northw
 - Calls use a fast model (Haiku when you've chosen Claude; set `COWORKER_CALL_MODEL` to override) and Recall's low-latency transcription. Set `RECALL_TRANSCRIPT=captions` to use the meeting platform's captions instead.
 - Each call summary records reply-time p50 and p95.
 
-**Expect** about 1.5–3 seconds before a spoken answer. That works for intro and qualification calls. Fully streaming speech is the next step.
+**Pilot limitation:** the current short-clip audio endpoint is not intended for an ongoing conversational agent. Test a private call before allowing the bot to join other people's meetings. Migrating live speech to Recall Output Media is the next step; do not rely on a specific spoken-response latency yet.
 
 ## 5b. Text messages (Twilio SMS and WhatsApp)
 
@@ -275,6 +276,7 @@ Members get Team features through the admin's subscription. If the Team price in
 | `MICROSOFT_CLIENT_ID` / `_SECRET` | [Azure portal → App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) (or [entra.microsoft.com](https://entra.microsoft.com)) |
 | `SLACK_CLIENT_ID` / `_SECRET` / `SLACK_SIGNING_SECRET` | [api.slack.com/apps](https://api.slack.com/apps). Open your app → **Basic Information** |
 | `RECALL_API_KEY` | [recall.ai](https://www.recall.ai) → dashboard → API keys. Use the API base URL for your workspace's region. |
+| `RECALL_WORKSPACE_VERIFICATION_SECRET` | Same Recall workspace → API keys & secrets → workspace verification secret (`whsec_…`). This is separate from the API key. |
 | `ELEVENLABS_API_KEY` | [elevenlabs.io → API keys](https://elevenlabs.io/app/settings/api-keys). Voice cloning needs a paid plan. |
 | `TAVUS_API_KEY`, `TAVUS_REPLICA_ID` (optional video avatar) | [platform.tavus.io](https://platform.tavus.io) |
 | `HUBSPOT_CLIENT_ID` / `_SECRET` (optional) | [developers.hubspot.com](https://developers.hubspot.com) → your app. Users can instead paste a private-app token from HubSpot **Settings → Integrations → Private Apps**. |

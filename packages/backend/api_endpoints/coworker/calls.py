@@ -1,7 +1,6 @@
 """Calls, playbook, voice, and twin routes."""
 from __future__ import annotations
 
-import os
 import threading
 from typing import Any
 
@@ -90,8 +89,9 @@ def create_meeting() -> tuple:
         url = str(data.get("meetingUrl", ""))
         if not url.startswith("https://"):
             return error("Paste a Zoom, Google Meet, or Teams link")
-        if not recall.is_configured():
-            return error("The meeting bot isn't configured on this server (set RECALL_API_KEY).", 501, "not_configured")
+        issue = recall.bot_setup_issue()
+        if issue:
+            return error(issue, 501, "not_configured")
     meeting = meetings.start(
         store(), user_id, mode=mode, title=str(data.get("title", ""))[:300], prospect_name=str(data.get("prospectName", ""))[:200],
         company=str(data.get("prospectCompany", ""))[:200], prospect_email=str(data.get("prospectEmail", ""))[:200],
@@ -99,7 +99,7 @@ def create_meeting() -> tuple:
     )
     if mode == "bot":
         first = (coworker.get("owner_name") or "").split(" ")[0] or "Your"
-        base = os.environ.get("BACKEND_URL", request.host_url.rstrip("/"))
+        base = recall.webhook_base_url()
         hook = f"{base}/api/coworker/meetings/recall/webhook?token={_webhook_token(user_id, meeting['id'])}"
         try:
             bot_id = recall.create_bot(meeting["meeting_url"], f"{first}'s AI coworker (Ourogen)",
@@ -165,6 +165,9 @@ def recall_webhook() -> tuple:
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
     if not _webhook_ip_limiter.is_allowed(ip):
         return error("rate limited", 429, "rate_limited")
+    raw_body = request.get_data()
+    if not recall.verify_webhook(raw_body, request.headers):
+        return error("invalid Recall signature", 403, "forbidden")
     secret = str(current_app.config.get("JWT_SECRET_KEY") or "dev")
     try:
         token = URLSafeSerializer(secret, salt="recall-webhook").loads(request.args.get("token", ""))

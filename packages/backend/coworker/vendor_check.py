@@ -69,6 +69,10 @@ def check_recall() -> dict[str, str]:
         return _result("Recall.ai", "skipped", "RECALL_API_KEY not set (no meeting bot)")
     from coworker.connectors import recall
 
+    issue = recall.bot_setup_issue()
+    if issue:
+        return _result("Recall.ai", "fail", issue)
+
     return _http("Recall.ai", f"{recall._base()}/bot/?page_size=1", recall._headers(),
                  lambda b: f"reachable at {urlparse(recall._base()).netloc}, {b.get('count', 'some')} bots on record")
 

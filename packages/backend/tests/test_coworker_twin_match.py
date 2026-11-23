@@ -129,13 +129,15 @@ def test_vendor_checks(monkeypatch):
     for k in ("ANTHROPIC_API_KEY", "ELEVENLABS_API_KEY", "RECALL_API_KEY", "TAVUS_API_KEY", "TAVUS_REPLICA_ID",
               "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SMTP_URL",
               "TWIN_S3_BUCKET", "REDIS_URL", "RATE_LIMIT_REDIS_URL", "APP_ENV", "MICROSOFT_CLIENT_ID",
-              "MICROSOFT_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "BACKEND_URL"):
+              "MICROSOFT_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "BACKEND_URL", "RECALL_WORKSPACE_VERIFICATION_SECRET"):
         monkeypatch.delenv(k, raising=False)
     assert {r["status"] for r in vendor_check.run_all() if r["name"] != "Voice match"} == {"skipped"}
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     monkeypatch.setenv("ELEVENLABS_API_KEY", "k")
     monkeypatch.setenv("RECALL_API_KEY", "k")
+    monkeypatch.setenv("RECALL_WORKSPACE_VERIFICATION_SECRET", "whsec_dGVzdA==")
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
     monkeypatch.setenv("TAVUS_API_KEY", "k")
     assert vendor_check.check_tavus()["status"] == "fail"
     monkeypatch.setenv("TAVUS_REPLICA_ID", "r1")
@@ -159,6 +161,7 @@ def test_vendor_checks(monkeypatch):
     with patch("requests.get", side_effect=requests.ConnectionError()):
         assert "network" in vendor_check.check_anthropic()["detail"]
 
+    monkeypatch.delenv("BACKEND_URL", raising=False)
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "g")
     assert vendor_check.check_google()["status"] == "fail"
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "s")

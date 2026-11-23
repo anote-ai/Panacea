@@ -15,6 +15,8 @@ def _env(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setenv("COWORKER_OFFLINE", "1")
     monkeypatch.setenv("RECALL_API_KEY", "rk")
+    monkeypatch.setenv("RECALL_WORKSPACE_VERIFICATION_SECRET", "whsec_dGVzdA==")
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
     with patch("services.provider_keys.get_user_provider_key", return_value=None):
         yield
 

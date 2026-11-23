@@ -70,6 +70,8 @@ def test_join_meeting_without_bot_uses_studio_and_matches_calendar(s, posted):
 def test_join_meeting_sends_bot_when_configured(s, posted, monkeypatch):
     s.update_coworker(1, mode="live")
     monkeypatch.setenv("RECALL_API_KEY", "rk")
+    monkeypatch.setenv("RECALL_WORKSPACE_VERIFICATION_SECRET", "whsec_dGVzdA==")
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
     with patch("coworker.connectors.recall.create_bot", return_value="bot-1") as create:
         out = delegate.join_meeting(s, 1, chat_id=9, meeting_url="https://meet.google.com/abc-defg-hij",
                                     context="qualify budget", prospect_name="Dana")

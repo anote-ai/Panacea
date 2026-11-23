@@ -97,7 +97,7 @@ The chat sidebar now has a **Today** section with the work your coworker did nex
 5. **Hand off your calls for good:** in chat, say *"Join all my external intro calls from now on."* Confirm the card. For each matching meeting with a video link:
    - About 30 minutes before, it opens a chat named after the meeting with a prep brief, and sends a push and an email with **Skip this one**.
    - Write notes for the call in that chat ("push for a 3-month pilot"). It takes them into the call. Reply "skip" and it won't join.
-   - At the start, the meeting bot joins (it needs `RECALL_API_KEY`), and the summary and follow-up land in that same chat.
+   - At the start, the meeting bot joins (it needs a Recall API key, workspace verification secret, and public HTTPS backend URL), and the summary and follow-up land in that same chat.
    - **Today** shows each one as *Joining*, *Joined*, or *Skipped*.
 
 ## 6. Set up your twin (3 minutes)
@@ -115,7 +115,7 @@ The chat sidebar now has a **Today** section with the work your coworker did nex
 
 ## Turn on the real things
 
-Add keys to `packages/backend/.env`, then `docker compose up --build` again.
+For local Docker Compose, add keys to the repository's `.env`, then run `docker compose up --build` again. Production keys belong in the `panacea/prod` Secrets Manager value; redeploy to refresh the containers.
 
 | Add | You get |
 |---|---|
@@ -124,7 +124,7 @@ Add keys to `packages/backend/.env`, then `docker compose up --build` again.
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | **Your real Outlook mail and calendar** (Microsoft 365 or a personal Microsoft account). Setup is in [PILOT_LAUNCH.md](PILOT_LAUNCH.md#3-microsoft-365-outlook-mail-and-calendar). |
 | Slack user token | Paste an `xoxp-…` token in **Settings → Connections**, or set `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET` for OAuth. Slack requires an HTTPS redirect, so use a tunnel for local OAuth. Add `SLACK_SIGNING_SECRET` and Event Subscriptions for real-time answers instead of a one-minute poll. |
 | `ELEVENLABS_API_KEY` | Your cloned voice on calls |
-| `RECALL_API_KEY` | **Join a real meeting:** paste a Zoom, Meet, or Teams link in Calls. The bot needs a public `BACKEND_URL` (e.g. an ngrok URL) to receive live transcripts. |
+| `RECALL_API_KEY`, `RECALL_WORKSPACE_VERIFICATION_SECRET` | **Join a real meeting:** paste a Zoom, Meet, or Teams link in Calls. The bot also needs a public HTTPS `BACKEND_URL` to receive verified live transcripts. Without ElevenLabs, it responds in meeting chat. Production keys go into AWS Secrets Manager `panacea/prod` in `us-east-1`; see [PILOT_LAUNCH.md](PILOT_LAUNCH.md#5-meetings-recallai-and-voice-elevenlabs). |
 | `TAVUS_API_KEY`, `TAVUS_REPLICA_ID` | Live video avatar sessions from the Twin tab |
 | `PILOT_SLACK_WEBHOOK_URL` | Landing-page pilot applications post to Slack |
 

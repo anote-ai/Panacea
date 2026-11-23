@@ -35,11 +35,11 @@ aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --region "$AWS_REGI
   --query SecretString --output text \
   | python3 -c 'import sys,json; [print(f"{k}={v}") for k,v in json.load(sys.stdin).items()]' > .env
 
-# The host's Compose file can predate the Microsoft integration. Compose uses
+# The host's Compose file can predate the Microsoft and meeting integrations. Compose uses
 # .env for interpolation, but only passes variables explicitly listed under a
 # service to that container. Keep these settings in a separate, value-free
-# override so old hosts can connect Outlook without replacing their Compose
-# file or printing credentials in deployment logs.
+# override so old hosts can connect Outlook and join meetings without replacing
+# their Compose file or printing credentials in deployment logs.
 cat > docker-compose.coworker-env.yml.new <<'YAML'
 services:
   backend:
@@ -49,6 +49,12 @@ services:
       MICROSOFT_TENANT: ${MICROSOFT_TENANT:-common}
       MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI:-}
       MICROSOFT_LOGIN_REDIRECT_URI: ${MICROSOFT_LOGIN_REDIRECT_URI:-}
+      BACKEND_URL: ${BACKEND_URL:-https://api.ourogen.ai}
+      RECALL_API_KEY: ${RECALL_API_KEY:-}
+      RECALL_WORKSPACE_VERIFICATION_SECRET: ${RECALL_WORKSPACE_VERIFICATION_SECRET:-}
+      RECALL_API_BASE: ${RECALL_API_BASE:-https://us-east-1.recall.ai/api/v1}
+      RECALL_TRANSCRIPT: ${RECALL_TRANSCRIPT:-low_latency}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
 YAML
 chmod 600 docker-compose.coworker-env.yml.new
 mv docker-compose.coworker-env.yml.new docker-compose.coworker-env.yml
@@ -82,6 +88,9 @@ import json, sys
 env = json.load(sys.stdin)["services"]["backend"].get("environment", {})
 keys = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET")
 print("==> Outlook backend configuration: " + ("ready" if all(env.get(k) for k in keys) else "not configured"))
+keys = ("RECALL_API_KEY", "RECALL_WORKSPACE_VERIFICATION_SECRET", "BACKEND_URL")
+print("==> Meeting bot backend configuration: " + ("ready" if all(env.get(k) for k in keys) else "not configured"))
+print("==> Meeting bot voice configuration: " + ("ready" if env.get("ELEVENLABS_API_KEY") else "chat replies only"))
 '
 if [[ -n "$BACKEND_IMAGE" && "$BACKEND_IMAGE" != "$IMAGE_URI" ]]; then
   echo "==> docker-compose.yml runs '$BACKEND_IMAGE' for backend; pointing it at the new build"
