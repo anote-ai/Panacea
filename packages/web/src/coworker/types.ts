@@ -49,6 +49,7 @@ export interface Capabilities {
   voice?: boolean;
   avatar?: boolean;
   meeting_bot?: boolean;
+  meeting_bot_issue?: string;
 }
 
 export interface Risk {

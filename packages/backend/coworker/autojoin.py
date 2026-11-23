@@ -143,8 +143,8 @@ def run(store: Store, user_id: int, resp: dict[str, Any]) -> list[str]:
             continue
         until = start - now
         if until > timedelta(0) and _claim(store, user_id, int(resp["id"]), f"autojoin-brief:{event['external_id']}") is not None:
-            out.append(_announce(store, user_id, resp, event, can_join=recall.is_configured()))
-        if recall.is_configured() and until <= JOIN_LEAD and -until <= JOIN_GRACE:
+            out.append(_announce(store, user_id, resp, event, can_join=recall.bot_ready()))
+        if recall.bot_ready() and until <= JOIN_LEAD and -until <= JOIN_GRACE:
             joined = _join(store, user_id, resp, event)
             if joined:
                 out.append(joined)

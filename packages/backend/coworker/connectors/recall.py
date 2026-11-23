@@ -9,10 +9,19 @@ current docs before relying on this outside the pilot.
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
+import hmac
+import ipaddress
 import os
+import time
+from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
+from werkzeug.datastructures import Headers
 
 from coworker.connectors.base import ConnectorError
 
@@ -28,6 +37,75 @@ SILENT_MP3_B64 = (
 
 def is_configured() -> bool:
     return bool(os.environ.get("RECALL_API_KEY"))
+
+
+def _verification_key() -> bytes | None:
+    secret = os.environ.get("RECALL_WORKSPACE_VERIFICATION_SECRET", "")
+    if not secret.startswith("whsec_"):
+        return None
+    try:
+        key = base64.b64decode(secret.removeprefix("whsec_"), validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    return key or None
+
+
+def bot_setup_issue() -> str:
+    """Why a bot cannot safely join and receive live transcripts."""
+    if not is_configured():
+        return "Set RECALL_API_KEY on the server to join meetings."
+    if not _verification_key():
+        return "Set RECALL_WORKSPACE_VERIFICATION_SECRET from the Recall workspace to verify live transcripts."
+    base = os.environ.get("BACKEND_URL", "").rstrip("/")
+    url = urlparse(base)
+    if url.scheme != "https" or not url.hostname or url.username or url.password or url.path or url.query or url.fragment:
+        return "Set BACKEND_URL to the public HTTPS backend address so Recall can deliver transcripts."
+    try:
+        if ipaddress.ip_address(url.hostname).is_loopback or ipaddress.ip_address(url.hostname).is_private:
+            return "Set BACKEND_URL to the public HTTPS backend address so Recall can deliver transcripts."
+    except ValueError:
+        if url.hostname == "localhost":
+            return "Set BACKEND_URL to the public HTTPS backend address so Recall can deliver transcripts."
+    return ""
+
+
+def bot_ready() -> bool:
+    return not bot_setup_issue()
+
+
+def webhook_base_url() -> str:
+    issue = bot_setup_issue()
+    if issue:
+        raise ConnectorError(issue)
+    return os.environ["BACKEND_URL"].rstrip("/")
+
+
+def verify_webhook(raw_body: bytes, headers: Mapping[str, str] | Headers) -> bool:
+    """Verify Recall's workspace signature on the exact request bytes before parsing JSON."""
+    key = _verification_key()
+    message_id = headers.get("Webhook-Id")
+    timestamp = headers.get("Webhook-Timestamp")
+    signatures = headers.get("Webhook-Signature", "")
+    if not key or not message_id or not timestamp or not signatures:
+        return False
+    try:
+        if abs(time.time() - int(timestamp)) > 300:
+            return False
+    except ValueError:
+        return False
+    signed = message_id.encode() + b"." + timestamp.encode() + b"." + raw_body
+    expected = hmac.new(key, signed, hashlib.sha256).digest()
+    for versioned in signatures.split():
+        version, _, signature = versioned.partition(",")
+        if version != "v1" or not signature:
+            continue
+        try:
+            provided = base64.b64decode(signature, validate=True)
+        except (binascii.Error, ValueError):
+            continue
+        if hmac.compare_digest(expected, provided):
+            return True
+    return False
 
 
 def _base() -> str:

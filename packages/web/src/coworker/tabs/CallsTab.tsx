@@ -92,8 +92,10 @@ export default function CallsTab() {
             <input className={`${inputCls} mt-3`} placeholder="https://zoom.us/j/…" value={form.meetingUrl} onChange={(e) => setForm({ ...form, meetingUrl: e.target.value })} />
             <button className={`${primaryBtn} mt-2`} disabled={!capabilities?.meeting_bot || !form.meetingUrl}
               onClick={() => start({ mode: 'bot', ...form })}>
-              {capabilities?.meeting_bot ? 'Send my coworker' : 'Needs RECALL_API_KEY'}
+              {capabilities?.meeting_bot ? 'Send my coworker' : 'Meeting bot not ready'}
             </button>
+            {!capabilities?.meeting_bot && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{capabilities?.meeting_bot_issue || 'Checking meeting bot setup…'}</p>}
+            {capabilities?.meeting_bot && !capabilities.voice && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">The bot can reply in meeting chat. Add ELEVENLABS_API_KEY for spoken replies.</p>}
           </Card>
         </div>
         {msg && <p className="text-sm text-red-500 mt-3">{msg}</p>}

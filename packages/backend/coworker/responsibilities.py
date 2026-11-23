@@ -468,7 +468,7 @@ def suggestions(store: Store, user_id: int) -> list[dict[str, Any]]:
     from coworker import autojoin
     from coworker.connectors import recall
 
-    if recall.is_configured():
+    if recall.bot_ready():
         joinable = [e for e in meetings if autojoin.meeting_url(e)]
         add("auto_join", f"{n(len(joinable), 'external video call', 'external video calls')} in the next 3 days I could take for you.",
             len(joinable))

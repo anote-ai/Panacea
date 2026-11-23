@@ -1,8 +1,12 @@
 """Coworker calls, guardrails, voice, twin consent, meeting bot, and avatar."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import io
 import json
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,7 +20,7 @@ from coworker.store import Store
 @pytest.fixture(autouse=True)
 def _env(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    for key in ("ELEVENLABS_API_KEY", "RECALL_API_KEY", "TAVUS_API_KEY", "TAVUS_REPLICA_ID"):
+    for key in ("ELEVENLABS_API_KEY", "RECALL_API_KEY", "RECALL_WORKSPACE_VERIFICATION_SECRET", "TAVUS_API_KEY", "TAVUS_REPLICA_ID"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("TWIN_FOLDER", str(tmp_path / "twin"))
     with patch("api_endpoints.coworker.core.owner_profile", return_value=("Natan Vidra", "natan@example.com")), \
@@ -251,6 +255,11 @@ def test_call_routes(client, auth_headers, demo):
 def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
     h = auth_headers
     monkeypatch.setenv("RECALL_API_KEY", "rk")
+    assert "RECALL_WORKSPACE_VERIFICATION_SECRET" in client.get("/api/coworker", headers=h).get_json()["capabilities"]["meeting_bot_issue"]
+    key = b"test-workspace-secret"
+    monkeypatch.setenv("RECALL_WORKSPACE_VERIFICATION_SECRET", "whsec_" + base64.b64encode(key).decode())
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
+    assert client.get("/api/coworker", headers=h).get_json()["capabilities"]["meeting_bot"] is True
     with patch("coworker.connectors.recall.create_bot", return_value="bot42"):
         m = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://meet.google.com/abc"},
                         headers=h).get_json()["meeting"]
@@ -259,19 +268,30 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
 
     with client.application.app_context():
         token = _webhook_token(1, m["id"])
+    def webhook(payload, *, signed=True, seconds_ago=0):
+        raw = json.dumps(payload).encode()
+        stamp = str(int(time.time()) - seconds_ago)
+        signature = base64.b64encode(hmac.new(key, b"msg_1." + stamp.encode() + b"." + raw, hashlib.sha256).digest()).decode()
+        headers = {"Webhook-Id": "msg_1", "Webhook-Timestamp": stamp,
+                   "Webhook-Signature": f"v1,{signature if signed else 'invalid'}"}
+        return client.post(f"/api/coworker/meetings/recall/webhook?token={token}", data=raw,
+                           content_type="application/json", headers=headers)
+
     event = {"data": {"data": {"words": [{"text": "Is this a bot?"}], "participant": {"name": "Dana"}}}}
     with patch("coworker.connectors.recall.send_chat") as chat:
-        assert client.post(f"/api/coworker/meetings/recall/webhook?token={token}", json=event).status_code == 200
+        assert webhook(event, signed=False).status_code == 403
+        assert webhook(event, seconds_ago=360).status_code == 403
+        assert webhook(event).status_code == 200
         assert "AI" in chat.call_args.args[1]
     monkeypatch.setenv("ELEVENLABS_API_KEY", "el")
     leave_event = {"data": {"data": {"words": [{"text": "please leave"}], "participant": {"name": "Dana"}}}}
     with patch("coworker.voice.tts", return_value=b"mp3"), patch("coworker.connectors.recall.speak") as speak, \
          patch("coworker.connectors.recall.leave") as leave:
-        client.post(f"/api/coworker/meetings/recall/webhook?token={token}", json=leave_event)
+        webhook(leave_event)
     assert speak.called and leave.called
     assert client.post("/api/coworker/meetings/recall/webhook?token=forged", json=event).status_code == 403
     bot_event = {"data": {"data": {"words": [{"text": "hi"}], "participant": {"name": "Natan's AI coworker (Ourogen)"}}}}
-    assert client.post(f"/api/coworker/meetings/recall/webhook?token={token}", json=bot_event).status_code == 200
+    assert webhook(bot_event).status_code == 200
     from coworker.connectors.base import ConnectorError
 
     monkeypatch.setenv("RECALL_API_KEY", "rk")
