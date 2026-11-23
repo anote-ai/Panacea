@@ -227,6 +227,17 @@ def test_outlook_oauth_routes(client, auth_headers, monkeypatch):
     assert client.delete("/api/coworker/connections/microsoft", headers=h).get_json()["disconnected"]
 
 
+def test_empty_outlook_redirect_override_uses_public_backend(monkeypatch):
+    monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
+    monkeypatch.setenv("MICROSOFT_REDIRECT_URI", "")  # Compose passes the optional variable as empty.
+    expected = "https://api.ourogen.ai/api/coworker/connections/microsoft/callback"
+    assert microsoft.redirect_uri() == expected
+    assert parse_qs(urlparse(microsoft.auth_url("state")).query)["redirect_uri"] == [expected]
+    with patch("coworker.connectors.microsoft._token_request", return_value={}) as token_request:
+        microsoft.exchange_code("code")
+    assert token_request.call_args.args[0]["redirect_uri"] == expected
+
+
 def test_outlook_helpers():
     assert microsoft.fetch_account_email.__name__  # module imports cleanly
     with patch("coworker.connectors.microsoft.requests.get", return_value=_resp(200, {"userPrincipalName": "N@C.com"})):

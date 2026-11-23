@@ -35,6 +35,30 @@ aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --region "$AWS_REGI
   --query SecretString --output text \
   | python3 -c 'import sys,json; [print(f"{k}={v}") for k,v in json.load(sys.stdin).items()]' > .env
 
+# The host's Compose file can predate the Microsoft integration. Compose uses
+# .env for interpolation, but only passes variables explicitly listed under a
+# service to that container. Keep these settings in a separate, value-free
+# override so old hosts can connect Outlook without replacing their Compose
+# file or printing credentials in deployment logs.
+cat > docker-compose.coworker-env.yml.new <<'YAML'
+services:
+  backend:
+    environment:
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT: ${MICROSOFT_TENANT:-common}
+      MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI:-}
+      MICROSOFT_LOGIN_REDIRECT_URI: ${MICROSOFT_LOGIN_REDIRECT_URI:-}
+YAML
+chmod 600 docker-compose.coworker-env.yml.new
+mv docker-compose.coworker-env.yml.new docker-compose.coworker-env.yml
+COMPOSE_FILE=docker-compose.yml
+if [[ -f docker-compose.override.yml ]]; then
+  COMPOSE_FILE+=:docker-compose.override.yml
+fi
+COMPOSE_FILE+=:docker-compose.coworker-env.yml
+export COMPOSE_FILE
+
 echo "==> Pulling $IMAGE_URI"
 aws ecr get-login-password --region "$AWS_REGION" \
   | docker login --username AWS --password-stdin "$ECR_REGISTRY" >/dev/null
@@ -53,6 +77,12 @@ fi
 
 BACKEND_IMAGE=$(docker compose config --format json 2>/dev/null \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["services"]["backend"].get("image",""))' 2>/dev/null || true)
+docker compose config --format json 2>/dev/null | python3 -c '
+import json, sys
+env = json.load(sys.stdin)["services"]["backend"].get("environment", {})
+keys = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET")
+print("==> Outlook backend configuration: " + ("ready" if all(env.get(k) for k in keys) else "not configured"))
+'
 if [[ -n "$BACKEND_IMAGE" && "$BACKEND_IMAGE" != "$IMAGE_URI" ]]; then
   echo "==> docker-compose.yml runs '$BACKEND_IMAGE' for backend; pointing it at the new build"
   docker tag "$IMAGE_URI" "$BACKEND_IMAGE"

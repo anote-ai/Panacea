@@ -317,7 +317,7 @@ def _revoke_sessions(user_id: int) -> None:
 
 def _microsoft_redirect_uri() -> str:
     default = f"{os.environ.get('BACKEND_URL', 'http://localhost:5000').rstrip('/')}/auth/microsoft/callback"
-    return os.environ.get("MICROSOFT_LOGIN_REDIRECT_URI", default)
+    return os.environ.get("MICROSOFT_LOGIN_REDIRECT_URI") or default
 
 
 def _microsoft_state_serializer() -> URLSafeTimedSerializer:

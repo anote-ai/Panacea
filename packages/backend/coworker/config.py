@@ -62,8 +62,13 @@ def check(env: Mapping[str, Any]) -> tuple[list[str], list[str]]:
             warnings.append("GOOGLE_COWORKER_REDIRECT_URI (or its BACKEND_URL fallback) should be https:// in production.")
         elif urlsplit(google_redirect).netloc != urlsplit(backend_url).netloc:
             warnings.append("Google Coworker callback host differs from BACKEND_URL; check its routing and Google Cloud authorized redirect URI.")
-    if env.get("MICROSOFT_CLIENT_ID") and not str(env.get("MICROSOFT_REDIRECT_URI") or "").startswith("https://"):
-        warnings.append("MICROSOFT_REDIRECT_URI should be https:// in production.")
+    if env.get("MICROSOFT_CLIENT_ID"):
+        backend_url = str(env.get("BACKEND_URL") or "http://localhost:5000").rstrip("/")
+        for key, path in (("MICROSOFT_REDIRECT_URI", "/api/coworker/connections/microsoft/callback"),
+                          ("MICROSOFT_LOGIN_REDIRECT_URI", "/auth/microsoft/callback")):
+            redirect = str(env.get(key) or f"{backend_url}{path}")
+            if not redirect.startswith("https://"):
+                warnings.append(f"{key} (or its BACKEND_URL fallback) should be https:// in production.")
     if env.get("GMAIL_PUSH_AUDIENCE") and not env.get("GMAIL_PUSH_SERVICE_ACCOUNT"):
         errors.append("GMAIL_PUSH_AUDIENCE needs GMAIL_PUSH_SERVICE_ACCOUNT: any Google account can mint a token for an audience.")
     if env.get("SLACK_CLIENT_ID") and not env.get("SLACK_SIGNING_SECRET"):
