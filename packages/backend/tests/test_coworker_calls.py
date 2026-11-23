@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from coworker import bot_media, meetings, memory, twin, voice
-from coworker.connectors import recall, tavus
+from coworker.connectors import avatar_bridge, recall, tavus
 from coworker.connectors.demo import DemoConnector
 from coworker.store import Store
 
@@ -20,7 +20,8 @@ from coworker.store import Store
 @pytest.fixture(autouse=True)
 def _env(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    for key in ("ELEVENLABS_API_KEY", "RECALL_API_KEY", "RECALL_WORKSPACE_VERIFICATION_SECRET", "TAVUS_API_KEY", "TAVUS_REPLICA_ID"):
+    for key in ("ELEVENLABS_API_KEY", "RECALL_API_KEY", "RECALL_WORKSPACE_VERIFICATION_SECRET", "TAVUS_API_KEY",
+                "TAVUS_REPLICA_ID", "MEETING_AVATAR_BRIDGE_URL", "MEETING_AVATAR_BRIDGE_SECRET"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("TWIN_FOLDER", str(tmp_path / "twin"))
     with patch("api_endpoints.coworker.core.owner_profile", return_value=("Natan Vidra", "natan@example.com")), \
@@ -209,6 +210,14 @@ def test_recall_and_tavus_adapters(monkeypatch):
         recall.speak("bot1", "b64")
         recall.stop_audio("bot1")
         assert req.call_args.args[:2] == ("DELETE", "https://us-east-1.recall.ai/api/v1/bot/bot1/output_audio/")
+    with patch("coworker.connectors.recall.requests.request", return_value=_resp(201, {"id": "bot2"})) as req:
+        recall.create_bot("https://meet.google.com/a-b-c", "AI coworker", "I'm an AI", "https://hook",
+                          avatar_page_url="https://avatar.example/session/1")
+        body = req.call_args.kwargs["json"]
+        assert body["variant"]["google_meet"] == "web_4_core"
+        assert body["output_media"]["camera"] == {
+            "kind": "webpage", "config": {"url": "https://avatar.example/session/1"}}
+        assert "automatic_video_output" not in body
     with patch("coworker.connectors.recall.requests.request", return_value=_resp(400, {"e": 1})):
         with pytest.raises(Exception):
             recall.leave("bot1")
@@ -223,6 +232,23 @@ def test_recall_and_tavus_adapters(monkeypatch):
     with patch("coworker.connectors.tavus.requests.post", return_value=_resp(500, {})):
         with pytest.raises(Exception):
             tavus.create_conversation("n", "ctx", "hi")
+
+
+def test_avatar_bridge_adapter(monkeypatch):
+    monkeypatch.setenv("MEETING_AVATAR_BRIDGE_URL", "https://avatar.example")
+    monkeypatch.setenv("MEETING_AVATAR_BRIDGE_SECRET", "secret")
+    monkeypatch.setenv("TAVUS_REPLICA_ID", "replica")
+    with patch("coworker.connectors.avatar_bridge.requests.request",
+               return_value=_resp(201, {"id": "session-1", "camera_url": "https://avatar.example/camera/1"})) as req:
+        session = avatar_bridge.create_session(meeting_id=3, user_id=1, display_name="Natan's AI coworker",
+                                               greeting_text="Hello", greeting_mp3_b64="bXAz")
+    assert session == {"id": "session-1", "camera_url": "https://avatar.example/camera/1"}
+    assert req.call_args.kwargs["headers"]["Authorization"] == "Bearer secret"
+    with patch("coworker.connectors.avatar_bridge.requests.request", return_value=_resp(204, {})) as req:
+        avatar_bridge.speak("session-1", "bXAz", "Hi")
+        avatar_bridge.stop("session-1")
+        avatar_bridge.close("session-1")
+    assert req.call_count == 3
 
 
 # ---------------------------------------------------------------------------
