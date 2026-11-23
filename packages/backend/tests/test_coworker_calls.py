@@ -283,7 +283,7 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
         assert agreed.status_code == 200 and agreed.get_json()["agreed"]
         m = client.get(f"/api/coworker/meetings/{m['id']}", headers=h).get_json()["meeting"]
     assert m["botId"] == "bot42" and m["platform"] == "google_meet"
-    assert "Thanks for agreeing" in synth.call_args.args[0]
+    assert "confirm out loud" in synth.call_args.args[0]
     assert base64.b64decode(create.call_args.kwargs["greeting_mp3_b64"]) == b"greeting-audio"
     assert m["metrics"]["audio_status"] == "greeting_queued"
     from PIL import Image
@@ -303,10 +303,14 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
         return client.post(f"/api/coworker/meetings/recall/webhook?token={token}", data=raw,
                            content_type="application/json", headers=headers)
 
+    consent_event = {"data": {"data": {"words": [{"text": "Yes, that's okay."}], "participant": {"name": "Dana"}}}}
+    with patch("coworker.connectors.recall.send_chat") as chat:
+        assert webhook(consent_event, signed=False).status_code == 403
+        assert webhook(consent_event, seconds_ago=360).status_code == 403
+        assert webhook(consent_event).status_code == 200
+        assert "Thank you for confirming" in chat.call_args.args[1]
     event = {"data": {"data": {"words": [{"text": "Is this a bot?"}], "participant": {"name": "Dana"}}}}
     with patch("coworker.connectors.recall.send_chat") as chat:
-        assert webhook(event, signed=False).status_code == 403
-        assert webhook(event, seconds_ago=360).status_code == 403
         assert webhook(event).status_code == 200
         assert "AI" in chat.call_args.args[1]
     monkeypatch.setenv("ELEVENLABS_API_KEY", "el")
