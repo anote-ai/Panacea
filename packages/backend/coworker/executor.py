@@ -305,8 +305,8 @@ def _execute(store: Store, user_id: int, action: dict[str, Any], coworker: dict[
         files = attachments.files_for(store, user_id, payload.get("attachments") or [])
         res = ws.create_draft(payload.get("to") or [], payload.get("subject", ""), payload.get("body", ""),
                               payload.get("thread_id", ""), files, provider=provider)
-        mailbox = "Outlook" if provider == "outlook" else "Gmail" if provider == "gmail" else (
-            "Outlook" if ws.email_connector(provider, payload.get("thread_id", "")).provider == "microsoft" else "Gmail")
+        selected = ws.email_connector(provider, payload.get("thread_id", "")) if not provider else None
+        mailbox = "Outlook" if provider == "outlook" or getattr(selected, "provider", "") == "microsoft" else "Gmail"
         return {"external_id": res.external_id, "draft": True, "mailbox": mailbox,
                 "undo": {**res.undo, "provider": provider or ("microsoft" if mailbox == "Outlook" else "google")}}
     if kind == "email.send":
