@@ -48,6 +48,7 @@ def test_upcoming_meeting_is_not_last_contact(s):
 
 def test_escalation_recorded_once(s):
     m = meetings.start(s, 1, mode="simulated", title="t", prospect_name="Dana", company="Northwind")
+    meetings.respond(s, 1, m["id"], "Yes.")
     for _ in range(2):
         meetings.respond(s, 1, m["id"], "Could you do 30% off if we sign this month?")
     assert len((s.get("cw_meetings", m["id"], 1)["metrics"] or {})["escalations"]) == 1

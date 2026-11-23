@@ -114,6 +114,13 @@ def skip(store: Store, user_id: int, event_id: str) -> bool:
     if _claim(store, user_id, int(resp["id"]), key, status="skipped", summary="skipped by you") is None:
         run = _run(store, user_id, int(resp["id"]), key) or {}
         return run.get("status") == "skipped"
+    brief_run = _run(store, user_id, int(resp["id"]), f"autojoin-brief:{event_id}") or {}
+    meeting_match = re.search(r"(?:^|;)meeting:(\d+)", str(brief_run.get("summary") or ""))
+    if meeting_match:
+        meeting_id = int(meeting_match.group(1))
+        prepared = store.get("cw_meetings", meeting_id, user_id)
+        if prepared and prepared.get("status") in ("awaiting_consent", "consent_granted"):
+            store.update("cw_meetings", meeting_id, user_id, {"status": "ended", "ended_at": iso()})
     event = store.one("SELECT subject FROM cw_items WHERE user_id = %s AND kind = 'event' AND external_id = %s",
                       (user_id, event_id)) or {}
     store.log(user_id, "meeting", f"Won't join {event.get('subject') or 'that meeting'}: you skipped it", {"event_id": event_id})
@@ -152,36 +159,54 @@ def run(store: Store, user_id: int, resp: dict[str, Any]) -> list[str]:
 
 
 def _announce(store: Store, user_id: int, resp: dict[str, Any], event: dict[str, Any], can_join: bool) -> str:
-    from coworker import notify, push, reports
+    from coworker import delegate, notify, push, reports
 
     brief = drafting.meeting_brief(store, user_id, event)
     subject = event.get("subject") or "your meeting"
     when = brief["event"]["label"]
+    prepared = None
     if can_join:
-        plan = (f"I'll join **{subject}** at {when} as your disclosed AI coworker, ask for consent to take notes, "
-                "and post the summary and a follow-up draft here when it ends.\n\n"
+        try:
+            guests = _external_guests(store, user_id, event)
+            prepared = delegate.join_meeting(
+                store, user_id, chat_id=None, meeting_url=meeting_url(event), context=resp.get("instruction") or "",
+                title=subject, prospect_name=(guests[0].get("name") or "") if guests else "",
+                prospect_email=(guests[0].get("email") or "") if guests else "", auto_start_on_consent=False,
+            )["meeting"]
+        except delegate.DelegateError:
+            can_join = False
+    if can_join and prepared:
+        consent_url = (prepared.get("answers") or {}).get("consent_url") or ""
+        plan = (f"I'll join **{subject}** at {when} as your disclosed AI coworker after attendee consent. "
+                f"Send the attendee this consent link before the call: {consent_url}\n\n"
+                "No meeting bot is created until they agree. After consent, I'll join at the scheduled time and post the summary here.\n\n"
                 "Anything I should push for or avoid? Reply in this chat before the call. "
                 f"Changed your mind? [Skip this one]({skip_url(user_id, event['external_id'])}).")
     else:
         plan = ("A meeting bot isn't set up on this server, so I can't join this one for you. "
                 "Here's your brief so you walk in prepared.")
     chat_id = reports.new_chat(user_id, f"📞 {subject}"[:120], f"{brief['markdown']}\n\n{plan}")
+    if prepared:
+        answers = {**(prepared.get("answers") or {}), "chat_id": chat_id}
+        store.update("cw_meetings", int(prepared["id"]), user_id, {"answers": answers})
     claimed = _run(store, user_id, int(resp["id"]), f"autojoin-brief:{event['external_id']}")
     if claimed:
-        store.update("cw_runs", int(claimed["id"]), None, {"status": "done", "summary": f"chat:{chat_id or ''}"})
+        suffix = f";meeting:{prepared['id']}" if prepared else ""
+        store.update("cw_runs", int(claimed["id"]), None, {"status": "done", "summary": f"chat:{chat_id or ''}{suffix}"})
     store.log(user_id, "brief", f"Prep brief ready: {subject}",
               {"brief": brief, "autojoin": {"event_id": event["external_id"], "will_join": can_join}}, chat_id=chat_id)
     if can_join:
-        push.send(store, user_id, f"Joining {subject} at {when}", "Your coworker will take this call. Open to add context or skip.",
+        push.send(store, user_id, f"Consent needed for {subject}", "Send the attendee consent link before the call.",
                   {"type": "autojoin", "eventId": event["external_id"], "chatId": chat_id})
-        notify.deliver(store, user_id, f"I'll join {subject} at {when}",
-                       f"{brief['markdown']}\n\nI'll join as your disclosed AI coworker and send you the summary after.\n\n"
+        notify.deliver(store, user_id, f"Consent needed before {subject}",
+                       f"{brief['markdown']}\n\nSend this attendee consent link before the call: {consent_url}\n\n"
+                       "I'll join at the scheduled time only after they agree.\n\n"
                        f"Skip this one: {skip_url(user_id, event['external_id'])}")
-    return f"Prepared a brief for {subject}" + (" and scheduled to join" if can_join else "")
+    return f"Prepared a brief for {subject}" + (" and requested attendee consent" if can_join else "")
 
 
 def _join(store: Store, user_id: int, resp: dict[str, Any], event: dict[str, Any]) -> str | None:
-    from coworker import delegate, push, reports
+    from coworker import meeting_consent, push, reports
     from coworker.connectors.base import ConnectorError
 
     key = f"autojoin:{event['external_id']}"
@@ -190,21 +215,27 @@ def _join(store: Store, user_id: int, resp: dict[str, Any], event: dict[str, Any
         return None  # already joined, or the user skipped it
     brief_run = _run(store, user_id, int(resp["id"]), f"autojoin-brief:{event['external_id']}") or {}
     summary = str(brief_run.get("summary") or "")
-    chat_id = int(summary[5:]) if summary.startswith("chat:") and summary[5:].isdigit() else None
-    guests = _external_guests(store, user_id, event)
+    chat_match = re.search(r"(?:^|;)chat:(\d+)", summary)
+    meeting_match = re.search(r"(?:^|;)meeting:(\d+)", summary)
+    chat_id = int(chat_match.group(1)) if chat_match else None
+    meeting_id = int(meeting_match.group(1)) if meeting_match else None
     context = "\n".join(filter(None, [resp.get("instruction") or "", _chat_context(user_id, chat_id)]))
     try:
-        result = delegate.join_meeting(store, user_id, chat_id=chat_id, meeting_url=meeting_url(event), context=context,
-                                       title=event.get("subject") or "", prospect_name=(guests[0].get("name") or "") if guests else "",
-                                       prospect_email=(guests[0].get("email") or "") if guests else "")
-    except (delegate.DelegateError, ConnectorError) as exc:
+        if not meeting_id:
+            raise meeting_consent.ConsentLinkError("No attendee consent request was prepared.")
+        prepared = store.get("cw_meetings", meeting_id, user_id)
+        if prepared:
+            answers = {**(prepared.get("answers") or {}), "context": context, "chat_id": chat_id}
+            store.update("cw_meetings", meeting_id, user_id, {"answers": answers})
+        result = meeting_consent.start_granted(store, user_id, meeting_id, _secret())
+    except (meeting_consent.ConsentLinkError, ConnectorError) as exc:
         store.update("cw_runs", run_id, None, {"status": "failed", "summary": str(exc)[:500]})
         store.log(user_id, "escalation", f"Couldn't join {event.get('subject')}: {exc}", {"event_id": event["external_id"]})
         push.send(store, user_id, f"Couldn't join {event.get('subject')}", str(exc)[:200], {"type": "autojoin_failed"})
         reports.post(user_id, chat_id, f"I couldn't join: {exc}. You may want to take this one yourself.")
         return None
-    store.update("cw_runs", run_id, None, {"status": "done", "summary": f"meeting:{result['meeting']['id']}"})
-    reports.post(user_id, chat_id, f"Joining now. {reports.marker({'type': 'meeting', 'id': result['meeting']['id']})}")
+    store.update("cw_runs", run_id, None, {"status": "done", "summary": f"meeting:{result['id']}"})
+    reports.post(user_id, chat_id, f"Consent is confirmed; joining now. {reports.marker({'type': 'meeting', 'id': result['id']})}")
     return f"Joined {event.get('subject')}"
 
 
@@ -231,8 +262,8 @@ SKIP_RE = re.compile(r"\b(?:skip|cancel|don'?t join|do not join|no need to join|
 
 def pending_for_chat(store: Store, user_id: int, chat_id: int) -> dict[str, Any] | None:
     """The upcoming auto-join this chat was opened for, until the bot has joined (or it was skipped)."""
-    row = store.one("SELECT * FROM cw_runs WHERE user_id = %s AND trigger_key LIKE %s AND summary = %s ORDER BY id DESC LIMIT 1",
-                    (user_id, "autojoin-brief:%", f"chat:{chat_id}"))
+    row = store.one("SELECT * FROM cw_runs WHERE user_id = %s AND trigger_key LIKE %s AND summary LIKE %s ORDER BY id DESC LIMIT 1",
+                    (user_id, "autojoin-brief:%", f"chat:{chat_id}%"))
     if not row:
         return None
     event_id = row["trigger_key"].split(":", 1)[1]

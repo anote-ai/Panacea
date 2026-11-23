@@ -49,7 +49,8 @@ HUMAN_Q_RE = re.compile(
 )
 LEAVE_RE = re.compile(
     r"\b(stop recording|don'?t record|do not record|not comfortable (?:with|being) record\w*|please leave|leave the (?:call|meeting)|"
-    r"turn (?:it|that|the recording) off|no recording|i don'?t consent|i do not consent|"
+    r"turn (?:it|that|the recording) off|no recording|no notes|(?:don'?t|do not) (?:take|keep) notes|"
+    r"i don'?t consent|i do not consent|"
     r"(?:don'?t|do not) want (?:this|it|that|to be) recorded|not (?:ok|okay|fine) with (?:being )?record\w*)\b",
     re.IGNORECASE,
 )
@@ -59,7 +60,9 @@ CONSENT_YES_RE = re.compile(
     r"\b(?:that'?s|it'?s) (?:fine|ok(?:ay)?)\b|\byou can (?:record|take notes)\b|\bnotes are (?:fine|ok(?:ay)?)\b",
     re.IGNORECASE,
 )
-NOT_RECORDED = "[not recorded: waiting for consent to take notes]"
+CONSENT_NO_RE = re.compile(r"^\W*(?:no\b(?!\s*problem)|nope\b|nah\b|not (?:okay|comfortable)\b)|"
+                            r"\b(?:don'?t|do not) (?:want|take|keep) (?:any )?notes\b", re.IGNORECASE)
+NOT_RECORDED = "[not saved in Ourogen: waiting for consent to take notes]"
 PRICING_RE = re.compile(r"\b(pric\w*|cost|how much|per seat|plans?|quote)\b", re.IGNORECASE)
 
 SIMULATED_PROSPECTS: dict[str, dict[str, Any]] = {
@@ -67,6 +70,7 @@ SIMULATED_PROSPECTS: dict[str, dict[str, Any]] = {
         "name": "Dana Whitfield", "company": "Northwind Capital", "email": "dana@northwindcap.com",
         "title": "Northwind Capital × Anote: intro call",
         "lines": [
+            "Yes.",
             "Hi, thanks for making time. Wait, before we start, am I talking to a real person?",
             "Okay, that's actually pretty cool. So, we're a 40-person fund and the deal team drowns in memos and data rooms.",
             "Right now analysts just Ctrl-F through PDFs and paste things into a spreadsheet. It eats hours every week.",
@@ -82,6 +86,7 @@ SIMULATED_PROSPECTS: dict[str, dict[str, Any]] = {
         "name": "Riley Chen", "company": "Brightline Ventures", "email": "riley@brightline.vc",
         "title": "Ourogen Coworker demo for Brightline Ventures",
         "lines": [
+            "Yes.",
             "Hi! So I'm told I'm talking to an AI coworker right now. Is that right?",
             "Wild. I'm a founder too, and honestly I spend half my week on email and calls like this one.",
             "What exactly would you do for me day to day?",
@@ -125,8 +130,8 @@ def disclosure_line(store: Store, user_id: int, prospect_name: str = "") -> str:
     first = (coworker.get("owner_name") or "the team").split(" ")[0]
     company = memory.company_context(store, user_id)["name"]
     hello = f"Hi {prospect_name.split(' ')[0]}" if prospect_name else "Hi there"
-    return (f"{hello}, I'm {first}'s AI coworker{' at ' + company if company else ''}. I'm an AI, not {first}, "
-            f"and I'm taking notes so {first} can follow up. Is that okay with you?")
+    return (f"{hello}, I'm {first}'s AI coworker{' at ' + company if company else ''}. I'm an AI, not {first}. "
+            f"I'd like to take notes so {first} can follow up. Is that okay with you?")
 
 
 def _all_party(store: Store, user_id: int) -> bool:
@@ -350,7 +355,8 @@ def respond(store: Store, user_id: int, meeting_id: int, text: str, speaker: str
         store.update("cw_meetings", meeting_id, user_id, {"transcript": transcript})
         return {"reply": "", "meeting": store.get("cw_meetings", meeting_id, user_id), "ended": False}
     pending = metrics.get("consent") == "pending"
-    if pending and CONSENT_YES_RE.search(text) and not LEAVE_RE.search(text):
+    declined = pending and bool(LEAVE_RE.search(text) or CONSENT_NO_RE.search(text))
+    if pending and CONSENT_YES_RE.search(text) and not declined:
         metrics["consent"] = "granted"
         metrics["consent_at"] = iso()
         pending = False
@@ -359,14 +365,30 @@ def respond(store: Store, user_id: int, meeting_id: int, text: str, speaker: str
                        **({} if recorded else {"redacted": True})})
     prior_answers = meeting.get("answers") or {}
     answers = _extract_answers(text, prior_answers)
-    guard = _guardrail_reply(store, user_id, meeting, text)
+    guard = _guardrail_reply(store, user_id, meeting, text) if not pending else None
     kind = "agent"
-    if guard:
+    if declined:
+        reply, kind = "Understood. I won't take notes, and I'll leave the call. Thank you.", "leave"
+    elif pending:
+        # Do not ask the model to discuss or remember unconsented content. One short,
+        # deterministic question also avoids appending a second consent request.
+        if int(metrics.get("consent_asked", 0)) >= 1:
+            reply, kind = "I'll leave the call without taking notes. Thank you.", "leave"
+        else:
+            kind = "consent"
+            metrics["consent_asked"] = 1
+            if HUMAN_Q_RE.search(text):
+                reply = "Yes, I'm an AI coworker. May I take notes for this conversation?"
+            else:
+                reply = "Before we continue, may I take notes for this conversation?"
+    elif guard:
         reply, kind = guard
         if kind == "escalation" and text[:200] not in (metrics.get("escalations") or []):
             metrics.setdefault("escalations", []).append(text[:200])
             store.log(user_id, "escalation", f"On the call with {meeting['prospect_name'] or meeting['title']}: “{text[:140]}”",
                       {"meeting_id": meeting_id})
+    elif re.fullmatch(r"\W*(?:yes|yeah|yep|yup|sure|okay|ok|go ahead|of course|please do|sounds good)\W*", text, re.I) and metrics.get("consent_at"):
+        reply = "Thanks for agreeing. What would you like to discuss?"
     elif llm.available(user_id):
         try:
             reply = _llm_reply(store, user_id, {**meeting, "transcript": transcript}, text, answers) or \
@@ -375,9 +397,6 @@ def respond(store: Store, user_id: int, meeting_id: int, text: str, speaker: str
             reply = _offline_reply(store, user_id, meeting, text, answers)
     else:
         reply = _offline_reply(store, user_id, meeting, text, answers)
-    if pending and kind != "leave" and int(metrics.get("consent_asked", 0)) < 2:
-        metrics["consent_asked"] = int(metrics.get("consent_asked", 0)) + 1
-        reply = f"{reply.rstrip()} Before I take notes, is it okay with you if I do?"
     # Hard rule: never let a reply claim to be human.
     if re.search(r"\bI(?:'m| am) (?:a )?(?:human|real person|not an ai)\b", reply, re.IGNORECASE):
         reply = "To be clear, I'm an AI coworker, not a person."
@@ -524,11 +543,12 @@ def finish(store: Store, user_id: int, meeting_id: int) -> dict[str, Any]:
 
 
 def serialize(m: dict[str, Any]) -> dict[str, Any]:
+    answers = m.get("answers") or {}
     return {
         "id": m["id"], "title": m["title"], "mode": m["mode"], "platform": m["platform"], "meetingUrl": m.get("meeting_url") or "",
         "botId": m.get("bot_id") or "", "prospectName": m["prospect_name"], "prospectCompany": m["prospect_company"],
         "status": m["status"], "transcript": [t for t in (m.get("transcript") or []) if t.get("speaker") != "owner"],
         "whispers": [t for t in (m.get("transcript") or []) if t.get("speaker") == "owner"],
-        "summary": summary_of(m), "answers": m.get("answers") or {},
+        "summary": summary_of(m), "answers": answers, "consentUrl": answers.get("consent_url") or "",
         "metrics": m.get("metrics") or {}, "startedAt": m["started_at"], "endedAt": m.get("ended_at"),
     }

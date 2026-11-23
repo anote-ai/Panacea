@@ -56,6 +56,7 @@ def call_guardrails(store: Store) -> dict[str, Any]:
     misses = []
     for utterance, expected in cases.CALL_GUARDRAILS:
         m = meetings.start(store, 1, mode="live_call", prospect_name="Eval Prospect")
+        meetings.respond(store, 1, m["id"], "Yes.")
         result = meetings.respond(store, 1, m["id"], utterance)
         if result["kind"] != expected:
             misses.append({"case": utterance, "expected": expected, "got": result["kind"]})
@@ -115,6 +116,7 @@ def call_injection(store: Store) -> dict[str, Any]:
     misses = []
     for utterance in cases.CALL_INJECTIONS:
         m = meetings.start(store, 1, mode="live_call", prospect_name="Eval Prospect")
+        meetings.respond(store, 1, m["id"], "Yes.")
         result = meetings.respond(store, 1, m["id"], utterance)
         if result["kind"] != "escalation":
             misses.append({"case": utterance, "expected": "escalation", "got": result["kind"]})

@@ -33,6 +33,26 @@ def test_backchannels_never_start_a_turn(s, meeting):
         assert not live_call.is_backchannel(text)
 
 
+def test_spoken_yes_is_not_lost_during_consent(s, meeting, monkeypatch):
+    s.update("cw_meetings", meeting["id"], 1, {"metrics": {"consent": "pending"}})
+    turn = live_call.on_segment(s, 1, meeting["id"], "Yes.")
+    assert turn is not None
+    with patch("coworker.connectors.recall.send_chat") as chat:
+        result = live_call.take_turn(s, 1, meeting["id"], turn, wait=0)
+    assert result["meeting"]["metrics"]["consent"] == "granted"
+    assert "Thanks for agreeing" in chat.call_args.args[1]
+    assert result["meeting"]["transcript"][-2]["text"] == "Yes."
+
+
+def test_spoken_no_ends_call_without_storing_words(s, meeting):
+    s.update("cw_meetings", meeting["id"], 1, {"metrics": {"consent": "pending"}})
+    turn = live_call.on_segment(s, 1, meeting["id"], "No.")
+    with patch("coworker.connectors.recall.send_chat"), patch("coworker.connectors.recall.leave") as leave:
+        result = live_call.take_turn(s, 1, meeting["id"], turn, wait=0)
+    assert result["ended"] and result["meeting"]["transcript"][-2]["redacted"]
+    leave.assert_called_once_with("bot-1")
+
+
 def test_one_reply_per_turn_with_everything_they_said(s, meeting):
     first = live_call.on_segment(s, 1, meeting["id"], "We have about forty people")
     second = live_call.on_segment(s, 1, meeting["id"], "and we need it by March. What does it cost?")
@@ -91,8 +111,12 @@ def test_failures_dont_break_the_call(s, meeting, monkeypatch):
     with patch("coworker.connectors.recall.stop_audio", side_effect=ConnectorError("x")):
         turn = live_call.on_segment(s, 1, meeting["id"], "Can you hear me")
     with patch("coworker.voice.tts", return_value=b"mp3"), \
-            patch("coworker.connectors.recall.speak", side_effect=ConnectorError("audio down")):
+            patch("coworker.connectors.recall.speak", side_effect=ConnectorError("audio down")), \
+            patch("coworker.connectors.recall.send_chat") as chat:
         assert live_call.take_turn(s, 1, meeting["id"], turn, wait=0) is not None
+    chat.assert_called_once()
+    metrics = s.get("cw_meetings", meeting["id"], 1)["metrics"]
+    assert metrics["audio_status"] == "failed" and "posted in meeting chat" in metrics["audio_error"]
     assert live_call.take_turn(s, 1, meeting["id"], 99999, wait=0) is None
 
 

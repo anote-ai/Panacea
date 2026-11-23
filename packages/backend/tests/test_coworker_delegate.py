@@ -75,8 +75,9 @@ def test_join_meeting_sends_bot_when_configured(s, posted, monkeypatch):
     with patch("coworker.connectors.recall.create_bot", return_value="bot-1") as create:
         out = delegate.join_meeting(s, 1, chat_id=9, meeting_url="https://meet.google.com/abc-defg-hij",
                                     context="qualify budget", prospect_name="Dana")
-    assert out["how"] == "bot" and out["meeting"]["bot_id"] == "bot-1"
-    assert "AI coworker (Ourogen)" in create.call_args.args[1] and "token=" in create.call_args.args[3]
+    assert out["how"] == "consent" and out["meeting"]["status"] == "awaiting_consent"
+    assert out["meeting"]["answers"]["consent_url"]
+    create.assert_not_called()
 
 
 def test_join_meeting_tool_errors_are_readable(s):

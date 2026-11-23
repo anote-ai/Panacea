@@ -21,6 +21,7 @@ export interface MeetingT {
   summary: any;
   answers: Record<string, any>;
   metrics: Record<string, any>;
+  consentUrl?: string;
   startedAt: string;
 }
 
@@ -52,7 +53,10 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
   const photoUrl = useAssetUrl(twinPhoto);
   autoRef.current = autoplay;
 
-  const ended = meeting.status !== 'active';
+  const waitingConsent = ['awaiting_consent', 'consent_granted', 'starting'].includes(meeting.status);
+  const waitLabel = meeting.status === 'awaiting_consent' ? 'Waiting for consent'
+    : meeting.status === 'consent_granted' ? 'Consent confirmed' : 'Bot starting';
+  const ended = ['ended', 'failed', 'declined'].includes(meeting.status);
   const name = coworker?.displayName || 'AI coworker';
 
   useEffect(() => {
@@ -185,15 +189,20 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
         <div className="flex items-center gap-3 mb-4">
           <button className="text-sm text-gray-500 hover:underline" onClick={onClose}>← Back</button>
           <h2 className="font-semibold flex-1 truncate">{meeting.title}</h2>
-          {!ended ? <Pill tone="red">● Live</Pill> : <Pill>Ended</Pill>}
-          {!ended && <button className={primaryBtn} onClick={finish}>End call</button>}
+          {waitingConsent ? <Pill tone="amber">{waitLabel}</Pill> : !ended ? <Pill tone="red">● Live</Pill> : <Pill>{meeting.status}</Pill>}
+          {!ended && <button className={primaryBtn} onClick={finish}>{waitingConsent ? 'Cancel' : 'End call'}</button>}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
           <Card className="p-5 flex flex-col items-center gap-4">
             <AvatarStage name={name} ownerName={coworker?.ownerName} photoUrl={photoUrl} speaking={speaking} listening={listening} />
             <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-              {capabilities?.voice ? 'Speaking with your AI voice.' : 'Using the browser voice. Add ElevenLabs for your cloned voice.'}
+              {meeting.mode === 'bot'
+                ? meeting.metrics?.audio_status === 'failed' ? 'Meet audio failed; see the notice below.'
+                  : meeting.metrics?.audio_status === 'sent' ? 'Audio request sent to Meet.'
+                  : meeting.metrics?.audio_status === 'greeting_queued' ? 'Spoken greeting queued for Meet.'
+                  : 'Replies appear in meeting chat; voice is not configured.'
+                : capabilities?.voice ? 'Using your AI voice in this browser call.' : 'Using the browser voice. Add ElevenLabs for your cloned voice.'}
             </p>
             {meeting.mode === 'live_call' && !ended && (
               hasSpeechRecognition() ? (
@@ -212,9 +221,21 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
               </div>
             )}
             {meeting.mode === 'bot' && (
-              <p className="text-xs text-center text-gray-500">Bot in {meeting.platform.replace('_', ' ')}: {meeting.meetingUrl}</p>
+              <div className="text-xs text-center text-gray-500 space-y-2">
+                <p>Bot in {meeting.platform.replace('_', ' ')}: {meeting.meetingUrl}</p>
+                <p>The bot's camera shows your verified Twin photo on new calls. Its participant icon is managed by the meeting platform.</p>
+                <a className="underline" href="/app/coworker/twin">Update Twin photo</a>
+              </div>
             )}
-            <div className="w-full grid grid-cols-2 gap-2 text-center">
+            {meeting.status === 'awaiting_consent' && meeting.consentUrl && (
+              <div className="w-full rounded-lg bg-amber-50 dark:bg-amber-950 p-3 text-xs text-amber-900 dark:text-amber-100 space-y-2">
+                <p className="font-medium">Share this link with the attendee before the meeting.</p>
+                <input className={`${inputCls} text-xs`} readOnly value={meeting.consentUrl} onFocus={(e) => e.currentTarget.select()} />
+                <button className={ghostBtn} onClick={() => navigator.clipboard.writeText(meeting.consentUrl || '')}>Copy consent link</button>
+                <p>The bot has not been created and will not join until they agree.</p>
+              </div>
+            )}
+            {meeting.mode !== 'bot' && <div className="w-full grid grid-cols-2 gap-2 text-center">
               <div className="rounded-lg bg-[#F7F7F8] dark:bg-[#2F2F2F] py-2">
                 <p className="text-lg font-semibold tabular-nums">{avg('think') ?? '—'}<span className="text-xs font-normal"> ms</span></p>
                 <p className="text-[11px] text-gray-500">avg think time</p>
@@ -223,8 +244,8 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
                 <p className="text-lg font-semibold tabular-nums">{avg('voice') ?? '—'}<span className="text-xs font-normal"> ms</span></p>
                 <p className="text-[11px] text-gray-500">avg to first audio</p>
               </div>
-            </div>
-            {!ended && (
+            </div>}
+            {!ended && !waitingConsent && (
               <div className="w-full">
                 <p className="text-xs font-medium mb-1">Whisper to your coworker</p>
                 <div className="flex gap-2">
@@ -238,9 +259,19 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
 
           <div className="space-y-4">
             <Card className="p-4">
+              {meeting.mode === 'bot' && meeting.metrics?.audio_error && (
+                <p className="mb-3 rounded-lg bg-amber-50 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  {meeting.metrics.audio_error}
+                </p>
+              )}
+              {meeting.metrics?.consent === 'link_pending' && (
+                <p className="mb-3 rounded-lg bg-amber-50 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  Waiting for agreement through the attendee consent link. The meeting bot has not joined.
+                </p>
+              )}
               {meeting.metrics?.consent === 'pending' && (
                 <p className="mb-3 rounded-lg bg-[#F7F7F8] dark:bg-[#2F2F2F] px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
-                  Notes are off until they agree to them. Their words aren't saved until then.
+                  Waiting for their spoken agreement to take notes. Ourogen discards their words until they agree; live speech is processed to recognize the answer.
                 </p>
               )}
               {meeting.metrics?.consent === 'granted' && (
@@ -256,7 +287,7 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
                         {t.speaker === 'coworker' ? name : meeting.prospectName || 'Them'}
                         {t.kind && t.kind !== 'agent' ? ` · ${t.kind}` : ''}
                       </p>
-                      {(t as any).redacted ? <span className="italic opacity-70">Not recorded (no consent yet)</span> : t.text}
+                      {(t as any).redacted ? <span className="italic opacity-70">Not saved in Ourogen (waiting for consent)</span> : t.text}
                     </div>
                   </div>
                 ))}
@@ -275,7 +306,7 @@ export default function CallStudio({ meeting: initial, onClose }: { meeting: Mee
               {err && <p className="text-xs text-red-500 mt-2">{err}</p>}
             </Card>
 
-            {!ended && (
+            {!ended && !waitingConsent && (
               <Card className="p-4">
                 <p className="text-sm font-medium mb-2">Qualification so far</p>
                 <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
