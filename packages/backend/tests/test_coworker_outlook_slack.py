@@ -226,8 +226,24 @@ def test_draft_action_routes_to_source_mailbox_with_both_connected(store):
             assert action["status"] == "executed" and action["result"]["draft"] is True
             assert action["result"]["mailbox"] == ("Gmail" if source_provider == "gmail" else "Outlook")
             assert action["result"]["undo"]["provider"] == source_provider
+            assert action["payload"]["mailbox_provider"] == source_provider
             assert expected.create_draft.call_args.kwargs["thread_id"] == f"thread-{source_provider}"
     assert google.create_draft.call_count == outlook.create_draft.call_count == 1
+
+
+def test_disconnected_source_mailbox_never_falls_back_to_other_account(store):
+    from coworker import executor
+
+    outlook = MagicMock(provider="microsoft")
+    source = store.add_item(1, {"provider": "gmail", "external_id": "g-in", "thread_id": "g-thread",
+                                "kind": "email", "direction": "inbound", "author_email": "a@b.com",
+                                "subject": "Hello", "body": "Reply please", "occurred_at": iso()})
+    with patch.object(Workspace, "_live", lambda self, provider, **_: outlook if provider == "microsoft" else None):
+        action = executor.propose(store, 1, "email.draft", {"to": ["a@b.com"], "subject": "Re: Hello",
+                                                           "body": "Sure", "thread_id": "g-thread"},
+                                  title="Reply draft", source_item_id=source)
+    assert action["status"] == "failed" and "Google isn't connected" in action["error"]
+    outlook.create_draft.assert_not_called()
 
 
 def test_outlook_oauth_routes(client, auth_headers, monkeypatch):

@@ -132,6 +132,9 @@ export default function ActionCard({ id, action: initial, compact = false }: { i
         <div className="px-4 py-3 space-y-1.5">
           {(action.type === 'email.send' || action.type === 'email.draft') && (
             <>
+              {p.mailbox_provider && (
+                <Field label="From">{p.mailbox_account || (p.mailbox_provider === 'gmail' ? 'Gmail' : 'Outlook')}</Field>
+              )}
               <Field label="To">
                 {editing ? (
                   <input className={input} value={(p.to || []).join(', ')}

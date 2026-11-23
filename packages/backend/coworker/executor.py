@@ -72,6 +72,23 @@ def _context(store: Store, user_id: int, payload: dict[str, Any], source_item_id
     }
 
 
+def _mailbox_label(store: Store, user_id: int, source_item_id: int | None, thread_id: str) -> tuple[str, str]:
+    source = store.get("cw_items", source_item_id, user_id) if source_item_id else None
+    if source is None and thread_id:
+        source = next((it for it in reversed(store.thread(user_id, thread_id))
+                       if it.get("kind") == "email" and it.get("provider") in ("gmail", "outlook")), None)
+    provider = (source or {}).get("provider", "")
+    if provider not in ("gmail", "outlook"):
+        for name, label in (("google", "gmail"), ("microsoft", "outlook")):
+            row = store.get_connection_row(user_id, name)
+            if row and row.get("status") in ("connected", "syncing"):
+                provider = label
+                break
+    name = "google" if provider == "gmail" else "microsoft" if provider == "outlook" else ""
+    row = store.get_connection_row(user_id, name) if name else None
+    return provider, str((row or {}).get("account_label") or "")
+
+
 def propose(
     store: Store,
     user_id: int,
@@ -88,6 +105,11 @@ def propose(
 ) -> dict[str, Any]:
     if action_type not in policy.ACTION_TYPES:
         raise ActionError(f"Unknown action type {action_type}")
+    payload = dict(payload)
+    if action_type in ("email.send", "email.draft"):
+        provider, account = _mailbox_label(store, user_id, source_item_id, payload.get("thread_id") or "")
+        if provider:
+            payload.update({"mailbox_provider": provider, "mailbox_account": account})
     ctx = _context(store, user_id, payload, source_item_id)
     coworker = ctx.pop("coworker")
     risks = []
