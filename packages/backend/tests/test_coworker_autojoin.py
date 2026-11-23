@@ -85,7 +85,7 @@ def test_brief_then_join_then_report(s, chats):
     meeting = s.query("SELECT * FROM cw_meetings WHERE user_id = 1")[0]
     token = meeting["answers"]["consent_token"]
     with patch("coworker.connectors.recall.create_bot") as early:
-        agreed = meeting_consent.decide(s, token, "dev", True)
+        agreed = meeting_consent.decide(s, token, autojoin._secret(), True)
     assert agreed["status"] == "consent_granted"
     early.assert_not_called()
 
@@ -170,7 +170,7 @@ def test_keywords_no_bot_and_failures(s, chats, monkeypatch):
     monkeypatch.setenv("RECALL_API_KEY", "rk")
     demo_meeting = s.one("SELECT * FROM cw_meetings WHERE user_id = 1 AND title = %s", ("Globex demo",))
     assert demo_meeting
-    meeting_consent.decide(s, demo_meeting["answers"]["consent_token"], "dev", True)
+    meeting_consent.decide(s, demo_meeting["answers"]["consent_token"], autojoin._secret(), True)
     s.execute("UPDATE cw_items SET occurred_at = %s WHERE external_id = 'demo'", (iso(utcnow() + timedelta(minutes=1)),))
     from coworker.connectors.base import ConnectorError
 
