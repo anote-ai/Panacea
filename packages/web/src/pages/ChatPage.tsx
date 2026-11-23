@@ -1165,13 +1165,13 @@ export default function ChatPage() {
           </button>
           <button
             onClick={() => nav(coworker ? '/app/coworker' : '/app/onboarding')}
-            title={coworker ? 'Your AI coworker' : 'Set up your AI coworker'}
+            title={coworker ? 'Open your persistent coworker workspace' : 'Set up your persistent AI coworker'}
             className={`w-full rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-[#2F2F2F] transition-colors flex items-center gap-2 ${
               sidebarOpen ? 'text-left px-3 py-2' : 'justify-center py-2'
             }`}
           >
             <span className="w-4 text-center flex-shrink-0" aria-hidden>🤖</span>
-            {sidebarOpen && <span className="flex-1">{coworker ? 'Coworker' : 'Set up your coworker'}</span>}
+            {sidebarOpen && <span className="flex-1">{coworker ? 'Coworker workspace' : 'Set up your coworker'}</span>}
             {sidebarOpen && coworker && (coworkerStatus.pending || 0) > 0 && (
               <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-black text-white dark:bg-white dark:text-black text-[10px] font-semibold flex items-center justify-center">
                 {coworkerStatus.pending}
@@ -1241,13 +1241,24 @@ export default function ChatPage() {
           </button>
           <div className="flex items-center gap-2">
             {coworker && (
-              <button
-                onClick={toggleMode}
-                title={coworkerMode ? 'Talking to your AI coworker (can act for you). Click for a plain assistant.' : 'Plain assistant. Click to talk to your coworker.'}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-[#F7F7F8] dark:bg-[#2F2F2F] hover:bg-gray-200 dark:hover:bg-[#3a3a3a]"
-              >
-                {coworkerMode ? '🤖 Coworker' : '💬 Assistant'}
-              </button>
+              <div className="flex items-center rounded-xl bg-[#F7F7F8] dark:bg-[#2F2F2F] p-1" aria-label="Conversation mode">
+                <button
+                  onClick={() => { if (coworkerMode) toggleMode(); }}
+                  aria-pressed={!coworkerMode}
+                  title="Assistant: ask questions and work together in this chat"
+                  className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${!coworkerMode ? 'bg-white dark:bg-[#454545] shadow-sm font-medium' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                >
+                  💬 Assistant
+                </button>
+                <button
+                  onClick={() => { if (!coworkerMode) toggleMode(); }}
+                  aria-pressed={coworkerMode}
+                  title="Coworker: assign work across your connected accounts and ongoing responsibilities"
+                  className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${coworkerMode ? 'bg-white dark:bg-[#454545] shadow-sm font-medium' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                >
+                  🤖 Coworker
+                </button>
+              </div>
             )}
             {coworkerMode && <HeaderControls />}
           </div>
@@ -1255,6 +1266,13 @@ export default function ChatPage() {
         {coworkerMode && coworker?.status === 'paused' && (
           <div className="bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/30 text-xs text-amber-900 dark:text-amber-200 px-4 py-1.5 text-center">
             Your coworker is paused. It can still answer questions, but nothing will be sent and no responsibilities will run.
+          </div>
+        )}
+        {coworker && messages.length === 0 && (
+          <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-2 text-center text-xs text-gray-500 dark:text-gray-400">
+            {coworkerMode
+              ? 'Assign work that can continue across email, calendar, meetings, and recurring responsibilities.'
+              : 'Ask questions, develop ideas, and work together in this conversation.'}
           </div>
         )}
 
@@ -1268,7 +1286,7 @@ export default function ChatPage() {
               </h1>
               <p className="text-xs text-gray-600 dark:text-gray-400">
                 {coworkerMode
-                  ? `I'm ${coworker?.displayName || 'your AI coworker'}. I can read your work, draft in your voice, and take on ongoing jobs. Anything I send waits for your approval.`
+                  ? `I'm ${coworker?.displayName || 'your AI coworker'}. Assign me one-time work or an ongoing responsibility. I'll use your connected work, follow your approval settings, and show progress in the Coworker workspace.`
                   : 'Ask a question, explore an idea, or bring a document.'}
               </p>
               {coworkerLoaded && !coworker && (
