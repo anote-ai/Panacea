@@ -18,9 +18,10 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from coworker import drafting, executor, meetings, memory, scheduling, security
+from coworker import bot_media, drafting, executor, meetings, memory, scheduling, security
 from coworker.connectors.base import ConnectorError
 from coworker.store import Store, iso, parse_iso, utcnow
+from coworker.voice import VoiceError
 
 URL_RE = re.compile(r"https://[^\s)>\]]+")
 HANDLE_BY_DEFAULT = ("sales_lead", "scheduling", "support", "partner", "candidate", "investor")
@@ -69,6 +70,12 @@ def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url
         raise DelegateError(recall.bot_setup_issue())
     use_bot = bool(meeting_url) and recall.bot_ready()
     if use_bot:
+        disclosure = meetings.disclosure_line(store, user_id, prospect_name)
+        try:
+            greeting = bot_media.greeting(store, user_id, disclosure)
+            avatar = bot_media.camera_frame(store, user_id)
+        except VoiceError as exc:
+            raise DelegateError(f"Couldn't prepare the meeting voice: {exc}") from exc
         meeting = meetings.start(store, user_id, mode="bot", title=title, prospect_name=prospect_name, company=company,
                                  prospect_email=prospect_email, meeting_url=meeting_url, context=context, chat_id=chat_id)
         first = (coworker.get("owner_name") or "").split(" ")[0] or "Your"
@@ -86,11 +93,14 @@ def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url
         hook = f"{recall.webhook_base_url()}/api/coworker/meetings/recall/webhook?token={token}"
         try:
             bot_id = recall.create_bot(meeting_url, f"{first}'s AI coworker (Ourogen)",
-                                       meetings.disclosure_line(store, user_id) + " Say 'please leave' and I will.", hook)
+                                       disclosure + " Say 'please leave' and I will.", hook,
+                                       greeting_mp3_b64=greeting, avatar_jpeg_b64=avatar)
         except ConnectorError:
             store.update("cw_meetings", meeting["id"], user_id, {"status": "failed"})
             raise
-        store.update("cw_meetings", meeting["id"], user_id, {"bot_id": bot_id})
+        store.update("cw_meetings", meeting["id"], user_id, {
+            "bot_id": bot_id, "metrics": {**meeting["metrics"], "audio_status": "greeting_queued" if greeting else "chat_only"},
+        })
         how = "bot"
         from coworker import push
 

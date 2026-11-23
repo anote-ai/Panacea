@@ -70,7 +70,11 @@ def on_segment(store: Store, user_id: int, meeting_id: int, text: str) -> int | 
     """Record what the other side just said. Returns the turn row id, or None if ignored."""
     text = (text or "").strip()
     meeting = store.get("cw_meetings", meeting_id, user_id)
-    if not text or not meeting or meeting["status"] != "active" or is_backchannel(text):
+    if not text or not meeting or meeting["status"] != "active":
+        return None
+    # A bare "yes"/"okay" is the answer to the opening consent question,
+    # not a backchannel. Once consent is decided, suppress such small talk.
+    if is_backchannel(text) and (meeting.get("metrics") or {}).get("consent") != "pending":
         return None
     if _speaking_until(meeting) > time.time() and meeting.get("bot_id"):
         from coworker.connectors import recall
@@ -130,7 +134,7 @@ def split_first_sentence(text: str) -> tuple[str, str]:
     return m.group(1).strip(), m.group(2).strip()
 
 
-def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> None:
+def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> str:
     """Speak ``text``. Longer replies start after the first sentence's audio is ready,
     while the rest is still being synthesized, and stop if the other side interrupts."""
     from concurrent.futures import ThreadPoolExecutor
@@ -139,17 +143,17 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> None
     from coworker.connectors import recall
 
     if not meeting.get("bot_id") or not text:
-        return
+        return "unavailable"
     if not voice.is_configured():
         recall.send_chat(meeting["bot_id"], text)
-        return
+        return "chat_only"
     voice_id = ((store.get_coworker(user_id) or {}).get("settings") or {}).get("voice_id")
     first, rest = split_first_sentence(text)
     if not rest:
         audio = _audio(text, voice_id)
         recall.speak(meeting["bot_id"], base64.b64encode(audio).decode())
         _set_metric(store, user_id, meeting["id"], speaking_until=time.time() + mp3_seconds(audio))
-        return
+        return "sent"
     with ThreadPoolExecutor(max_workers=1) as pool:
         later = pool.submit(_audio, rest, voice_id)
         head = _audio(first, voice_id)
@@ -164,9 +168,10 @@ def _say(store: Store, user_id: int, meeting: dict[str, Any], text: str) -> None
         time.sleep(wait)
     current = store.get("cw_meetings", meeting["id"], user_id) or {}
     if _speaking_until(current) == 0 or current.get("status") != "active":
-        return  # they interrupted (barge-in cleared it) or the call ended: don't keep talking
+        return "sent"  # they interrupted (barge-in cleared it) or the call ended
     recall.speak(meeting["bot_id"], base64.b64encode(tail).decode())
     _set_metric(store, user_id, meeting["id"], speaking_until=time.time() + mp3_seconds(tail))
+    return "sent"
 
 
 def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: float | None = None) -> dict[str, Any] | None:
@@ -183,6 +188,7 @@ def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: f
     started = time.monotonic()
     meeting = store.get("cw_meetings", meeting_id, user_id) or {}
     done = threading.Event()
+    pending = (meeting.get("metrics") or {}).get("consent") == "pending"
 
     def filler() -> None:
         if not done.wait(FILLER_AFTER):
@@ -191,18 +197,34 @@ def take_turn(store: Store, user_id: int, meeting_id: int, turn_id: int, wait: f
             except (ConnectorError, VoiceError):
                 pass
 
-    threading.Thread(target=filler, name=f"call-filler-{meeting_id}", daemon=True).start()
+    if not pending:  # never speak over someone's answer to the consent question
+        threading.Thread(target=filler, name=f"call-filler-{meeting_id}", daemon=True).start()
     try:
         result = meetings.respond(store, user_id, meeting_id, text)
     finally:
         done.set()
     m = result["meeting"]
     try:
-        _say(store, user_id, m, result["reply"])
-        if result["ended"] and m.get("bot_id"):
-            recall.leave(m["bot_id"])
+        audio_status = _say(store, user_id, m, result["reply"])
+        _set_metric(store, user_id, meeting_id, audio_status=audio_status, audio_error="")
     except (ConnectorError, VoiceError) as exc:
         log.warning("couldn't speak on call %s: %s", meeting_id, exc)
+        chat_sent = False
+        if m.get("bot_id") and not result["ended"]:
+            try:
+                recall.send_chat(m["bot_id"], result["reply"])
+                chat_sent = True
+            except ConnectorError:
+                log.warning("couldn't post fallback reply in meeting chat %s", meeting_id)
+        _set_metric(store, user_id, meeting_id, audio_status="failed",
+                    audio_error="Couldn't play audio in the meeting. " +
+                    ("The reply was posted in meeting chat." if chat_sent else "The reply could not be posted in meeting chat either."))
+    finally:
+        if result["ended"] and m.get("bot_id"):
+            try:
+                recall.leave(m["bot_id"])
+            except ConnectorError as exc:
+                log.warning("couldn't leave meeting %s: %s", meeting_id, exc)
     elapsed = int((time.monotonic() - started) * 1000)
     metrics = (store.get("cw_meetings", meeting_id, user_id) or {}).get("metrics") or {}
     _set_metric(store, user_id, meeting_id, turn_ms=[*(metrics.get("turn_ms") or []), elapsed][-200:])

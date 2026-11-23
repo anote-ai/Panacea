@@ -184,7 +184,7 @@ export default function TwinTab() {
         <AvatarStage name={coworker?.displayName || 'AI coworker'} ownerName={coworker?.ownerName} photoUrl={photoUrl} videoUrl={videoUrl} speaking={speaking} />
         <div className="flex-1 space-y-2 text-sm">
           <p className="font-medium text-base">Your twin, on calls</p>
-          <p className="text-gray-600 dark:text-gray-300">Your coworker can join calls with your voice and face. It always opens by saying it's your AI, and the AI badge is part of the frame.</p>
+          <p className="text-gray-600 dark:text-gray-300">Your coworker can join calls with a disclosed AI voice. Your verified photo appears in its camera tile on new meeting bot calls; the participant icon is controlled by Meet. The animated avatar appears here in the browser.</p>
           <div className="flex flex-wrap gap-2">
             <Pill tone={consented ? 'green' : 'amber'}>{consented ? 'Consent verified' : 'Consent needed'}</Pill>
             <Pill tone={status.voiceId ? 'green' : 'gray'}>{status.voiceId ? 'Your voice' : 'Stock voice'}</Pill>

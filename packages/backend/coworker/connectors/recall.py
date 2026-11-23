@@ -132,17 +132,20 @@ def transcript_provider() -> dict[str, Any]:
     return {"recallai_streaming": {"mode": "prioritize_low_latency", "language_code": "en"}}
 
 
-def create_bot(meeting_url: str, bot_name: str, disclosure: str, webhook_url: str) -> str:
+def create_bot(meeting_url: str, bot_name: str, disclosure: str, webhook_url: str, *,
+               greeting_mp3_b64: str | None = None, avatar_jpeg_b64: str | None = None) -> str:
     body = {
         "meeting_url": meeting_url,
         "bot_name": bot_name[:100],
         "chat": {"on_bot_join": {"send_to": "everyone", "message": disclosure[:500]}},
-        "automatic_audio_output": {"in_call_recording": {"data": {"kind": "mp3", "b64_data": SILENT_MP3_B64}}},
+        "automatic_audio_output": {"in_call_recording": {"data": {"kind": "mp3", "b64_data": greeting_mp3_b64 or SILENT_MP3_B64}}},
         "recording_config": {
             "transcript": {"provider": transcript_provider()},
             "realtime_endpoints": [{"type": "webhook", "url": webhook_url, "events": ["transcript.data"]}],
         },
     }
+    if avatar_jpeg_b64:
+        body["automatic_video_output"] = {"in_call_recording": {"kind": "jpeg", "b64_data": avatar_jpeg_b64}}
     return str(_call("POST", "/bot/", body).get("id", ""))
 
 

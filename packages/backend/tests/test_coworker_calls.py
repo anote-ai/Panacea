@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from coworker import meetings, memory, twin, voice
+from coworker import bot_media, meetings, memory, twin, voice
 from coworker.connectors import recall, tavus
 from coworker.connectors.demo import DemoConnector
 from coworker.store import Store
@@ -63,10 +63,10 @@ def test_simulated_sales_call_end_to_end(s):
         result = meetings.respond(s, 1, m["id"], line)
         kinds.append(result["kind"])
         assert result["reply"]
-    assert kinds[0] == "disclosure"
+    assert kinds[1] == "disclosure"  # fictional prospect agrees before the demo starts
     assert "escalation" in kinds
     transcript = s.get("cw_meetings", m["id"], 1)["transcript"]
-    pricing_reply = [t["text"] for t in transcript if t["speaker"] == "coworker"][6]
+    pricing_reply = [t["text"] for t in transcript if t["speaker"] == "coworker"][7]
     assert "$99" in pricing_reply or "$49" in pricing_reply
     assert "30%" not in " ".join(t["text"] for t in transcript if t["speaker"] == "coworker")
     ended = meetings.finish(s, 1, m["id"])
@@ -88,7 +88,7 @@ def test_self_demo_persona(s):
     while (line := meetings.next_prospect_line(s.get("cw_meetings", m["id"], 1))):
         replies.append(meetings.respond(s, 1, m["id"], line)["reply"])
     joined = " ".join(replies)
-    assert "AI" in replies[0]
+    assert "AI" in replies[1]
     assert "approval" in joined and "pauses me" in joined
 
 
@@ -106,6 +106,7 @@ def test_leave_and_whisper_guardrails(s):
 
 def test_discovery_questions_progress(s):
     m = meetings.start(s, 1, mode="live_call", prospect_name="Ana")
+    meetings.respond(s, 1, m["id"], "Yes.")
     r1 = meetings.respond(s, 1, m["id"], "Hi there")["reply"]
     assert "problem" in r1
     r2 = meetings.respond(s, 1, m["id"], "We're drowning in contracts and it wastes hours")["reply"]
@@ -139,6 +140,7 @@ def test_playbook_and_serialize(s):
     assert meetings._platform("https://meet.google.com/x") == "google_meet"
     assert meetings._platform("https://teams.microsoft.com/x") == "teams"
     assert meetings._platform("https://whereby.com/x") == "other"
+    meetings.respond(s, 1, m["id"], "Yes.")
     assert "approve" in meetings.respond(s, 1, m["id"], "How do I know you're safe?")["reply"]
     assert meetings.summary_of({"summary": "not json"}) is None
 
@@ -196,11 +198,12 @@ def test_voice_module(monkeypatch):
 def test_recall_and_tavus_adapters(monkeypatch):
     monkeypatch.setenv("RECALL_API_KEY", "rk")
     with patch("coworker.connectors.recall.requests.request", return_value=_resp(201, {"id": "bot1"})) as req:
-        assert recall.create_bot("https://zoom.us/j/1", "Natan's AI coworker (Ourogen)", "I'm an AI", "https://hook") == "bot1"
+        assert recall.create_bot("https://zoom.us/j/1", "Natan's AI coworker (Ourogen)", "I'm an AI", "https://hook",
+                                 greeting_mp3_b64="bXAz", avatar_jpeg_b64="anBlZw==") == "bot1"
         body = req.call_args.kwargs["json"]
         assert body["chat"]["on_bot_join"]["message"] == "I'm an AI"
-        # Recall rejects output_audio unless the bot was created able to speak.
-        assert body["automatic_audio_output"]["in_call_recording"]["data"]["kind"] == "mp3"
+        assert body["automatic_audio_output"]["in_call_recording"]["data"] == {"kind": "mp3", "b64_data": "bXAz"}
+        assert body["automatic_video_output"]["in_call_recording"] == {"kind": "jpeg", "b64_data": "anBlZw=="}
         recall.leave("bot1")
         recall.send_chat("bot1", "hi")
         recall.speak("bot1", "b64")
@@ -237,10 +240,12 @@ def test_call_routes(client, auth_headers, demo):
     assert client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/1"}, headers=h).status_code == 501
     m = client.post("/api/coworker/meetings", json={"mode": "simulated", "persona": "northwind"}, headers=h).get_json()["meeting"]
     got = client.get(f"/api/coworker/meetings/{m['id']}", headers=h).get_json()
-    assert got["nextProspectLine"].startswith("Hi")
+    assert got["nextProspectLine"] == "Yes."
     assert client.post(f"/api/coworker/meetings/{m['id']}/turn", json={}, headers=h).status_code == 400
     turn = client.post(f"/api/coworker/meetings/{m['id']}/turn", json={"text": got["nextProspectLine"]}, headers=h).get_json()
-    assert "AI" in turn["reply"] and turn["kind"] == "disclosure" and turn["latencyMs"] >= 0
+    assert "agreeing" in turn["reply"] and turn["latencyMs"] >= 0
+    turn = client.post(f"/api/coworker/meetings/{m['id']}/turn", json={"text": turn["nextProspectLine"]}, headers=h).get_json()
+    assert "AI" in turn["reply"] and turn["kind"] == "disclosure"
     assert client.post(f"/api/coworker/meetings/{m['id']}/turn", json={"text": "hint", "speaker": "owner"}, headers=h).status_code == 200
     assert client.post("/api/coworker/meetings/999/turn", json={"text": "x"}, headers=h).status_code == 404
     ended = client.post(f"/api/coworker/meetings/{m['id']}/end", headers=h).get_json()["meeting"]
@@ -260,10 +265,19 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
     monkeypatch.setenv("RECALL_WORKSPACE_VERIFICATION_SECRET", "whsec_" + base64.b64encode(key).decode())
     monkeypatch.setenv("BACKEND_URL", "https://api.ourogen.ai")
     assert client.get("/api/coworker", headers=h).get_json()["capabilities"]["meeting_bot"] is True
-    with patch("coworker.connectors.recall.create_bot", return_value="bot42"):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "el")
+    with patch("coworker.voice.tts", return_value=b"greeting-audio") as synth, \
+            patch("coworker.connectors.recall.create_bot", return_value="bot42") as create:
         m = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://meet.google.com/abc"},
                         headers=h).get_json()["meeting"]
     assert m["botId"] == "bot42" and m["platform"] == "google_meet"
+    assert "I'd like to take notes" in synth.call_args.args[0]
+    assert base64.b64decode(create.call_args.kwargs["greeting_mp3_b64"]) == b"greeting-audio"
+    assert m["metrics"]["audio_status"] == "greeting_queued"
+    from PIL import Image
+
+    frame = Image.open(io.BytesIO(base64.b64decode(create.call_args.kwargs["avatar_jpeg_b64"])))
+    assert frame.size == (1280, 720) and frame.format == "JPEG"
     from api_endpoints.coworker.calls import _webhook_token
 
     with client.application.app_context():
@@ -295,9 +309,16 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
     from coworker.connectors.base import ConnectorError
 
     monkeypatch.setenv("RECALL_API_KEY", "rk")
-    with patch("coworker.connectors.recall.create_bot", side_effect=ConnectorError("down")):
+    with patch("coworker.voice.tts", return_value=b"mp3"), \
+            patch("coworker.connectors.recall.create_bot", side_effect=ConnectorError("down")):
         assert client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/9"},
                            headers=h).status_code == 502
+    with patch("coworker.voice.tts", side_effect=voice.VoiceError("TTS unavailable")), \
+            patch("coworker.connectors.recall.create_bot") as no_bot:
+        failed = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/9"},
+                             headers=h)
+    assert failed.status_code == 502 and "TTS unavailable" in failed.get_json()["error"]
+    no_bot.assert_not_called()
 
 
 def test_voice_and_twin_routes(client, auth_headers, demo, monkeypatch):
@@ -372,7 +393,7 @@ def test_all_party_recording_consent(s):
     m = meetings.start(s, 1, mode="live_call", prospect_name="Ana")
     assert m["metrics"]["consent"] == "pending"
     first = meetings.respond(s, 1, m["id"], "Hang on, we're a 40 person team and our budget is 50k")
-    assert "okay with you" in first["reply"]
+    assert first["reply"] == "Before we continue, may I take notes for this conversation?"
     stored = first["meeting"]["transcript"][-2]
     assert stored["redacted"] and stored["text"] == meetings.NOT_RECORDED
     assert "team_size" not in (first["meeting"]["answers"] or {})  # nothing derived is kept either
@@ -389,9 +410,36 @@ def test_all_party_recording_consent(s):
     assert "okay with you" not in r["reply"] and "12 people" in r["meeting"]["transcript"][-2]["text"]
 
 
-def test_consent_reask_is_capped(s):
+def test_meet_camera_photo_requires_verified_consent(s):
+    from PIL import Image
+
+    raw = io.BytesIO()
+    Image.new("RGB", (48, 48), (225, 35, 30)).save(raw, format="PNG")
+    twin.save_asset(s, 1, "photo", "face.png", "image/png", raw.getvalue())
+
+    def pixel():
+        frame = Image.open(io.BytesIO(base64.b64decode(bot_media.camera_frame(s, 1))))
+        return frame.getpixel((640, 300))
+
+    before = pixel()
+    with patch("coworker.twin.verified", return_value=True):
+        after = pixel()
+    assert before[0] < 180 and after[0] > 190 and after[1] < 100
+
+
+def test_consent_reask_then_leave(s):
     m = meetings.start(s, 1, mode="live_call", prospect_name="Ana")
-    for line in ("Hmm.", "Tell me more.", "What else?"):
-        last = meetings.respond(s, 1, m["id"], line)
-    assert last["meeting"]["metrics"]["consent_asked"] == 2
-    assert "okay with you" not in last["reply"]
+    first = meetings.respond(s, 1, m["id"], "Hmm.")
+    assert first["kind"] == "consent" and first["reply"].count("?") == 1
+    last = meetings.respond(s, 1, m["id"], "Tell me more.")
+    assert last["ended"] and last["meeting"]["metrics"]["consent_asked"] == 1
+    assert last["meeting"]["status"] == "ended"
+
+
+def test_consent_refusal_and_no_problem(s):
+    declined = meetings.start(s, 1, mode="live_call")
+    result = meetings.respond(s, 1, declined["id"], "No, I don't want notes.")
+    assert result["ended"] and result["meeting"]["metrics"]["consent"] == "pending"
+    assert result["meeting"]["transcript"][-2]["redacted"]
+    accepted = meetings.start(s, 1, mode="live_call")
+    assert meetings.respond(s, 1, accepted["id"], "No problem.")["meeting"]["metrics"]["consent"] == "granted"
