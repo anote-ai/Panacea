@@ -140,6 +140,11 @@ def create_bot(meeting_url: str, bot_name: str, disclosure: str, webhook_url: st
         "chat": {"on_bot_join": {"send_to": "everyone", "message": disclosure[:500]}},
         "automatic_audio_output": {"in_call_recording": {"data": {"kind": "mp3", "b64_data": greeting_mp3_b64 or SILENT_MP3_B64}}},
         "recording_config": {
+            # This agent needs a live transcript, not a meeting recording.
+            # Explicit nulls prevent Recall's default mixed-video artifact.
+            "video_mixed_mp4": None,
+            "participant_events": None,
+            "meeting_metadata": None,
             "transcript": {"provider": transcript_provider()},
             "realtime_endpoints": [{"type": "webhook", "url": webhook_url, "events": ["transcript.data"]}],
         },

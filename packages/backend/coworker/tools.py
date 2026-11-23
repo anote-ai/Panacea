@@ -251,9 +251,12 @@ def _run(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[Any, str]:
         m = joined["meeting"]
         ctx.cards.append({"type": "meeting", "id": m["id"]})
         note = {"bot": "The bot is joining now; the summary will be posted in this chat when the call ends.",
+                "consent": "Share the consent link first. The bot will join only after the attendee agrees.",
                 "studio": "No meeting bot is configured, so the call runs in the call studio. Open it to start talking.",
                 "demo": "Demo call finished; the summary and follow-up draft are in this chat."}[joined["how"]]
-        return {"meeting_id": m["id"], "status": m["status"], "how": joined["how"], "note": note}, f"Joined: {m['title']}"
+        return {"meeting_id": m["id"], "status": m["status"], "how": joined["how"], "note": note,
+                "consent_url": (m.get("answers") or {}).get("consent_url", "")}, \
+            (f"Consent needed: {m['title']}" if joined["how"] == "consent" else f"Joined: {m['title']}")
     if name == "reply_to_emails":
         from coworker import delegate
 

@@ -8,10 +8,11 @@ from flask import Response, current_app, jsonify, request
 from itsdangerous import BadSignature, URLSafeSerializer
 
 from api_endpoints.coworker.common import coworker_bp, error, store, uid
-from coworker import billing, blobstore, bot_media, meetings, twin, voice
+from coworker import billing, blobstore, meeting_consent, meetings, twin, voice
 from coworker.connectors import recall, tavus
 from coworker.connectors.base import ConnectorError
 from coworker.errors import public_message
+from coworker.store import iso
 from middleware.auth import require_auth
 from middleware.rate_limit import RateLimiter
 
@@ -92,33 +93,55 @@ def create_meeting() -> tuple:
         issue = recall.bot_setup_issue()
         if issue:
             return error(issue, 501, "not_configured")
-        disclosure = meetings.disclosure_line(store(), user_id, str(data.get("prospectName", ""))[:200])
-        try:
-            greeting = bot_media.greeting(store(), user_id, disclosure)
-            avatar = bot_media.camera_frame(store(), user_id)
-        except voice.VoiceError as exc:
-            return error(public_message(exc), 502, "voice_failed")
     meeting = meetings.start(
         store(), user_id, mode=mode, title=str(data.get("title", ""))[:300], prospect_name=str(data.get("prospectName", ""))[:200],
         company=str(data.get("prospectCompany", ""))[:200], prospect_email=str(data.get("prospectEmail", ""))[:200],
         meeting_url=str(data.get("meetingUrl", ""))[:500], persona=str(data.get("persona", "")),
     )
     if mode == "bot":
-        first = (coworker.get("owner_name") or "").split(" ")[0] or "Your"
-        base = recall.webhook_base_url()
-        hook = f"{base}/api/coworker/meetings/recall/webhook?token={_webhook_token(user_id, meeting['id'])}"
-        try:
-            bot_id = recall.create_bot(meeting["meeting_url"], f"{first}'s AI coworker (Ourogen)",
-                                       disclosure + " Say 'please leave' and I will.", hook,
-                                       greeting_mp3_b64=greeting, avatar_jpeg_b64=avatar)
-        except ConnectorError as exc:
-            store().update("cw_meetings", meeting["id"], user_id, {"status": "failed"})
-            return error(public_message(exc), 502, "bot_failed")
-        store().update("cw_meetings", meeting["id"], user_id, {
-            "bot_id": bot_id, "metrics": {**meeting["metrics"], "audio_status": "greeting_queued" if greeting else "chat_only"},
-        })
-        meeting = store().get("cw_meetings", meeting["id"], user_id) or meeting
+        meeting = meeting_consent.request(
+            store(), user_id, meeting, secret=str(current_app.config.get("JWT_SECRET_KEY") or "dev"),
+            frontend_url=meeting_consent.frontend_url(),
+        )
     return jsonify({"meeting": meetings.serialize(meeting)}), 201
+
+
+_consent_limiter = RateLimiter(max_calls=30, period=60, name="meeting-consent")
+
+
+@coworker_bp.get("/meetings/consent/<token>")
+def meeting_consent_details(token: str) -> tuple:
+    if not _consent_limiter.is_allowed(request.remote_addr or "unknown"):
+        return error("rate limited", 429, "rate_limited")
+    try:
+        meeting = meeting_consent.resolve(store(), token, str(current_app.config.get("JWT_SECRET_KEY") or "dev"))
+    except meeting_consent.ConsentLinkError as exc:
+        return error(str(exc), 404, "invalid_link")
+    coworker = store().get_coworker(int(meeting["user_id"])) or {}
+    return jsonify({
+        "title": meeting["title"], "ownerName": coworker.get("owner_name") or "the organizer",
+        "coworkerName": coworker.get("display_name") or "AI coworker", "status": meeting["status"],
+        "platform": meeting["platform"],
+    }), 200
+
+
+@coworker_bp.post("/meetings/consent/<token>")
+def meeting_consent_decision(token: str) -> tuple:
+    if not _consent_limiter.is_allowed(request.remote_addr or "unknown"):
+        return error("rate limited", 429, "rate_limited")
+    data = request.get_json(silent=True) or {}
+    if data.get("decision") not in ("agree", "decline"):
+        return error("Choose agree or decline")
+    try:
+        meeting = meeting_consent.decide(
+            store(), token, str(current_app.config.get("JWT_SECRET_KEY") or "dev"), data["decision"] == "agree",
+        )
+    except meeting_consent.ConsentLinkError as exc:
+        return error(str(exc), 409, "consent_error")
+    except (ConnectorError, voice.VoiceError) as exc:
+        return error(public_message(exc), 502, "bot_failed")
+    return jsonify({"status": meeting["status"],
+                    "agreed": meeting["status"] in ("consent_granted", "starting", "active")}), 200
 
 
 @coworker_bp.get("/meetings/<int:meeting_id>")
@@ -156,6 +179,10 @@ def end_meeting(meeting_id: int) -> tuple:
     m = store().get("cw_meetings", meeting_id, user_id)
     if not m:
         return error("Not found", 404, "not_found")
+    if m["status"] in ("awaiting_consent", "consent_granted", "starting"):
+        store().update("cw_meetings", meeting_id, user_id, {"status": "ended", "ended_at": iso()})
+        ended = store().get("cw_meetings", meeting_id, user_id)
+        return jsonify({"meeting": meetings.serialize(ended or m)}), 200
     if m.get("bot_id") and recall.is_configured():
         try:
             recall.leave(m["bot_id"])

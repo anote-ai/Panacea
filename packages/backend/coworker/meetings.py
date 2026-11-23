@@ -543,11 +543,12 @@ def finish(store: Store, user_id: int, meeting_id: int) -> dict[str, Any]:
 
 
 def serialize(m: dict[str, Any]) -> dict[str, Any]:
+    answers = m.get("answers") or {}
     return {
         "id": m["id"], "title": m["title"], "mode": m["mode"], "platform": m["platform"], "meetingUrl": m.get("meeting_url") or "",
         "botId": m.get("bot_id") or "", "prospectName": m["prospect_name"], "prospectCompany": m["prospect_company"],
         "status": m["status"], "transcript": [t for t in (m.get("transcript") or []) if t.get("speaker") != "owner"],
         "whispers": [t for t in (m.get("transcript") or []) if t.get("speaker") == "owner"],
-        "summary": summary_of(m), "answers": m.get("answers") or {},
+        "summary": summary_of(m), "answers": answers, "consentUrl": answers.get("consent_url") or "",
         "metrics": m.get("metrics") or {}, "startedAt": m["started_at"], "endedAt": m.get("ended_at"),
     }

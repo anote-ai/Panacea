@@ -87,7 +87,7 @@ export default function CallsTab() {
           <Card className="p-4 flex flex-col">
             <p className="text-sm font-medium">📞 Join a real meeting</p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex-1">
-              Paste a Zoom, Google Meet, or Teams link. The bot joins as “your AI coworker (Ourogen)” and posts a disclosure in chat.
+              Paste a Zoom, Google Meet, or Teams link. You'll get an attendee consent link first; the disclosed AI coworker joins only after they agree.
             </p>
             <input className={`${inputCls} mt-3`} placeholder="https://zoom.us/j/…" value={form.meetingUrl} onChange={(e) => setForm({ ...form, meetingUrl: e.target.value })} />
             <button className={`${primaryBtn} mt-2`} disabled={!capabilities?.meeting_bot || !form.meetingUrl}

@@ -270,8 +270,20 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
             patch("coworker.connectors.recall.create_bot", return_value="bot42") as create:
         m = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://meet.google.com/abc"},
                         headers=h).get_json()["meeting"]
+        assert m["status"] == "awaiting_consent" and not m["botId"]
+        synth.assert_not_called()
+        create.assert_not_called()
+        token = m["consentUrl"].rsplit("/", 1)[1]
+        details = client.get(f"/api/coworker/meetings/consent/{token}").get_json()
+        assert details["platform"] == "google_meet"
+        agreed = client.post(f"/api/coworker/meetings/consent/{token}", json={"decision": "agree"})
+        agreed_again = client.post(f"/api/coworker/meetings/consent/{token}", json={"decision": "agree"})
+        assert agreed_again.get_json()["status"] == "active"
+        assert create.call_count == 1
+        assert agreed.status_code == 200 and agreed.get_json()["agreed"]
+        m = client.get(f"/api/coworker/meetings/{m['id']}", headers=h).get_json()["meeting"]
     assert m["botId"] == "bot42" and m["platform"] == "google_meet"
-    assert "I'd like to take notes" in synth.call_args.args[0]
+    assert "Thanks for agreeing" in synth.call_args.args[0]
     assert base64.b64decode(create.call_args.kwargs["greeting_mp3_b64"]) == b"greeting-audio"
     assert m["metrics"]["audio_status"] == "greeting_queued"
     from PIL import Image
@@ -311,14 +323,27 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
     monkeypatch.setenv("RECALL_API_KEY", "rk")
     with patch("coworker.voice.tts", return_value=b"mp3"), \
             patch("coworker.connectors.recall.create_bot", side_effect=ConnectorError("down")):
-        assert client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/9"},
-                           headers=h).status_code == 502
+        pending = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/9"},
+                              headers=h).get_json()["meeting"]
+        bad_token = pending["consentUrl"].rsplit("/", 1)[1]
+        assert client.post(f"/api/coworker/meetings/consent/{bad_token}", json={"decision": "agree"}).status_code == 502
     with patch("coworker.voice.tts", side_effect=voice.VoiceError("TTS unavailable")), \
             patch("coworker.connectors.recall.create_bot") as no_bot:
-        failed = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/9"},
-                             headers=h)
+        pending = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/10"},
+                              headers=h).get_json()["meeting"]
+        voice_token = pending["consentUrl"].rsplit("/", 1)[1]
+        failed = client.post(f"/api/coworker/meetings/consent/{voice_token}", json={"decision": "agree"})
     assert failed.status_code == 502 and "TTS unavailable" in failed.get_json()["error"]
     no_bot.assert_not_called()
+
+    with patch("coworker.connectors.recall.create_bot") as no_declined_bot:
+        pending = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/11"},
+                              headers=h).get_json()["meeting"]
+        decline_token = pending["consentUrl"].rsplit("/", 1)[1]
+        declined = client.post(f"/api/coworker/meetings/consent/{decline_token}", json={"decision": "decline"})
+    assert declined.get_json() == {"agreed": False, "status": "declined"}
+    no_declined_bot.assert_not_called()
+    assert client.get("/api/coworker/meetings/consent/forged").status_code == 404
 
 
 def test_voice_and_twin_routes(client, auth_headers, demo, monkeypatch):

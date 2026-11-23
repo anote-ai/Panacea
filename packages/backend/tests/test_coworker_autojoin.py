@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from coworker import autojoin, brain, delegate, responsibilities, tools
+from coworker import autojoin, brain, delegate, meeting_consent, responsibilities, tools
 from coworker.store import Store, iso, utcnow
 
 
@@ -74,13 +74,20 @@ def test_brief_then_join_then_report(s, chats):
     _event(s, "later", 120, subject="Globex QBR")
 
     out = responsibilities.run_one(s, 1, resp)
-    assert out == ["Prepared a brief for Northwind intro and scheduled to join"]
+    assert out == ["Prepared a brief for Northwind intro and requested attendee consent"]
     assert chats["new_chat"].call_args.args[1] == "📞 Northwind intro"
     assert "Skip this one" in chats["new_chat"].call_args.args[2]
-    assert chats["push"].call_args.args[2].startswith("Joining Northwind intro")
+    assert chats["push"].call_args.args[2].startswith("Consent needed")
     assert "/api/coworker/autojoin/skip/" in chats["deliver"].call_args.args[3]
     assert responsibilities.run_one(s, 1, resp) == []  # nothing twice
     assert autojoin.pending_for_chat(s, 1, 41) == {"event_id": "e1", "responsibility_id": resp["id"]}
+
+    meeting = s.query("SELECT * FROM cw_meetings WHERE user_id = 1")[0]
+    token = meeting["answers"]["consent_token"]
+    with patch("coworker.connectors.recall.create_bot") as early:
+        agreed = meeting_consent.decide(s, token, "dev", True)
+    assert agreed["status"] == "consent_granted"
+    early.assert_not_called()
 
     # It starts in a minute: the bot joins with the user's notes from the meeting's chat.
     s.execute("UPDATE cw_items SET occurred_at = %s WHERE external_id = 'e1'", (iso(utcnow() + timedelta(minutes=1)),))
@@ -92,7 +99,7 @@ def test_brief_then_join_then_report(s, chats):
     meeting = s.query("SELECT * FROM cw_meetings WHERE user_id = 1")[0]
     assert meeting["bot_id"] == "bot-9" and meeting["answers"]["chat_id"] == 41
     assert "push for a pilot" in meeting["answers"]["context"]
-    assert "Joining now" in chats["post"].call_args.args[2]
+    assert "joining now" in chats["post"].call_args.args[2]
     assert autojoin.pending_for_chat(s, 1, 41) is None  # an ordinary chat again
     assert autojoin.state(s, 1, "e1") == "joined"
     with patch("coworker.connectors.recall.create_bot") as again:
@@ -109,6 +116,7 @@ def test_skip_from_chat_link_and_api(s, chats, client, auth_headers, app):
     events = list(autojoin.chat_turn(s, 1, autojoin.pending_for_chat(s, 1, 41), "Actually skip it, I'll take this one"))
     assert "won't join" in events[0][1]
     assert autojoin.state(s, 1, "e2") == "skipped" and autojoin.skip(s, 1, "e2")  # skipping twice is fine
+    assert s.one("SELECT status FROM cw_meetings WHERE user_id = 1")["status"] == "ended"
     s.execute("UPDATE cw_items SET occurred_at = %s WHERE external_id = 'e2'", (iso(utcnow()),))
     with patch("coworker.connectors.recall.create_bot") as create_bot:
         responsibilities.run_one(s, 1, resp)
@@ -149,7 +157,7 @@ def test_keywords_no_bot_and_failures(s, chats, monkeypatch):
     resp = _resp(s, keywords=["demo"])
     _event(s, "intro", 20, subject="Northwind intro")
     _event(s, "demo", 20, subject="Globex demo")
-    assert responsibilities.run_one(s, 1, resp) == ["Prepared a brief for Globex demo and scheduled to join"]
+    assert responsibilities.run_one(s, 1, resp) == ["Prepared a brief for Globex demo and requested attendee consent"]
 
     monkeypatch.delenv("RECALL_API_KEY")
     resp2 = _resp(s, keywords=[])
@@ -160,6 +168,9 @@ def test_keywords_no_bot_and_failures(s, chats, monkeypatch):
     assert autojoin.state(s, 1, "nobot", will_join=False) == "brief_only"
 
     monkeypatch.setenv("RECALL_API_KEY", "rk")
+    demo_meeting = s.one("SELECT * FROM cw_meetings WHERE user_id = 1 AND title = %s", ("Globex demo",))
+    assert demo_meeting
+    meeting_consent.decide(s, demo_meeting["answers"]["consent_token"], "dev", True)
     s.execute("UPDATE cw_items SET occurred_at = %s WHERE external_id = 'demo'", (iso(utcnow() + timedelta(minutes=1)),))
     from coworker.connectors.base import ConnectorError
 
@@ -177,7 +188,7 @@ def test_paused_coworker_cannot_be_sent(s, chats):
     resp = _resp(s)
     _event(s, "p1", 1)
     with patch("coworker.delegate.join_meeting", side_effect=delegate.DelegateError("Your coworker is paused.")):
-        assert autojoin.run(s, 1, resp) == ["Prepared a brief for Northwind intro and scheduled to join"]
+        assert autojoin.run(s, 1, resp) == ["Prepared a brief for Northwind intro"]
     assert autojoin.state(s, 1, "p1") == "failed"
 
 

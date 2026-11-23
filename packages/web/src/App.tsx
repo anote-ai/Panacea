@@ -1,6 +1,7 @@
 import axios from "axios";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import MeetingConsentPage from "./pages/MeetingConsentPage";
 import ChatPage from "./pages/ChatPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import LoginPage from "./pages/LoginPage";
@@ -158,6 +159,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+            <Route path="/meeting-consent/:token" element={<MeetingConsentPage />} />
             <Route path="/app/checkout" element={<RequireAuth><CheckoutResultPage /></RequireAuth>} />
             <Route path="/app/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
             <Route path="/app/join/:token" element={<RequireAuth><JoinTeamPage /></RequireAuth>} />

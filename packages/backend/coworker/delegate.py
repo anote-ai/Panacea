@@ -18,10 +18,8 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from coworker import bot_media, drafting, executor, meetings, memory, scheduling, security
-from coworker.connectors.base import ConnectorError
+from coworker import drafting, executor, meeting_consent, meetings, memory, scheduling, security
 from coworker.store import Store, iso, parse_iso, utcnow
-from coworker.voice import VoiceError
 
 URL_RE = re.compile(r"https://[^\s)>\]]+")
 HANDLE_BY_DEFAULT = ("sales_lead", "scheduling", "support", "partner", "candidate", "investor")
@@ -47,7 +45,8 @@ def _match_event(store: Store, user_id: int, hint: str) -> dict[str, Any] | None
 
 
 def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url: str = "", context: str = "",
-                 title: str = "", prospect_name: str = "", company: str = "", prospect_email: str = "") -> dict[str, Any]:
+                 title: str = "", prospect_name: str = "", company: str = "", prospect_email: str = "",
+                 auto_start_on_consent: bool = True) -> dict[str, Any]:
     """Send the coworker to a meeting. Returns {meeting, how, event}."""
     coworker = store.get_coworker(user_id) or {}
     if coworker.get("status") != "active":
@@ -70,17 +69,8 @@ def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url
         raise DelegateError(recall.bot_setup_issue())
     use_bot = bool(meeting_url) and recall.bot_ready()
     if use_bot:
-        disclosure = meetings.disclosure_line(store, user_id, prospect_name)
-        try:
-            greeting = bot_media.greeting(store, user_id, disclosure)
-            avatar = bot_media.camera_frame(store, user_id)
-        except VoiceError as exc:
-            raise DelegateError(f"Couldn't prepare the meeting voice: {exc}") from exc
         meeting = meetings.start(store, user_id, mode="bot", title=title, prospect_name=prospect_name, company=company,
                                  prospect_email=prospect_email, meeting_url=meeting_url, context=context, chat_id=chat_id)
-        first = (coworker.get("owner_name") or "").split(" ")[0] or "Your"
-        from itsdangerous import URLSafeSerializer
-
         secret = os.environ.get("JWT_SECRET_KEY", "dev")
         try:
             from flask import current_app, has_app_context
@@ -89,22 +79,15 @@ def join_meeting(store: Store, user_id: int, *, chat_id: int | None, meeting_url
                 secret = str(current_app.config.get("JWT_SECRET_KEY") or secret)
         except ImportError:  # pragma: no cover
             pass
-        token = URLSafeSerializer(secret, salt="recall-webhook").dumps({"u": user_id, "m": meeting["id"]})
-        hook = f"{recall.webhook_base_url()}/api/coworker/meetings/recall/webhook?token={token}"
-        try:
-            bot_id = recall.create_bot(meeting_url, f"{first}'s AI coworker (Ourogen)",
-                                       disclosure + " Say 'please leave' and I will.", hook,
-                                       greeting_mp3_b64=greeting, avatar_jpeg_b64=avatar)
-        except ConnectorError:
-            store.update("cw_meetings", meeting["id"], user_id, {"status": "failed"})
-            raise
-        store.update("cw_meetings", meeting["id"], user_id, {
-            "bot_id": bot_id, "metrics": {**meeting["metrics"], "audio_status": "greeting_queued" if greeting else "chat_only"},
-        })
-        how = "bot"
+        meeting = meeting_consent.request(
+            store, user_id, meeting, secret=secret, frontend_url=meeting_consent.frontend_url(),
+            auto_start=auto_start_on_consent,
+        )
+        how = "consent"
         from coworker import push
 
-        push.send(store, user_id, f"Your coworker joined: {meeting['title']}", "Tap to watch, whisper, or take over.",
+        push.send(store, user_id, f"Consent needed: {meeting['title']}",
+                  "Share the attendee consent link. Your coworker will join only after they agree.",
                   {"type": "call", "meetingId": meeting["id"]})
     else:
         # No meeting bot here: run it as a browser call the user (or the guest) can join from the call studio.

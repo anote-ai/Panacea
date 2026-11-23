@@ -229,6 +229,10 @@ def _offline_turn(ctx: tools.ToolContext, message: str) -> Generator[Event, None
             yield ("text", "Done. I ran the call (demo workspace: a scripted prospect played Dana from Northwind). "
                            "I opened by saying I'm an AI, followed your context, and escalated anything I can't decide. "
                            "The summary and a drafted follow-up are just below.")
+        elif how == "consent":
+            yield ("text", "Before I join, send this consent link to the attendee:\n\n"
+                           f"{result['consent_url']}\n\nI'll join only after they confirm that everyone on the call agrees to AI note-taking. "
+                           "You can watch the status in **Coworker → Calls**.")
         elif how == "bot":
             yield ("text", "I'm joining now as your disclosed AI coworker. I'll post the summary and a drafted follow-up "
                            "here when the call ends. You can watch live from **Coworker → Calls**.")
