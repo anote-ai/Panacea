@@ -133,7 +133,8 @@ def transcript_provider() -> dict[str, Any]:
 
 
 def create_bot(meeting_url: str, bot_name: str, disclosure: str, webhook_url: str, *,
-               greeting_mp3_b64: str | None = None, avatar_jpeg_b64: str | None = None) -> str:
+               greeting_mp3_b64: str | None = None, avatar_jpeg_b64: str | None = None,
+               avatar_page_url: str | None = None) -> str:
     body = {
         "meeting_url": meeting_url,
         "bot_name": bot_name[:100],
@@ -149,7 +150,15 @@ def create_bot(meeting_url: str, bot_name: str, disclosure: str, webhook_url: st
             "realtime_endpoints": [{"type": "webhook", "url": webhook_url, "events": ["transcript.data"]}],
         },
     }
-    if avatar_jpeg_b64:
+    if avatar_page_url:
+        # Dynamic camera frames are rendered by the secured bridge page. The
+        # bridge also plays Ourogen's audio, so automatic_audio_output is
+        # deliberately removed to prevent a second, echoing audio path.
+        body["variant"] = {"zoom": "web_4_core", "google_meet": "web_4_core",
+                           "microsoft_teams": "web_4_core", "webex": "web_4_core"}
+        body["output_media"] = {"camera": {"kind": "webpage", "config": {"url": avatar_page_url}}}
+        body.pop("automatic_audio_output", None)
+    elif avatar_jpeg_b64:
         body["automatic_video_output"] = {"in_call_recording": {"kind": "jpeg", "b64_data": avatar_jpeg_b64}}
     return str(_call("POST", "/bot/", body).get("id", ""))
 
