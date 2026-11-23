@@ -9,7 +9,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 
 from api_endpoints.coworker.common import coworker_bp, error, store, uid
 from coworker import billing, blobstore, meeting_consent, meetings, twin, voice
-from coworker.connectors import recall, tavus
+from coworker.connectors import avatar_bridge, recall, tavus
 from coworker.connectors.base import ConnectorError
 from coworker.errors import public_message
 from coworker.store import iso
@@ -186,6 +186,12 @@ def end_meeting(meeting_id: int) -> tuple:
     if m.get("bot_id") and recall.is_configured():
         try:
             recall.leave(m["bot_id"])
+        except ConnectorError:
+            pass
+    avatar_session_id = str((m.get("metrics") or {}).get("avatar_session_id") or "")
+    if avatar_session_id:
+        try:
+            avatar_bridge.close(avatar_session_id)
         except ConnectorError:
             pass
     return jsonify({"meeting": meetings.serialize(meetings.finish(store(), user_id, meeting_id))}), 200
