@@ -106,7 +106,12 @@ class Workspace:
             return self._demo()
         connector = self.email_connector(provider, thread_id)
         if connector is None:
-            label = LABELS.get("google" if provider in ("gmail", "google") else "microsoft", "mailbox") if provider else "mailbox"
+            if not provider and thread_id:
+                source = next((it for it in reversed(self.store.thread(self.user_id, thread_id))
+                               if it.get("kind") == "email" and it.get("provider") in ("gmail", "outlook")), None)
+                provider = (source or {}).get("provider", "")
+            label = ("Google" if provider in ("gmail", "google") else "Outlook" if provider in
+                     ("outlook", "microsoft") else "mailbox")
             raise ConnectorError(f"{label} isn't connected. Reconnect it in Coworker → Settings.", "not_connected")
         return connector
 

@@ -228,7 +228,10 @@ def test_draft_action_routes_to_source_mailbox_with_both_connected(store):
             assert action["result"]["undo"]["provider"] == source_provider
             assert action["payload"]["mailbox_provider"] == source_provider
             assert expected.create_draft.call_args.kwargs["thread_id"] == f"thread-{source_provider}"
+            Workspace(store, 1).send_email(["a@b.com"], "Re: Hello", "Thanks", f"thread-{source_provider}")
+            assert expected.send_email.call_args.kwargs["thread_id"] == f"thread-{source_provider}"
     assert google.create_draft.call_count == outlook.create_draft.call_count == 1
+    assert google.send_email.call_count == outlook.send_email.call_count == 1
 
 
 def test_disconnected_source_mailbox_never_falls_back_to_other_account(store):
@@ -244,6 +247,10 @@ def test_disconnected_source_mailbox_never_falls_back_to_other_account(store):
                                   title="Reply draft", source_item_id=source)
     assert action["status"] == "failed" and "Google isn't connected" in action["error"]
     outlook.create_draft.assert_not_called()
+    with patch.object(Workspace, "_live", lambda self, provider, **_: outlook if provider == "microsoft" else None):
+        with pytest.raises(ConnectorError, match="Google isn't connected"):
+            Workspace(store, 1).send_email(["a@b.com"], "Re: Hello", "Sure", "g-thread")
+    outlook.send_email.assert_not_called()
 
 
 def test_outlook_oauth_routes(client, auth_headers, monkeypatch):
