@@ -83,13 +83,13 @@ export default function ResponsibilitiesTab() {
     <div>
       {msg && <p className="mb-4 text-sm rounded-lg bg-[#F7F7F8] dark:bg-[#2F2F2F] px-3 py-2">{msg}</p>}
       {suggestions.length > 0 && (
-        <Section title="Suggested for you" subtitle="Based on what's in your inbox, calendar, and Slack right now.">
+        <Section title="Responsibilities worth delegating" subtitle="Ongoing jobs suggested only when your connected inbox, calendar, or Slack shows matching work.">
           <div className="grid gap-3 sm:grid-cols-2">
             {suggestions.map((s) => (
               <Card key={s.template} className="p-4 flex flex-col">
                 <p className="text-sm font-medium">{s.name}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex-1">{s.why}</p>
-                <button className={`${primaryBtn} mt-3 self-start`} onClick={() => add({ template: s.template })}>Take this on</button>
+                <button className={`${primaryBtn} mt-3 self-start`} onClick={() => add({ template: s.template })}>Make this a responsibility</button>
               </Card>
             ))}
           </div>
@@ -98,7 +98,7 @@ export default function ResponsibilitiesTab() {
 
       <Section title="What I'm responsible for" subtitle="Standing jobs I do without being asked each time.">
         {items.length === 0 ? (
-          <Empty title="No responsibilities yet">Pick a suggestion above, or tell me in chat: “From now on, handle inbound leads.”</Empty>
+          <Empty title="No ongoing responsibilities yet">Choose a responsibility backed by your connected work, or tell Coworker in chat: “Every weekday, draft replies to emails that need me.”</Empty>
         ) : (
           <div className="space-y-3">
             {items.map((r) => (
