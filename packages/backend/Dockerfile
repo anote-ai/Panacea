@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libgomp1 \
     ffmpeg \
+    espeak-ng \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -20,7 +21,8 @@ COPY . .
 # layers so a new commit does not force those layers to rebuild.
 ARG BUILD_SHA=unknown
 ARG APP_VERSION=1.0.0
-ENV PANACEA_BUILD_SHA=${BUILD_SHA} \
+ENV COWORKER_LOCAL_TTS=1 \
+    PANACEA_BUILD_SHA=${BUILD_SHA} \
     PANACEA_VERSION=${APP_VERSION}
 
 EXPOSE 5000

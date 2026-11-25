@@ -358,13 +358,14 @@ def test_bot_meeting_and_webhook(client, auth_headers, demo, monkeypatch):
         bad_token = pending["consentUrl"].rsplit("/", 1)[1]
         assert client.post(f"/api/coworker/meetings/consent/{bad_token}", json={"decision": "agree"}).status_code == 502
     with patch("coworker.voice.tts", side_effect=voice.VoiceError("TTS unavailable")), \
-            patch("coworker.connectors.recall.create_bot") as no_bot:
+            patch("coworker.connectors.recall.create_bot", return_value="bot-chat") as chat_bot:
         pending = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/10"},
                               headers=h).get_json()["meeting"]
         voice_token = pending["consentUrl"].rsplit("/", 1)[1]
-        failed = client.post(f"/api/coworker/meetings/consent/{voice_token}", json={"decision": "agree"})
-    assert failed.status_code == 502 and "TTS unavailable" in failed.get_json()["error"]
-    no_bot.assert_not_called()
+        joined = client.post(f"/api/coworker/meetings/consent/{voice_token}", json={"decision": "agree"})
+    assert joined.status_code == 200 and joined.get_json()["status"] == "active"
+    chat_bot.assert_called_once()
+    assert chat_bot.call_args.kwargs["greeting_mp3_b64"] is None
 
     with patch("coworker.connectors.recall.create_bot") as no_declined_bot:
         pending = client.post("/api/coworker/meetings", json={"mode": "bot", "meetingUrl": "https://zoom.us/j/11"},

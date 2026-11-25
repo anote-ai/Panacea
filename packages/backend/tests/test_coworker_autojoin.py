@@ -218,3 +218,27 @@ def test_helpers():
 def test_suggested_when_a_bot_is_configured(s):
     _event(s, "s1", 24 * 60)
     assert any(x["template"] == "auto_join" for x in responsibilities.suggestions(s, 1))
+
+
+def test_tts_payment_error_does_not_block_approved_join(s, chats):
+    from coworker.voice import VoiceError
+
+    resp = _resp(s, keywords=[])
+    _event(s, "tts-fallback", 20)
+    responsibilities.run_one(s, 1, resp)
+    meeting = s.query("SELECT * FROM cw_meetings WHERE user_id = 1")[0]
+    token = meeting["answers"]["consent_token"]
+    # Exercise the immediate consent path, rather than waiting for the scheduler.
+    s.update("cw_meetings", meeting["id"], 1, {
+        "answers": {**meeting["answers"], "consent_auto_start": True},
+    })
+    with patch("coworker.bot_media.greeting", side_effect=VoiceError("Text-to-speech failed (402)")), \
+            patch("coworker.connectors.recall.create_bot", return_value="bot-fallback") as create_bot:
+        joined = meeting_consent.decide(s, token, autojoin._secret(), True)
+        meeting_consent.decide(s, token, autojoin._secret(), True)
+    create_bot.assert_called_once()
+    assert create_bot.call_args.kwargs["greeting_mp3_b64"] is None
+    assert "say yes out loud" in create_bot.call_args.args[2]
+    assert joined["status"] == "active"
+    assert joined["metrics"]["audio_status"] == "chat_only"
+    assert joined["metrics"]["spoken_confirmation"] == "pending"

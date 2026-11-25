@@ -13,7 +13,7 @@ from typing import Any
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeSerializer, URLSafeTimedSerializer
 
-from coworker import bot_media
+from coworker import bot_media, voice
 from coworker.connectors import avatar_bridge, recall
 from coworker.store import Store, iso
 
@@ -126,7 +126,12 @@ def _start_bot(store: Store, user_id: int, meeting_id: int, secret: str) -> dict
     greeting = (f"Hi, I'm {first}'s AI coworker. I'm an AI, not {first}. "
                 "You approved the consent link before I joined. Before we begin, please confirm out loud that "
                 "you're okay with me participating and taking notes. Is that okay?")
-    audio = bot_media.greeting(store, user_id, greeting)
+    try:
+        audio = bot_media.greeting(store, user_id, greeting)
+    except voice.VoiceError:
+        # Voice is optional; the join chat must still request spoken consent.
+        log.warning("Greeting audio unavailable for meeting %s; using chat", meeting_id)
+        audio = None
     avatar = bot_media.camera_frame(store, user_id)
     avatar_session: dict[str, str] | None = None
     if avatar_bridge.is_configured() and audio:
@@ -146,7 +151,8 @@ def _start_bot(store: Store, user_id: int, meeting_id: int, secret: str) -> dict
         bot_id = recall.create_bot(
             meeting["meeting_url"], f"{first}'s AI coworker (Ourogen)",
             f"I'm {first}'s disclosed AI coworker. Link consent was recorded before I joined, and I'm asking for "
-            "spoken confirmation now. Say 'no' or 'please leave' and I will.", hook,
+            "spoken confirmation now. Please say yes out loud if you agree to my participation and note-taking. "
+            "Say 'no' or 'please leave' and I will.", hook,
             greeting_mp3_b64=None if avatar_session else audio,
             avatar_jpeg_b64=None if avatar_session else avatar,
             avatar_page_url=avatar_session["camera_url"] if avatar_session else None,
