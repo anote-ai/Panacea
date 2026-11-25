@@ -72,8 +72,7 @@ def _local_tts(text: str) -> bytes:
         wav = subprocess.run(
             ["espeak-ng", "--stdout", "-v", voice_name, "-s", str(speed), text[:2500]],
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=LOCAL_TIMEOUT,
         ).stdout
         mp3 = subprocess.run(
@@ -84,8 +83,7 @@ def _local_tts(text: str) -> bytes:
             ],
             input=wav,
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=LOCAL_TIMEOUT,
         ).stdout
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
