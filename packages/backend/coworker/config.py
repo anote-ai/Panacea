@@ -75,9 +75,9 @@ def check(env: Mapping[str, Any]) -> tuple[list[str], list[str]]:
         warnings.append("SLACK_SIGNING_SECRET is unset: Slack is polled every minute instead of answered in real time.")
     if not env.get("TWIN_S3_BUCKET"):
         warnings.append("TWIN_S3_BUCKET is unset: twin files and consent evidence will be stored on container disk.")
-    if not env.get("ANTHROPIC_API_KEY"):
-        warnings.append("ANTHROPIC_API_KEY is unset: the coworker uses the local model at OLLAMA_BASE_URL if it answers, "
-                        "otherwise its offline planner.")
+    if not any(env.get(key) for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")):
+        warnings.append("No hosted-model API key is set: the coworker uses the local model at OLLAMA_BASE_URL if it "
+                        "answers, otherwise its offline planner.")
     return errors, warnings
 
 

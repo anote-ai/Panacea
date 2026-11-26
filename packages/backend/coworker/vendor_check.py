@@ -44,10 +44,21 @@ def _http(name: str, url: str, headers: dict[str, str], describe: Callable[[dict
 
 def check_anthropic() -> dict[str, str]:
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        return _result("Anthropic", "skipped", "ANTHROPIC_API_KEY not set (offline planner)")
-    model = os.environ.get("COWORKER_MODEL", "claude-opus-5-5")
+        return _result("Anthropic", "skipped", "ANTHROPIC_API_KEY not set")
+    configured = os.environ.get("COWORKER_MODEL", "")
+    model = configured if configured.startswith("claude") else "claude-haiku-5-5"
     return _http("Anthropic", f"https://api.anthropic.com/v1/models/{model}",
                  {"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01"},
+                 lambda b: f"model {b.get('id', model)} available")
+
+
+def check_openai() -> dict[str, str]:
+    if not os.environ.get("OPENAI_API_KEY"):
+        return _result("OpenAI", "skipped", "OPENAI_API_KEY not set")
+    configured = os.environ.get("COWORKER_MODEL", "")
+    model = configured if configured.startswith(("gpt", "o1", "o3", "o4")) else "gpt-6-luna"
+    return _http("OpenAI", f"https://api.openai.com/v1/models/{model}",
+                 {"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
                  lambda b: f"model {b.get('id', model)} available")
 
 
@@ -260,7 +271,7 @@ def check_voiceprint() -> dict[str, str]:
     return _result("Voice match", "ok", f"{voiceprint.backend()} backend, ffmpeg available")
 
 
-CHECKS = [check_anthropic, check_elevenlabs, check_recall, check_tavus, check_google, check_microsoft, check_slack,
+CHECKS = [check_openai, check_anthropic, check_elevenlabs, check_recall, check_tavus, check_google, check_microsoft, check_slack,
           check_twilio, check_chat_bots, check_crms, check_smtp, check_s3, check_redis, check_voiceprint, check_public_url, check_worker]
 
 

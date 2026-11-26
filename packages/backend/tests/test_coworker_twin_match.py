@@ -126,7 +126,7 @@ def _resp(status: int, body: dict | None = None) -> MagicMock:
 
 
 def test_vendor_checks(monkeypatch):
-    for k in ("ANTHROPIC_API_KEY", "ELEVENLABS_API_KEY", "RECALL_API_KEY", "TAVUS_API_KEY", "TAVUS_REPLICA_ID",
+    for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ELEVENLABS_API_KEY", "RECALL_API_KEY", "TAVUS_API_KEY", "TAVUS_REPLICA_ID",
               "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SMTP_URL",
               "TWIN_S3_BUCKET", "REDIS_URL", "RATE_LIMIT_REDIS_URL", "APP_ENV", "MICROSOFT_CLIENT_ID",
               "MICROSOFT_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "BACKEND_URL", "RECALL_WORKSPACE_VERIFICATION_SECRET"):
@@ -152,6 +152,9 @@ def test_vendor_checks(monkeypatch):
                       vendor_check.check_tavus())
     assert a["status"] == e["status"] == r["status"] == t["status"] == "ok"
     assert "instant cloning allowed" in e["detail"] and "3 bots" in r["detail"] and "Natan" in t["detail"]
+    monkeypatch.setenv("OPENAI_API_KEY", "o")
+    with patch("requests.get", return_value=_resp(200, {"id": "gpt-6-luna"})):
+        assert vendor_check.check_openai()["status"] == "ok"
     with patch("requests.get", return_value=_resp(401, {})):
         assert "rejected" in vendor_check.check_elevenlabs()["detail"]
     with patch("requests.get", return_value=_resp(500, {})):

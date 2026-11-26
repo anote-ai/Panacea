@@ -165,8 +165,10 @@ def record(results: dict[str, Any], path: str = HISTORY) -> dict[str, Any]:
     """Append this run's scores to the history the dashboard reads."""
     row = {
         "at": iso(), "git": _git_sha(), "agent": agent_version(),
-        "model": os.environ.get("COWORKER_MODEL", "claude-opus-5-5"),
-        "mode": "offline" if os.environ.get("COWORKER_OFFLINE") == "1" or not os.environ.get("ANTHROPIC_API_KEY") else "llm",
+        "model": os.environ.get("COWORKER_MODEL", "gpt-6-luna"),
+        "mode": "offline" if os.environ.get("COWORKER_OFFLINE") == "1" or not any(
+            os.environ.get(k) for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
+        ) else "llm",
         "suites": {k: {"score": round(v["score"], 4), "n": v["n"]} for k, v in results.items()},
         "cases": sum(v["n"] for v in results.values()),
     }

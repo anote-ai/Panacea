@@ -156,9 +156,9 @@ def test_call_model_is_the_fast_sibling(s, monkeypatch):
     monkeypatch.delenv("COWORKER_CALL_MODEL", raising=False)
     monkeypatch.delenv("COWORKER_MODEL", raising=False)
     with patch("coworker.store.get_store", return_value=s):
-        assert llm.call_model(1) == "claude-haiku-5-5"
+        assert llm.call_model(1) == "gpt-6-luna"
         s.update_coworker(1, settings={"model": "gpt-4o"})
-        assert llm.call_model(1) == "gpt-4o-mini"
+        assert llm.call_model(1) == "gpt-6-luna"
         s.update_coworker(1, settings={"model": "llama3.1"})
         assert llm.call_model(1) == "llama3.1"
         monkeypatch.setenv("COWORKER_CALL_MODEL", "claude-sonnet-5-5")

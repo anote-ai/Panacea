@@ -203,7 +203,7 @@ def test_llm_create_message_kwargs(monkeypatch):
     client = MagicMock()
     client.messages.with_raw_response.create.return_value = raw
     with patch("anthropic.Anthropic", return_value=client), patch("services.usage.record_usage"):
-        assert llm.complete_text("hi") == "hello"
+        assert llm.complete_text("hi", model="claude-opus-5-5") == "hello"
     kwargs = client.messages.with_raw_response.create.call_args.kwargs
     assert kwargs["model"] == "claude-opus-5-5"
     assert kwargs["extra_body"]["fallbacks"] == "default"

@@ -119,7 +119,8 @@ For local Docker Compose, add keys to the repository's `.env`, then run `docker 
 
 | Add | You get |
 |---|---|
-| `ANTHROPIC_API_KEY=sk-ant-…` | Claude (`claude-opus-5-5`) for chat, drafting, Slack answers, and calls. It reasons freely instead of following the offline planner. |
+| `OPENAI_API_KEY=sk-…` | GPT-6 Luna, the low-cost default for chat, drafting, Slack answers, calls, and recurring tasks. |
+| `ANTHROPIC_API_KEY=sk-ant-…` | Claude models as optional higher-capability choices and a fallback when configured. If a provider runs out of balance, the coworker tries `COWORKER_FALLBACK_MODELS` automatically. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | **Your real Gmail, Calendar, and Drive.** See below. |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | **Your real Outlook mail and calendar** (Microsoft 365 or a personal Microsoft account). Setup is in [PILOT_LAUNCH.md](PILOT_LAUNCH.md#3-microsoft-365-outlook-mail-and-calendar). |
 | Slack user token | Paste an `xoxp-…` token in **Settings → Connections**, or set `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET` for OAuth. Slack requires an HTTPS redirect, so use a tunnel for local OAuth. Add `SLACK_SIGNING_SECRET` and Event Subscriptions for real-time answers instead of a one-minute poll. |

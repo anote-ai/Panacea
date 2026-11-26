@@ -15,7 +15,8 @@ Open `http://localhost:3000`, create an account, and you land in coworker onboar
 
 | Variable | Unlocks |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude for chat, drafting, and calls (default model `claude-opus-5-5`; override with `COWORKER_MODEL`). Without it, an offline planner handles the common requests. |
+| `OPENAI_API_KEY` | GPT-6 Luna for chat, drafting, calls, and recurring tasks (default model `gpt-6-luna`; override with `COWORKER_MODEL`). |
+| `ANTHROPIC_API_KEY` | Optional Claude models. When a provider's balance is exhausted, the coworker tries `COWORKER_FALLBACK_MODELS` in order. Without any hosted key, an offline planner handles common requests. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_COWORKER_REDIRECT_URI` | Your real Gmail, Calendar, and Drive |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT`, `MICROSOFT_REDIRECT_URI` | Your real Outlook mail and calendar (Microsoft 365 or a personal account), from an Entra ID app registration. The same app powers "Continue with Microsoft" sign-in (redirect URI `BACKEND_URL/auth/microsoft/callback`, override with `MICROSOFT_LOGIN_REDIRECT_URI`) |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | Slack OAuth. You can also paste a user token (`xoxp-…`) in Settings. |
@@ -34,12 +35,12 @@ Open `http://localhost:3000`, create an account, and you land in coworker onboar
 | `REDIS_URL` | Shared rate limits for public endpoints (pilot form, meeting webhook). Without Redis, limits are per process. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TWILIO_WHATSAPP_FROM`, `TWILIO_WEBHOOK_URL` | Text your coworker by SMS or WhatsApp, and approve by text. Point the number's webhook at `BACKEND_URL/api/coworker/sms/inbound` |
 | `COWORKER_INBOUND_DOMAIN`, `COWORKER_INBOUND_TOKEN`, `COWORKER_INBOUND_REQUIRE_AUTH` | Email your coworker: CC or forward to `<first name>@<domain>` (Postmark or SendGrid inbound webhook at `BACKEND_URL/api/coworker/email/inbound?token=…`) |
-| `COWORKER_MODEL_PRICES` | Optional. Prices for non-Claude models in per-task cost, as JSON: `{"gpt-4o": [2.5, 10]}` (USD per million input, output tokens) |
+| `COWORKER_MODEL_PRICES` | Optional. Prices for models not built into the meter, as JSON: `{"my-model": [2.5, 10]}` (USD per million input, output tokens) |
 | `MICROSOFT_BOT_APP_ID`, `MICROSOFT_BOT_APP_PASSWORD`, `MICROSOFT_BOT_TENANT` | Microsoft Teams bot (Azure Bot; endpoint `BACKEND_URL/api/coworker/teams/messages`) |
 | `GOOGLE_CHAT_AUDIENCE` | Google Chat app (HTTP endpoint `BACKEND_URL/api/coworker/gchat/events`; the project number) |
 | `SLACK_BOT_ENABLED` | The @mentionable Slack bot (see the launch guide for the Slack app settings) |
 | `EXPO_ACCESS_TOKEN`, `COWORKER_PUSH` | Mobile push through Expo (the token is optional, for enhanced push security). `COWORKER_PUSH=0` turns pushes off. |
-| `COWORKER_MODEL`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `COWORKER_EXTRA_MODELS` | Model choice. Users pick a model in **Settings → Model**: Claude (default `claude-opus-5-5`), OpenAI, Gemini, or a local Ollama model. A model is offered when the server has a key for it or the user added their own. `COWORKER_EXTRA_MODELS=openai:gpt-5,google:gemini-3-pro` adds ids. |
+| `COWORKER_MODEL`, `COWORKER_FALLBACK_MODELS`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `COWORKER_EXTRA_MODELS` | Model choice. Users pick a model in **Settings → Model**: OpenAI (default `gpt-6-luna`), Claude, Gemini, or a local Ollama model. A model is offered when the server has a key for it or the user added their own. `COWORKER_FALLBACK_MODELS` is a comma-separated failover order for exhausted balances. `COWORKER_EXTRA_MODELS=openai:gpt-6.2-sol,google:gemini-3-pro` adds ids. |
 | `STRIPE_PRICE_COWORKER`, `STRIPE_PRICE_COWORKER_CALLS`, `STRIPE_PRICE_COWORKER_TEAM` | Plan changes in **Settings → Plan & usage**. The first purchase goes through Checkout. Later upgrades and downgrades swap the subscription price, prorated. Moving to Free cancels at period end. Changes made in Stripe's billing portal sync back through the webhook. |
 | `VOICEPRINT_BACKEND`, `VOICEPRINT_REQUIRED` | Voice match before cloning: `local` (default, needs ffmpeg) or `resemblyzer`. `VOICEPRINT_REQUIRED=0` disables the check (development only). |
 | `COWORKER_SYNC_MODE` | `thread` (default) syncs on a background thread in the web process; `worker` leaves sync to `coworker-worker` |
