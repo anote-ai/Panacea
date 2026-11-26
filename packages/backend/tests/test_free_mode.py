@@ -14,13 +14,15 @@ from coworker.store import Store, iso, utcnow
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
-    for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "COWORKER_MODEL", "OLLAMA_MODEL",
+    for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "COWORKER_MODEL",
+              "COWORKER_FALLBACK_MODELS", "OLLAMA_MODEL",
               "TELEGRAM_WEBHOOK_SECRET", "TELEGRAM_BOT_USERNAME"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("COWORKER_OFFLINE", "1")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
     monkeypatch.setenv("TELEGRAM_BOT_USERNAME", "OurogenBot")
     llm._ollama_seen.clear()
+    llm._billing_blocked_until.clear()
     with patch("services.provider_keys.get_user_provider_key", return_value=None), \
             patch("coworker.channels._history", return_value=[]), patch("coworker.channels._store_turn", return_value=70), \
             patch("coworker.notify.deliver", return_value="gmail") as mail:
@@ -39,7 +41,7 @@ def s(tmp_path):
 # -- local model ----------------------------------------------------------------------------------
 
 def test_local_model_when_no_key(monkeypatch):
-    assert llm.model_name() == "claude-opus-5-5"  # no Ollama: unchanged (offline planner)
+    assert llm.model_name() == "gpt-6-luna"  # no Ollama: unchanged (offline planner)
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
     with patch("coworker.llm.ollama_up", return_value=True):
         assert llm.model_name() == "llama3.1" and llm.api_key_for() == "ollama"
@@ -47,10 +49,10 @@ def test_local_model_when_no_key(monkeypatch):
         assert llm.model_name() == "gpt-oss:20b" and llm.provider_of("gpt-oss:20b") == "ollama"
         assert llm.usable("claude-opus-5-5", None, ["claude-opus-5-5"]) == "claude-opus-5-5"  # org allows only Claude
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant")
-        assert llm.model_name() == "claude-opus-5-5"  # a key switches back on its own
+        assert llm.model_name() == "claude-haiku-5-5"  # use an available hosted fallback before local
     with patch("coworker.llm.ollama_up", return_value=False):
         monkeypatch.delenv("ANTHROPIC_API_KEY")
-        assert llm.model_name() == "claude-opus-5-5"
+        assert llm.model_name() == "gpt-6-luna"
 
 
 def test_explicit_model_falls_back_too(monkeypatch):

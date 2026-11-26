@@ -73,7 +73,8 @@ services:
       GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-http://127.0.0.1:5000/callback}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       BACKEND_URL: ${BACKEND_URL:-http://localhost:5000}
-      COWORKER_MODEL: ${COWORKER_MODEL:-claude-opus-5-5}
+      COWORKER_MODEL: ${COWORKER_MODEL:-gpt-6-luna}
+      COWORKER_FALLBACK_MODELS: ${COWORKER_FALLBACK_MODELS:-gpt-6-luna,gemini-2.5-flash,claude-haiku-5-5}
       COWORKER_EFFORT: ${COWORKER_EFFORT:-medium}
       COWORKER_OFFLINE: ${COWORKER_OFFLINE:-0}
       # An empty override uses BACKEND_URL, then the sign-in callback if needed.

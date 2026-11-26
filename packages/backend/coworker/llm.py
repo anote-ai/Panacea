@@ -13,23 +13,30 @@ raw-response path and kept as plain JSON so every content block (including
 ``thinking`` and ``fallback`` blocks that newer models return) can be sent
 back unchanged on the next turn of a tool-use loop.
 
-Defaults follow current guidance: ``claude-opus-5-5`` with an explicit
-effort level and server-side refusal fallbacks. Override the model with
+The default is OpenAI's inexpensive ``gpt-6-luna``, which is suited to
+frequent bounded work such as inbox triage. If a provider rejects a request
+because its balance is exhausted, the call is retried on the first configured
+model in ``COWORKER_FALLBACK_MODELS``. Override the default model with
 ``COWORKER_MODEL``.
 """
 from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import os
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-DEFAULT_MODEL = "claude-opus-5-5"
-# USD per million tokens: (input, output, cache read). Anthropic list prices; other providers are
-# unpriced (tokens are still counted) unless COWORKER_MODEL_PRICES='{"gpt-4o": [2.5, 10]}' sets them.
+DEFAULT_MODEL = "gpt-6-luna"
+DEFAULT_FALLBACK_MODELS = ("gpt-6-luna", "gemini-2.5-flash", "claude-haiku-5-5")
+BILLING_BACKOFF_SECONDS = 15 * 60
+# USD per million tokens: (input, output, cache read). Models not listed here are unpriced
+# (tokens are still counted) unless COWORKER_MODEL_PRICES='{"model": [input, output]}' sets them.
 PRICES_PER_MTOK: dict[str, tuple[float, float, float]] = {
+    "gpt-6-luna": (0.10, 0.50, 0.01),
     "claude-fable-5-1": (10.0, 50.0, 0.25),
     "claude-opus-5-5": (4.0, 20.0, 0.20),
     "claude-opus-5": (5.0, 25.0, 0.50),
@@ -38,10 +45,15 @@ PRICES_PER_MTOK: dict[str, tuple[float, float, float]] = {
 }
 _usage_scope: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("coworker_usage", default=None)
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+log = logging.getLogger("coworker.llm")
+# A depleted provider would otherwise be called once for every tool step. Scope the
+# short circuit to one user because users can bring their own provider keys.
+_billing_blocked_until: dict[tuple[str, int | None], float] = {}
 
 
 MODELS: list[dict[str, str]] = [
-    {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "provider": "anthropic", "note": "Most capable (default)"},
+    {"id": "gpt-6-luna", "label": "GPT-6 Luna", "provider": "openai", "note": "Lowest cost (default)"},
+    {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "provider": "anthropic", "note": "Most capable"},
     {"id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "provider": "anthropic", "note": "Fast and capable"},
     {"id": "claude-haiku-5-5", "label": "Claude Haiku 5.5", "provider": "anthropic", "note": "Fastest, lowest cost"},
     {"id": "gpt-4o", "label": "GPT-4o", "provider": "openai", "note": "OpenAI"},
@@ -108,19 +120,73 @@ def free_model() -> str:
     return os.environ.get("OLLAMA_MODEL") or "llama3.1"
 
 
-def usable(model: str, user_id: int | None = None, allowed: list[str] | None = None) -> str:
-    """``model`` if its provider has a key; otherwise the free local model when Ollama is set up.
+def _allowed_models(user_id: int | None) -> list[str]:
+    if user_id is None:
+        return []
+    try:
+        from coworker import orgs
+        from coworker.store import get_store
 
-    So the coworker runs with no API keys at all, and switches back to the chosen model on its own
-    once a key is added. An organization that restricts models only falls back to an allowed one.
+        return orgs.allowed_models(get_store(), user_id)
+    except Exception:  # pragma: no cover - model routing must not depend on a policy lookup
+        return []
+
+
+def _fallback_candidates() -> list[str]:
+    raw = os.environ.get("COWORKER_FALLBACK_MODELS", ",".join(DEFAULT_FALLBACK_MODELS))
+    return list(dict.fromkeys(model.strip() for model in raw.split(",") if model.strip()))
+
+
+def _billing_blocked(provider: str, user_id: int | None) -> bool:
+    until = _billing_blocked_until.get((provider, user_id), 0)
+    if until <= time.monotonic():
+        _billing_blocked_until.pop((provider, user_id), None)
+        return False
+    return True
+
+
+def _fallback_model(
+    model: str,
+    user_id: int | None,
+    allowed: list[str] | None = None,
+    *,
+    exclude_models: set[str] | None = None,
+    exclude_providers: set[str] | None = None,
+) -> str | None:
+    """First configured lower-cost fallback that policy permits."""
+    allowed = _allowed_models(user_id) if allowed is None else allowed
+    excluded_models = exclude_models or set()
+    excluded_providers = exclude_providers or set()
+    for candidate in _fallback_candidates():
+        provider = provider_of(candidate)
+        if candidate == model or candidate in excluded_models or provider in excluded_providers:
+            continue
+        if allowed and candidate not in allowed:
+            continue
+        if not _billing_blocked(provider, user_id) and key_for(provider, user_id):
+            return candidate
+    return None
+
+
+def usable(model: str, user_id: int | None = None, allowed: list[str] | None = None) -> str:
+    """``model`` if its provider has a key, else another configured provider or local Ollama.
+
+    The coworker therefore uses an available paid provider before dropping to the
+    offline planner, and switches back to the chosen model once its key is added.
+    An organization that restricts models only falls back to an allowed one.
     """
-    if key_for(provider_of(model), user_id) or not ollama_up():
+    if key_for(provider_of(model), user_id):
+        return model
+    fallback = _fallback_model(model, user_id, allowed)
+    if fallback:
+        return fallback
+    if not ollama_up():
         return model
     free = free_model()
     return free if not allowed or free in allowed else model
 
 
-FAST_MODELS = {"anthropic": "claude-haiku-5-5", "openai": "gpt-4o-mini", "google": "gemini-2.5-flash"}
+FAST_MODELS = {"anthropic": "claude-haiku-5-5", "openai": "gpt-6-luna", "google": "gemini-2.5-flash"}
 
 
 def call_model(user_id: int | None = None) -> str:
@@ -217,8 +283,52 @@ def create_message(
     effort: str | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
-    """One Messages API call. Returns the response as a JSON dict."""
+    """One Messages API call, with cross-provider failover for exhausted balances."""
     model = usable(model, user_id) if model else model_name(user_id)
+    provider = provider_of(model)
+    if _billing_blocked(provider, user_id):
+        fallback = _fallback_model(model, user_id, exclude_providers={provider})
+        if fallback:
+            model = fallback
+    attempted: set[str] = set()
+    while True:
+        attempted.add(model)
+        try:
+            return _create_message_once(system=system, messages=messages, tools=tools, user_id=user_id,
+                                        max_tokens=max_tokens, effort=effort, model=model)
+        except Exception as exc:
+            provider = provider_of(model)
+            if not _is_billing_error(exc):
+                raise
+            _billing_blocked_until[(provider, user_id)] = time.monotonic() + BILLING_BACKOFF_SECONDS
+            fallback = _fallback_model(model, user_id, exclude_models=attempted, exclude_providers={provider})
+            if not fallback:
+                raise
+            log.warning("%s balance unavailable for user %s; retrying with %s", provider, user_id, fallback)
+            model = fallback
+
+
+def _is_billing_error(exc: Exception) -> bool:
+    details = " ".join(str(value) for value in (
+        exc, getattr(exc, "body", ""), getattr(exc, "error", ""), getattr(exc, "response", "")
+    )).lower()
+    return any(marker in details for marker in (
+        "credit balance is too low", "credit balance too low", "insufficient_quota",
+        "billing hard limit", "payment_required", "purchase credits", "billing quota",
+    ))
+
+
+def _create_message_once(
+    *,
+    system: str,
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
+    user_id: int | None,
+    max_tokens: int,
+    effort: str | None,
+    model: str,
+) -> dict[str, Any]:
+    """Dispatch one request to the provider for ``model``."""
     provider = provider_of(model)
     if provider != "anthropic":
         translated = _openai_compatible(provider, model, system=system, messages=messages, tools=tools,
@@ -379,8 +489,15 @@ def _openai_compatible(provider: str, model: str, *, system: str, messages: list
     if provider == "ollama":
         base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/") + "/v1"
     client = OpenAI(api_key=key_for(provider, user_id) or "none", base_url=base, max_retries=2, timeout=300)
-    kwargs: dict[str, Any] = {"model": model, "messages": to_openai_messages(system, messages),
-                              "max_tokens": min(max_tokens, 8000)}
+    kwargs: dict[str, Any] = {"model": model, "messages": to_openai_messages(system, messages)}
+    if model.startswith("gpt-6-luna"):
+        kwargs["max_completion_tokens"] = min(max_tokens, 8000)
+        # Luna's Chat Completions endpoint supports function calling only at
+        # reasoning_effort=none. extra_body keeps this compatible with the
+        # currently pinned OpenAI SDK, whose older type only knows low/medium/high.
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
+    else:
+        kwargs["max_tokens"] = min(max_tokens, 8000)
     if tools:
         kwargs["tools"] = to_openai_tools(tools)
     resp = client.chat.completions.create(**kwargs)

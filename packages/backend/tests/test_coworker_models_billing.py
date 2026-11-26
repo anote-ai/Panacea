@@ -13,9 +13,10 @@ from coworker.store import Store
 @pytest.fixture
 def s(tmp_path, monkeypatch):
     for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OLLAMA_BASE_URL",
-              "COWORKER_OFFLINE", "COWORKER_MODEL", "COWORKER_EXTRA_MODELS", "STRIPE_SECRET_KEY",
+              "COWORKER_OFFLINE", "COWORKER_MODEL", "COWORKER_FALLBACK_MODELS", "COWORKER_EXTRA_MODELS", "STRIPE_SECRET_KEY",
               "STRIPE_PRICE_COWORKER", "STRIPE_PRICE_COWORKER_CALLS", "STRIPE_PRICE_COWORKER_TEAM"):
         monkeypatch.delenv(k, raising=False)
+    llm._billing_blocked_until.clear()
     store = Store(f"sqlite:///{tmp_path}/m.db")
     store.create_coworker(1, "Natan Vidra", "natan@anote.ai", mode="demo")
     with patch("coworker.store.get_store", return_value=store), \
@@ -28,7 +29,7 @@ def s(tmp_path, monkeypatch):
 def test_catalog_availability_and_selection(s, monkeypatch):
     models = {m["id"]: m for m in llm.models_for(1)}
     assert not any(m["available"] for m in models.values())
-    assert models["claude-opus-5-5"]["selected"]
+    assert models["gpt-6-luna"]["selected"]
     monkeypatch.setenv("OPENAI_API_KEY", "sk")
     monkeypatch.setenv("COWORKER_EXTRA_MODELS", "openai:gpt-5, bogus, nope:x")
     models = {m["id"]: m for m in llm.models_for(1)}
@@ -90,7 +91,7 @@ def test_create_message_dispatches_by_provider(s, monkeypatch):
     assert ctor.call_args.kwargs["api_key"] == "gk"
     s.update_coworker(1, settings={"model": "llama3.1"})
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434/")
-    with patch("openai.OpenAI", return_value=fake) as ctor:
+    with patch("coworker.llm.ollama_up", return_value=True), patch("openai.OpenAI", return_value=fake) as ctor:
         llm.create_message(system="s", messages=[{"role": "user", "content": "x"}], tools=[{"name": "t", "input_schema": {}}],
                            user_id=1)
     assert ctor.call_args.kwargs["base_url"] == "http://ollama:11434/v1"
@@ -104,6 +105,30 @@ def test_create_message_dispatches_by_provider(s, monkeypatch):
         assert llm.complete_text("hi", user_id=1) == "ok"
     kwargs = anth.return_value.messages.with_raw_response.create.call_args.kwargs
     assert kwargs["model"] == "claude-haiku-5-5" and "output_config" not in kwargs["extra_body"]
+
+
+def test_exhausted_anthropic_balance_falls_back_to_luna(s, monkeypatch):
+    s.update_coworker(1, settings={"model": "claude-opus-5-5"})
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ak")
+    monkeypatch.setenv("OPENAI_API_KEY", "ok")
+    openai = MagicMock()
+    openai.chat.completions.create.return_value.model_dump.return_value = {
+        "model": "gpt-6-luna", "usage": {"prompt_tokens": 10, "completion_tokens": 3},
+        "choices": [{"finish_reason": "stop", "message": {"content": "Inbox handled."}}],
+    }
+    with patch("anthropic.Anthropic") as anthropic, patch("openai.OpenAI", return_value=openai):
+        anthropic.return_value.messages.with_raw_response.create.side_effect = RuntimeError(
+            "Your credit balance is too low to access the Anthropic API. Please purchase credits."
+        )
+        first = llm.create_message(system="s", messages=[{"role": "user", "content": "triage"}],
+                                   tools=[{"name": "search", "input_schema": {}}], user_id=1)
+        second = llm.create_message(system="s", messages=[{"role": "user", "content": "triage again"}],
+                                    tools=[{"name": "search", "input_schema": {}}], user_id=1)
+    assert llm.text_of(first) == "Inbox handled." and llm.text_of(second) == "Inbox handled."
+    assert anthropic.return_value.messages.with_raw_response.create.call_count == 1
+    kwargs = openai.chat.completions.create.call_args.kwargs
+    assert kwargs["model"] == "gpt-6-luna" and kwargs["max_completion_tokens"] == 8000
+    assert kwargs["extra_body"] == {"reasoning_effort": "none"} and "tools" in kwargs
 
 
 def test_brain_runs_on_openai_compatible_model(s, monkeypatch):
@@ -137,7 +162,7 @@ def test_model_routes(client, auth_headers, monkeypatch):
          patch("services.provider_keys.get_user_provider_key", return_value=None):
         client.post("/api/coworker", json={"mode": "demo"}, headers=auth_headers)
         body = client.get("/api/coworker/models", headers=auth_headers).get_json()
-        assert body["default"] == "claude-opus-5-5" and len(body["models"]) >= 8
+        assert body["default"] == "gpt-6-luna" and len(body["models"]) >= 9
         assert client.patch("/api/coworker", json={"settings": {"model": "nope"}}, headers=auth_headers).status_code == 400
         r = client.patch("/api/coworker", json={"settings": {"model": "gpt-4o"}}, headers=auth_headers)
         assert r.status_code == 400 and r.get_json()["code"] == "key_required"

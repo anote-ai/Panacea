@@ -55,7 +55,7 @@ Each scheduled task's card shows its last 30 days:
 
 Team admins see each member's scheduled-task AI spend in **Team**.
 
-Costs use list prices for Claude models. For other providers the card shows usage without a dollar amount, unless your operator sets prices with `COWORKER_MODEL_PRICES`.
+Costs use built-in list prices for Claude models and GPT-6 Luna. For other providers the card shows usage without a dollar amount, unless your operator sets prices with `COWORKER_MODEL_PRICES`.
 
 ## What happens on each run
 

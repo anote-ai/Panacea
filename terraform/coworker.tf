@@ -9,7 +9,13 @@ variable "backend_url" {
 
 variable "coworker_model" {
   type    = string
-  default = "claude-opus-5-5"
+  default = "gpt-6-luna"
+}
+
+variable "coworker_fallback_models" {
+  description = "Comma-separated models tried when the selected provider has no usable balance"
+  type        = string
+  default     = "gpt-6-luna,gemini-2.5-flash,claude-haiku-5-5"
 }
 
 variable "coworker_effort" {
@@ -209,6 +215,7 @@ locals {
   coworker_environment = [
     { name = "BACKEND_URL", value = var.backend_url },
     { name = "COWORKER_MODEL", value = var.coworker_model },
+    { name = "COWORKER_FALLBACK_MODELS", value = var.coworker_fallback_models },
     { name = "COWORKER_EFFORT", value = var.coworker_effort },
     { name = "COWORKER_ENFORCE_PLANS", value = var.coworker_enforce_plans },
     { name = "GOOGLE_COWORKER_REDIRECT_URI", value = "${var.backend_url}/api/coworker/connections/google/callback" },
